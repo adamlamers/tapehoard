@@ -19,6 +19,108 @@ export type BatchTrackRequest = {
 };
 
 /**
+ * CartItemSchema
+ */
+export type CartItemSchema = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * File Path
+     */
+    file_path: string;
+    /**
+     * Size
+     */
+    size: number;
+    /**
+     * Media Identifiers
+     */
+    media_identifiers: Array<string>;
+};
+
+/**
+ * DashboardStatsSchema
+ */
+export type DashboardStatsSchema = {
+    /**
+     * Total Files Indexed
+     */
+    total_files_indexed: number;
+    /**
+     * Total Data Size
+     */
+    total_data_size: number;
+    /**
+     * Tracked Paths Count
+     */
+    tracked_paths_count: number;
+    /**
+     * Unprotected Files Count
+     */
+    unprotected_files_count: number;
+    /**
+     * Unprotected Data Size
+     */
+    unprotected_data_size: number;
+    /**
+     * Ignored Files Count
+     */
+    ignored_files_count: number;
+    /**
+     * Ignored Data Size
+     */
+    ignored_data_size: number;
+    /**
+     * Redundancy Ratio
+     */
+    redundancy_ratio: number;
+    /**
+     * Last Scan Time
+     */
+    last_scan_time: string | null;
+    /**
+     * Media Distribution
+     */
+    media_distribution: {
+        [key: string]: number;
+    };
+};
+
+/**
+ * DirectoryCartRequest
+ */
+export type DirectoryCartRequest = {
+    /**
+     * Path
+     */
+    path: string;
+};
+
+/**
+ * FileVersionSchema
+ */
+export type FileVersionSchema = {
+    /**
+     * Media Identifier
+     */
+    media_identifier: string;
+    /**
+     * Media Type
+     */
+    media_type: string;
+    /**
+     * File Number
+     */
+    file_number: string;
+    /**
+     * Timestamp
+     */
+    timestamp: string;
+};
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -29,17 +131,267 @@ export type HttpValidationError = {
 };
 
 /**
- * TrackToggleRequest
+ * ItemMetadataSchema
  */
-export type TrackToggleRequest = {
+export type ItemMetadataSchema = {
     /**
-     * Path
+     * Id
      */
-    path: string;
+    id?: number | null;
     /**
-     * Is Directory
+     * File Path
      */
-    is_directory?: boolean;
+    file_path: string;
+    /**
+     * Type
+     */
+    type: string;
+    /**
+     * Size
+     */
+    size: number;
+    /**
+     * Mtime
+     */
+    mtime: number;
+    /**
+     * Last Seen Timestamp
+     */
+    last_seen_timestamp: string;
+    /**
+     * Sha256 Hash
+     */
+    sha256_hash?: string | null;
+    /**
+     * Versions
+     */
+    versions?: Array<FileVersionSchema>;
+    /**
+     * Child Count
+     */
+    child_count?: number | null;
+};
+
+/**
+ * JobSchema
+ */
+export type JobSchema = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Job Type
+     */
+    job_type: string;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Progress
+     */
+    progress: number;
+    /**
+     * Current Task
+     */
+    current_task: string | null;
+    /**
+     * Error Message
+     */
+    error_message: string | null;
+    /**
+     * Started At
+     */
+    started_at: string | null;
+    /**
+     * Completed At
+     */
+    completed_at: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+};
+
+/**
+ * ManifestMediaRequirement
+ */
+export type ManifestMediaRequirement = {
+    /**
+     * Identifier
+     */
+    identifier: string;
+    /**
+     * Media Type
+     */
+    media_type: string;
+    /**
+     * File Count
+     */
+    file_count: number;
+    /**
+     * Total Size
+     */
+    total_size: number;
+};
+
+/**
+ * MediaCreateSchema
+ */
+export type MediaCreateSchema = {
+    /**
+     * Media Type
+     */
+    media_type: string;
+    /**
+     * Identifier
+     */
+    identifier: string;
+    /**
+     * Generation Tier
+     */
+    generation_tier?: string | null;
+    /**
+     * Capacity
+     */
+    capacity: number;
+    /**
+     * Location
+     */
+    location?: string | null;
+    /**
+     * Config
+     */
+    config?: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * MediaSchema
+ */
+export type MediaSchema = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Media Type
+     */
+    media_type: string;
+    /**
+     * Identifier
+     */
+    identifier: string;
+    /**
+     * Generation Tier
+     */
+    generation_tier: string | null;
+    /**
+     * Capacity
+     */
+    capacity: number;
+    /**
+     * Bytes Used
+     */
+    bytes_used: number;
+    /**
+     * Location
+     */
+    location: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Config
+     */
+    config: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * MediaUpdateSchema
+ */
+export type MediaUpdateSchema = {
+    /**
+     * Status
+     */
+    status?: string | null;
+    /**
+     * Location
+     */
+    location?: string | null;
+    /**
+     * Config
+     */
+    config?: {
+        [key: string]: unknown;
+    } | null;
+};
+
+/**
+ * RestoreManifestSchema
+ */
+export type RestoreManifestSchema = {
+    /**
+     * Total Files
+     */
+    total_files: number;
+    /**
+     * Total Size
+     */
+    total_size: number;
+    /**
+     * Media Required
+     */
+    media_required: Array<ManifestMediaRequirement>;
+};
+
+/**
+ * ScanStatusSchema
+ */
+export type ScanStatusSchema = {
+    /**
+     * Is Running
+     */
+    is_running: boolean;
+    /**
+     * Files Processed
+     */
+    files_processed: number;
+    /**
+     * Files Hashed
+     */
+    files_hashed: number;
+    /**
+     * Total Files Found
+     */
+    total_files_found: number;
+    /**
+     * Current Path
+     */
+    current_path: string;
+    /**
+     * Last Run Time
+     */
+    last_run_time?: string | null;
+};
+
+/**
+ * SettingSchema
+ */
+export type SettingSchema = {
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Value
+     */
+    value: string;
 };
 
 /**
@@ -146,7 +498,131 @@ export type AppApiSystemFileItemSchema = {
      * Tracked
      */
     tracked?: boolean;
+    /**
+     * Ignored
+     */
+    ignored?: boolean;
 };
+
+export type GetDashboardStatsSystemDashboardStatsGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/dashboard/stats';
+};
+
+export type GetDashboardStatsSystemDashboardStatsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: DashboardStatsSchema;
+};
+
+export type GetDashboardStatsSystemDashboardStatsGetResponse = GetDashboardStatsSystemDashboardStatsGetResponses[keyof GetDashboardStatsSystemDashboardStatsGetResponses];
+
+export type ListJobsSystemJobsGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/system/jobs';
+};
+
+export type ListJobsSystemJobsGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListJobsSystemJobsGetError = ListJobsSystemJobsGetErrors[keyof ListJobsSystemJobsGetErrors];
+
+export type ListJobsSystemJobsGetResponses = {
+    /**
+     * Response List Jobs System Jobs Get
+     *
+     * Successful Response
+     */
+    200: Array<JobSchema>;
+};
+
+export type ListJobsSystemJobsGetResponse = ListJobsSystemJobsGetResponses[keyof ListJobsSystemJobsGetResponses];
+
+export type CancelJobSystemJobsJobIdCancelPostData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: number;
+    };
+    query?: never;
+    url: '/system/jobs/{job_id}/cancel';
+};
+
+export type CancelJobSystemJobsJobIdCancelPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CancelJobSystemJobsJobIdCancelPostError = CancelJobSystemJobsJobIdCancelPostErrors[keyof CancelJobSystemJobsJobIdCancelPostErrors];
+
+export type CancelJobSystemJobsJobIdCancelPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type StreamJobsSystemJobsStreamGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/jobs/stream';
+};
+
+export type StreamJobsSystemJobsStreamGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type TriggerScanSystemScanPostData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/scan';
+};
+
+export type TriggerScanSystemScanPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type GetScanStatusSystemScanStatusGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/scan/status';
+};
+
+export type GetScanStatusSystemScanStatusGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: ScanStatusSchema;
+};
+
+export type GetScanStatusSystemScanStatusGetResponse = GetScanStatusSystemScanStatusGetResponses[keyof GetScanStatusSystemScanStatusGetResponses];
 
 export type BrowsePathSystemBrowseGetData = {
     body?: never;
@@ -155,7 +631,7 @@ export type BrowsePathSystemBrowseGetData = {
         /**
          * Path
          */
-        path?: string;
+        path?: string | null;
     };
     url: '/system/browse';
 };
@@ -180,29 +656,6 @@ export type BrowsePathSystemBrowseGetResponses = {
 
 export type BrowsePathSystemBrowseGetResponse = BrowsePathSystemBrowseGetResponses[keyof BrowsePathSystemBrowseGetResponses];
 
-export type TrackPathSystemTrackPostData = {
-    body: TrackToggleRequest;
-    path?: never;
-    query?: never;
-    url: '/system/track';
-};
-
-export type TrackPathSystemTrackPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type TrackPathSystemTrackPostError = TrackPathSystemTrackPostErrors[keyof TrackPathSystemTrackPostErrors];
-
-export type TrackPathSystemTrackPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
 export type TrackBatchSystemTrackBatchPostData = {
     body: BatchTrackRequest;
     path?: never;
@@ -226,6 +679,49 @@ export type TrackBatchSystemTrackBatchPostResponses = {
     200: unknown;
 };
 
+export type GetSettingsSystemSettingsGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/settings';
+};
+
+export type GetSettingsSystemSettingsGetResponses = {
+    /**
+     * Response Get Settings System Settings Get
+     *
+     * Successful Response
+     */
+    200: {
+        [key: string]: string;
+    };
+};
+
+export type GetSettingsSystemSettingsGetResponse = GetSettingsSystemSettingsGetResponses[keyof GetSettingsSystemSettingsGetResponses];
+
+export type UpdateSettingSystemSettingsPostData = {
+    body: SettingSchema;
+    path?: never;
+    query?: never;
+    url: '/system/settings';
+};
+
+export type UpdateSettingSystemSettingsPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateSettingSystemSettingsPostError = UpdateSettingSystemSettingsPostErrors[keyof UpdateSettingSystemSettingsPostErrors];
+
+export type UpdateSettingSystemSettingsPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type GetTreeSystemTreeGetData = {
     body?: never;
     path?: never;
@@ -233,7 +729,7 @@ export type GetTreeSystemTreeGetData = {
         /**
          * Path
          */
-        path?: string;
+        path?: string | null;
     };
     url: '/system/tree';
 };
@@ -249,14 +745,111 @@ export type GetTreeSystemTreeGetError = GetTreeSystemTreeGetErrors[keyof GetTree
 
 export type GetTreeSystemTreeGetResponses = {
     /**
-     * Response Get Tree System Tree Get
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ListMediaInventoryMediaGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/inventory/media';
+};
+
+export type ListMediaInventoryMediaGetResponses = {
+    /**
+     * Response List Media Inventory Media Get
      *
      * Successful Response
      */
-    200: Array<TreeNodeSchema>;
+    200: Array<MediaSchema>;
 };
 
-export type GetTreeSystemTreeGetResponse = GetTreeSystemTreeGetResponses[keyof GetTreeSystemTreeGetResponses];
+export type ListMediaInventoryMediaGetResponse = ListMediaInventoryMediaGetResponses[keyof ListMediaInventoryMediaGetResponses];
+
+export type RegisterMediaInventoryMediaPostData = {
+    body: MediaCreateSchema;
+    path?: never;
+    query?: never;
+    url: '/inventory/media';
+};
+
+export type RegisterMediaInventoryMediaPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RegisterMediaInventoryMediaPostError = RegisterMediaInventoryMediaPostErrors[keyof RegisterMediaInventoryMediaPostErrors];
+
+export type RegisterMediaInventoryMediaPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: MediaSchema;
+};
+
+export type RegisterMediaInventoryMediaPostResponse = RegisterMediaInventoryMediaPostResponses[keyof RegisterMediaInventoryMediaPostResponses];
+
+export type DeleteMediaInventoryMediaMediaIdDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * Media Id
+         */
+        media_id: number;
+    };
+    query?: never;
+    url: '/inventory/media/{media_id}';
+};
+
+export type DeleteMediaInventoryMediaMediaIdDeleteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteMediaInventoryMediaMediaIdDeleteError = DeleteMediaInventoryMediaMediaIdDeleteErrors[keyof DeleteMediaInventoryMediaMediaIdDeleteErrors];
+
+export type DeleteMediaInventoryMediaMediaIdDeleteResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type UpdateMediaInventoryMediaMediaIdPatchData = {
+    body: MediaUpdateSchema;
+    path: {
+        /**
+         * Media Id
+         */
+        media_id: number;
+    };
+    query?: never;
+    url: '/inventory/media/{media_id}';
+};
+
+export type UpdateMediaInventoryMediaMediaIdPatchErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateMediaInventoryMediaMediaIdPatchError = UpdateMediaInventoryMediaMediaIdPatchErrors[keyof UpdateMediaInventoryMediaMediaIdPatchErrors];
+
+export type UpdateMediaInventoryMediaMediaIdPatchResponses = {
+    /**
+     * Successful Response
+     */
+    200: MediaSchema;
+};
+
+export type UpdateMediaInventoryMediaMediaIdPatchResponse = UpdateMediaInventoryMediaMediaIdPatchResponses[keyof UpdateMediaInventoryMediaMediaIdPatchResponses];
 
 export type BrowseIndexInventoryBrowseGetData = {
     body?: never;
@@ -265,7 +858,11 @@ export type BrowseIndexInventoryBrowseGetData = {
         /**
          * Path
          */
-        path?: string;
+        path?: string | null;
+        /**
+         * Include Ignored
+         */
+        include_ignored?: boolean;
     };
     url: '/inventory/browse';
 };
@@ -290,6 +887,114 @@ export type BrowseIndexInventoryBrowseGetResponses = {
 
 export type BrowseIndexInventoryBrowseGetResponse = BrowseIndexInventoryBrowseGetResponses[keyof BrowseIndexInventoryBrowseGetResponses];
 
+export type GetIndexTreeInventoryTreeGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Path
+         */
+        path?: string | null;
+        /**
+         * Include Ignored
+         */
+        include_ignored?: boolean;
+    };
+    url: '/inventory/tree';
+};
+
+export type GetIndexTreeInventoryTreeGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetIndexTreeInventoryTreeGetError = GetIndexTreeInventoryTreeGetErrors[keyof GetIndexTreeInventoryTreeGetErrors];
+
+export type GetIndexTreeInventoryTreeGetResponses = {
+    /**
+     * Response Get Index Tree Inventory Tree Get
+     *
+     * Successful Response
+     */
+    200: Array<TreeNodeSchema>;
+};
+
+export type GetIndexTreeInventoryTreeGetResponse = GetIndexTreeInventoryTreeGetResponses[keyof GetIndexTreeInventoryTreeGetResponses];
+
+export type GetItemMetadataInventoryMetadataGetData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Path
+         */
+        path: string;
+    };
+    url: '/inventory/metadata';
+};
+
+export type GetItemMetadataInventoryMetadataGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetItemMetadataInventoryMetadataGetError = GetItemMetadataInventoryMetadataGetErrors[keyof GetItemMetadataInventoryMetadataGetErrors];
+
+export type GetItemMetadataInventoryMetadataGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: ItemMetadataSchema;
+};
+
+export type GetItemMetadataInventoryMetadataGetResponse = GetItemMetadataInventoryMetadataGetResponses[keyof GetItemMetadataInventoryMetadataGetResponses];
+
+export type ListInventoryInventoryGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/inventory/';
+};
+
+export type ListInventoryInventoryGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type TriggerBackupBackupsTriggerMediaIdPostData = {
+    body?: never;
+    path: {
+        /**
+         * Media Id
+         */
+        media_id: number;
+    };
+    query?: never;
+    url: '/backups/trigger/{media_id}';
+};
+
+export type TriggerBackupBackupsTriggerMediaIdPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TriggerBackupBackupsTriggerMediaIdPostError = TriggerBackupBackupsTriggerMediaIdPostErrors[keyof TriggerBackupBackupsTriggerMediaIdPostErrors];
+
+export type TriggerBackupBackupsTriggerMediaIdPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type ListBackupsBackupsGetData = {
     body?: never;
     path?: never;
@@ -303,6 +1008,133 @@ export type ListBackupsBackupsGetResponses = {
      */
     200: unknown;
 };
+
+export type ListCartRestoresCartGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/restores/cart';
+};
+
+export type ListCartRestoresCartGetResponses = {
+    /**
+     * Response List Cart Restores Cart Get
+     *
+     * Successful Response
+     */
+    200: Array<CartItemSchema>;
+};
+
+export type ListCartRestoresCartGetResponse = ListCartRestoresCartGetResponses[keyof ListCartRestoresCartGetResponses];
+
+export type AddToCartRestoresCartFileIdPostData = {
+    body?: never;
+    path: {
+        /**
+         * File Id
+         */
+        file_id: number;
+    };
+    query?: never;
+    url: '/restores/cart/{file_id}';
+};
+
+export type AddToCartRestoresCartFileIdPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddToCartRestoresCartFileIdPostError = AddToCartRestoresCartFileIdPostErrors[keyof AddToCartRestoresCartFileIdPostErrors];
+
+export type AddToCartRestoresCartFileIdPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type AddDirectoryToCartRestoresCartDirectoryPostData = {
+    body: DirectoryCartRequest;
+    path?: never;
+    query?: never;
+    url: '/restores/cart/directory';
+};
+
+export type AddDirectoryToCartRestoresCartDirectoryPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddDirectoryToCartRestoresCartDirectoryPostError = AddDirectoryToCartRestoresCartDirectoryPostErrors[keyof AddDirectoryToCartRestoresCartDirectoryPostErrors];
+
+export type AddDirectoryToCartRestoresCartDirectoryPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type RemoveFromCartRestoresCartItemIdDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: number;
+    };
+    query?: never;
+    url: '/restores/cart/{item_id}';
+};
+
+export type RemoveFromCartRestoresCartItemIdDeleteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RemoveFromCartRestoresCartItemIdDeleteError = RemoveFromCartRestoresCartItemIdDeleteErrors[keyof RemoveFromCartRestoresCartItemIdDeleteErrors];
+
+export type RemoveFromCartRestoresCartItemIdDeleteResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ClearCartRestoresCartClearPostData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/restores/cart/clear';
+};
+
+export type ClearCartRestoresCartClearPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type GetManifestRestoresManifestGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/restores/manifest';
+};
+
+export type GetManifestRestoresManifestGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: RestoreManifestSchema;
+};
+
+export type GetManifestRestoresManifestGetResponse = GetManifestRestoresManifestGetResponses[keyof GetManifestRestoresManifestGetResponses];
 
 export type ReadRootGetData = {
     body?: never;

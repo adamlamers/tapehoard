@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BrowseIndexInventoryBrowseGetData, BrowseIndexInventoryBrowseGetErrors, BrowseIndexInventoryBrowseGetResponses, BrowsePathSystemBrowseGetData, BrowsePathSystemBrowseGetErrors, BrowsePathSystemBrowseGetResponses, GetTreeSystemTreeGetData, GetTreeSystemTreeGetErrors, GetTreeSystemTreeGetResponses, ListBackupsBackupsGetData, ListBackupsBackupsGetResponses, ReadRootGetData, ReadRootGetResponses, TrackBatchSystemTrackBatchPostData, TrackBatchSystemTrackBatchPostErrors, TrackBatchSystemTrackBatchPostResponses, TrackPathSystemTrackPostData, TrackPathSystemTrackPostErrors, TrackPathSystemTrackPostResponses } from './types.gen';
+import type { AddDirectoryToCartRestoresCartDirectoryPostData, AddDirectoryToCartRestoresCartDirectoryPostErrors, AddDirectoryToCartRestoresCartDirectoryPostResponses, AddToCartRestoresCartFileIdPostData, AddToCartRestoresCartFileIdPostErrors, AddToCartRestoresCartFileIdPostResponses, BrowseIndexInventoryBrowseGetData, BrowseIndexInventoryBrowseGetErrors, BrowseIndexInventoryBrowseGetResponses, BrowsePathSystemBrowseGetData, BrowsePathSystemBrowseGetErrors, BrowsePathSystemBrowseGetResponses, CancelJobSystemJobsJobIdCancelPostData, CancelJobSystemJobsJobIdCancelPostErrors, CancelJobSystemJobsJobIdCancelPostResponses, ClearCartRestoresCartClearPostData, ClearCartRestoresCartClearPostResponses, DeleteMediaInventoryMediaMediaIdDeleteData, DeleteMediaInventoryMediaMediaIdDeleteErrors, DeleteMediaInventoryMediaMediaIdDeleteResponses, GetDashboardStatsSystemDashboardStatsGetData, GetDashboardStatsSystemDashboardStatsGetResponses, GetIndexTreeInventoryTreeGetData, GetIndexTreeInventoryTreeGetErrors, GetIndexTreeInventoryTreeGetResponses, GetItemMetadataInventoryMetadataGetData, GetItemMetadataInventoryMetadataGetErrors, GetItemMetadataInventoryMetadataGetResponses, GetManifestRestoresManifestGetData, GetManifestRestoresManifestGetResponses, GetScanStatusSystemScanStatusGetData, GetScanStatusSystemScanStatusGetResponses, GetSettingsSystemSettingsGetData, GetSettingsSystemSettingsGetResponses, GetTreeSystemTreeGetData, GetTreeSystemTreeGetErrors, GetTreeSystemTreeGetResponses, ListBackupsBackupsGetData, ListBackupsBackupsGetResponses, ListCartRestoresCartGetData, ListCartRestoresCartGetResponses, ListInventoryInventoryGetData, ListInventoryInventoryGetResponses, ListJobsSystemJobsGetData, ListJobsSystemJobsGetErrors, ListJobsSystemJobsGetResponses, ListMediaInventoryMediaGetData, ListMediaInventoryMediaGetResponses, ReadRootGetData, ReadRootGetResponses, RegisterMediaInventoryMediaPostData, RegisterMediaInventoryMediaPostErrors, RegisterMediaInventoryMediaPostResponses, RemoveFromCartRestoresCartItemIdDeleteData, RemoveFromCartRestoresCartItemIdDeleteErrors, RemoveFromCartRestoresCartItemIdDeleteResponses, StreamJobsSystemJobsStreamGetData, StreamJobsSystemJobsStreamGetResponses, TrackBatchSystemTrackBatchPostData, TrackBatchSystemTrackBatchPostErrors, TrackBatchSystemTrackBatchPostResponses, TriggerBackupBackupsTriggerMediaIdPostData, TriggerBackupBackupsTriggerMediaIdPostErrors, TriggerBackupBackupsTriggerMediaIdPostResponses, TriggerScanSystemScanPostData, TriggerScanSystemScanPostResponses, UpdateMediaInventoryMediaMediaIdPatchData, UpdateMediaInventoryMediaMediaIdPatchErrors, UpdateMediaInventoryMediaMediaIdPatchResponses, UpdateSettingSystemSettingsPostData, UpdateSettingSystemSettingsPostErrors, UpdateSettingSystemSettingsPostResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -19,21 +19,39 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 /**
+ * Get Dashboard Stats
+ */
+export const getDashboardStatsSystemDashboardStatsGet = <ThrowOnError extends boolean = false>(options?: Options<GetDashboardStatsSystemDashboardStatsGetData, ThrowOnError>) => (options?.client ?? client).get<GetDashboardStatsSystemDashboardStatsGetResponses, unknown, ThrowOnError>({ url: '/system/dashboard/stats', ...options });
+
+/**
+ * List Jobs
+ */
+export const listJobsSystemJobsGet = <ThrowOnError extends boolean = false>(options?: Options<ListJobsSystemJobsGetData, ThrowOnError>) => (options?.client ?? client).get<ListJobsSystemJobsGetResponses, ListJobsSystemJobsGetErrors, ThrowOnError>({ url: '/system/jobs', ...options });
+
+/**
+ * Cancel Job
+ */
+export const cancelJobSystemJobsJobIdCancelPost = <ThrowOnError extends boolean = false>(options: Options<CancelJobSystemJobsJobIdCancelPostData, ThrowOnError>) => (options.client ?? client).post<CancelJobSystemJobsJobIdCancelPostResponses, CancelJobSystemJobsJobIdCancelPostErrors, ThrowOnError>({ url: '/system/jobs/{job_id}/cancel', ...options });
+
+/**
+ * Stream Jobs
+ */
+export const streamJobsSystemJobsStreamGet = <ThrowOnError extends boolean = false>(options?: Options<StreamJobsSystemJobsStreamGetData, ThrowOnError>) => (options?.client ?? client).get<StreamJobsSystemJobsStreamGetResponses, unknown, ThrowOnError>({ url: '/system/jobs/stream', ...options });
+
+/**
+ * Trigger Scan
+ */
+export const triggerScanSystemScanPost = <ThrowOnError extends boolean = false>(options?: Options<TriggerScanSystemScanPostData, ThrowOnError>) => (options?.client ?? client).post<TriggerScanSystemScanPostResponses, unknown, ThrowOnError>({ url: '/system/scan', ...options });
+
+/**
+ * Get Scan Status
+ */
+export const getScanStatusSystemScanStatusGet = <ThrowOnError extends boolean = false>(options?: Options<GetScanStatusSystemScanStatusGetData, ThrowOnError>) => (options?.client ?? client).get<GetScanStatusSystemScanStatusGetResponses, unknown, ThrowOnError>({ url: '/system/scan/status', ...options });
+
+/**
  * Browse Path
  */
 export const browsePathSystemBrowseGet = <ThrowOnError extends boolean = false>(options?: Options<BrowsePathSystemBrowseGetData, ThrowOnError>) => (options?.client ?? client).get<BrowsePathSystemBrowseGetResponses, BrowsePathSystemBrowseGetErrors, ThrowOnError>({ url: '/system/browse', ...options });
-
-/**
- * Track Path
- */
-export const trackPathSystemTrackPost = <ThrowOnError extends boolean = false>(options: Options<TrackPathSystemTrackPostData, ThrowOnError>) => (options.client ?? client).post<TrackPathSystemTrackPostResponses, TrackPathSystemTrackPostErrors, ThrowOnError>({
-    url: '/system/track',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
 
 /**
  * Track Batch
@@ -48,9 +66,60 @@ export const trackBatchSystemTrackBatchPost = <ThrowOnError extends boolean = fa
 });
 
 /**
+ * Get Settings
+ */
+export const getSettingsSystemSettingsGet = <ThrowOnError extends boolean = false>(options?: Options<GetSettingsSystemSettingsGetData, ThrowOnError>) => (options?.client ?? client).get<GetSettingsSystemSettingsGetResponses, unknown, ThrowOnError>({ url: '/system/settings', ...options });
+
+/**
+ * Update Setting
+ */
+export const updateSettingSystemSettingsPost = <ThrowOnError extends boolean = false>(options: Options<UpdateSettingSystemSettingsPostData, ThrowOnError>) => (options.client ?? client).post<UpdateSettingSystemSettingsPostResponses, UpdateSettingSystemSettingsPostErrors, ThrowOnError>({
+    url: '/system/settings',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Get Tree
  */
 export const getTreeSystemTreeGet = <ThrowOnError extends boolean = false>(options?: Options<GetTreeSystemTreeGetData, ThrowOnError>) => (options?.client ?? client).get<GetTreeSystemTreeGetResponses, GetTreeSystemTreeGetErrors, ThrowOnError>({ url: '/system/tree', ...options });
+
+/**
+ * List Media
+ */
+export const listMediaInventoryMediaGet = <ThrowOnError extends boolean = false>(options?: Options<ListMediaInventoryMediaGetData, ThrowOnError>) => (options?.client ?? client).get<ListMediaInventoryMediaGetResponses, unknown, ThrowOnError>({ url: '/inventory/media', ...options });
+
+/**
+ * Register Media
+ */
+export const registerMediaInventoryMediaPost = <ThrowOnError extends boolean = false>(options: Options<RegisterMediaInventoryMediaPostData, ThrowOnError>) => (options.client ?? client).post<RegisterMediaInventoryMediaPostResponses, RegisterMediaInventoryMediaPostErrors, ThrowOnError>({
+    url: '/inventory/media',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete Media
+ */
+export const deleteMediaInventoryMediaMediaIdDelete = <ThrowOnError extends boolean = false>(options: Options<DeleteMediaInventoryMediaMediaIdDeleteData, ThrowOnError>) => (options.client ?? client).delete<DeleteMediaInventoryMediaMediaIdDeleteResponses, DeleteMediaInventoryMediaMediaIdDeleteErrors, ThrowOnError>({ url: '/inventory/media/{media_id}', ...options });
+
+/**
+ * Update Media
+ */
+export const updateMediaInventoryMediaMediaIdPatch = <ThrowOnError extends boolean = false>(options: Options<UpdateMediaInventoryMediaMediaIdPatchData, ThrowOnError>) => (options.client ?? client).patch<UpdateMediaInventoryMediaMediaIdPatchResponses, UpdateMediaInventoryMediaMediaIdPatchErrors, ThrowOnError>({
+    url: '/inventory/media/{media_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Browse Index
@@ -58,9 +127,66 @@ export const getTreeSystemTreeGet = <ThrowOnError extends boolean = false>(optio
 export const browseIndexInventoryBrowseGet = <ThrowOnError extends boolean = false>(options?: Options<BrowseIndexInventoryBrowseGetData, ThrowOnError>) => (options?.client ?? client).get<BrowseIndexInventoryBrowseGetResponses, BrowseIndexInventoryBrowseGetErrors, ThrowOnError>({ url: '/inventory/browse', ...options });
 
 /**
+ * Get Index Tree
+ */
+export const getIndexTreeInventoryTreeGet = <ThrowOnError extends boolean = false>(options?: Options<GetIndexTreeInventoryTreeGetData, ThrowOnError>) => (options?.client ?? client).get<GetIndexTreeInventoryTreeGetResponses, GetIndexTreeInventoryTreeGetErrors, ThrowOnError>({ url: '/inventory/tree', ...options });
+
+/**
+ * Get Item Metadata
+ */
+export const getItemMetadataInventoryMetadataGet = <ThrowOnError extends boolean = false>(options: Options<GetItemMetadataInventoryMetadataGetData, ThrowOnError>) => (options.client ?? client).get<GetItemMetadataInventoryMetadataGetResponses, GetItemMetadataInventoryMetadataGetErrors, ThrowOnError>({ url: '/inventory/metadata', ...options });
+
+/**
+ * List Inventory
+ */
+export const listInventoryInventoryGet = <ThrowOnError extends boolean = false>(options?: Options<ListInventoryInventoryGetData, ThrowOnError>) => (options?.client ?? client).get<ListInventoryInventoryGetResponses, unknown, ThrowOnError>({ url: '/inventory/', ...options });
+
+/**
+ * Trigger Backup
+ */
+export const triggerBackupBackupsTriggerMediaIdPost = <ThrowOnError extends boolean = false>(options: Options<TriggerBackupBackupsTriggerMediaIdPostData, ThrowOnError>) => (options.client ?? client).post<TriggerBackupBackupsTriggerMediaIdPostResponses, TriggerBackupBackupsTriggerMediaIdPostErrors, ThrowOnError>({ url: '/backups/trigger/{media_id}', ...options });
+
+/**
  * List Backups
  */
 export const listBackupsBackupsGet = <ThrowOnError extends boolean = false>(options?: Options<ListBackupsBackupsGetData, ThrowOnError>) => (options?.client ?? client).get<ListBackupsBackupsGetResponses, unknown, ThrowOnError>({ url: '/backups/', ...options });
+
+/**
+ * List Cart
+ */
+export const listCartRestoresCartGet = <ThrowOnError extends boolean = false>(options?: Options<ListCartRestoresCartGetData, ThrowOnError>) => (options?.client ?? client).get<ListCartRestoresCartGetResponses, unknown, ThrowOnError>({ url: '/restores/cart', ...options });
+
+/**
+ * Add To Cart
+ */
+export const addToCartRestoresCartFileIdPost = <ThrowOnError extends boolean = false>(options: Options<AddToCartRestoresCartFileIdPostData, ThrowOnError>) => (options.client ?? client).post<AddToCartRestoresCartFileIdPostResponses, AddToCartRestoresCartFileIdPostErrors, ThrowOnError>({ url: '/restores/cart/{file_id}', ...options });
+
+/**
+ * Add Directory To Cart
+ */
+export const addDirectoryToCartRestoresCartDirectoryPost = <ThrowOnError extends boolean = false>(options: Options<AddDirectoryToCartRestoresCartDirectoryPostData, ThrowOnError>) => (options.client ?? client).post<AddDirectoryToCartRestoresCartDirectoryPostResponses, AddDirectoryToCartRestoresCartDirectoryPostErrors, ThrowOnError>({
+    url: '/restores/cart/directory',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove From Cart
+ */
+export const removeFromCartRestoresCartItemIdDelete = <ThrowOnError extends boolean = false>(options: Options<RemoveFromCartRestoresCartItemIdDeleteData, ThrowOnError>) => (options.client ?? client).delete<RemoveFromCartRestoresCartItemIdDeleteResponses, RemoveFromCartRestoresCartItemIdDeleteErrors, ThrowOnError>({ url: '/restores/cart/{item_id}', ...options });
+
+/**
+ * Clear Cart
+ */
+export const clearCartRestoresCartClearPost = <ThrowOnError extends boolean = false>(options?: Options<ClearCartRestoresCartClearPostData, ThrowOnError>) => (options?.client ?? client).post<ClearCartRestoresCartClearPostResponses, unknown, ThrowOnError>({ url: '/restores/cart/clear', ...options });
+
+/**
+ * Get Manifest
+ */
+export const getManifestRestoresManifestGet = <ThrowOnError extends boolean = false>(options?: Options<GetManifestRestoresManifestGetData, ThrowOnError>) => (options?.client ?? client).get<GetManifestRestoresManifestGetResponses, unknown, ThrowOnError>({ url: '/restores/manifest', ...options });
 
 /**
  * Read Root

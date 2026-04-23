@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import system, inventory, backups
+from app.api import system, inventory, backups, restores
 from app.db.database import engine
 from app.db import models
 
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(system.router)
 app.include_router(inventory.router)
 app.include_router(backups.router)
+app.include_router(restores.router)
 
 
 @app.get("/")

@@ -12,7 +12,8 @@
                 CassetteTape,
                 ShieldCheck,
                 ShieldAlert,
-                Square
+                Square,
+                EyeOff
         } from "lucide-svelte";
         import { Checkbox } from "$lib/components/ui/checkbox";
         import { Button } from "$lib/components/ui/button";
@@ -108,7 +109,8 @@
                 "group flex h-10 items-center border-b border-border-color/10 transition-all cursor-pointer select-none",
                 isSelected
                         ? "bg-blue-500/15 border-l-2 border-l-blue-500"
-                        : "hover:bg-white/5 border-l-2 border-l-transparent"
+                        : "hover:bg-white/5 border-l-2 border-l-transparent",
+                item.ignored && "opacity-40 grayscale-[0.5]"
         )}
         role="button"
         tabindex="0"
@@ -121,12 +123,16 @@
                 class="flex h-10 w-12 shrink-0 items-center justify-center border-r border-border-color/10"
                 onclick={(e) => {
                         e.stopPropagation();
-                        onToggleTrack();
+                        if (!item.ignored) onToggleTrack();
                 }}
                 onkeydown={(e) => e.key === " " && e.stopPropagation()}
                 role="none"
         >
-                {#if mode === 'host'}
+                {#if item.ignored}
+                        <div class="text-text-secondary/40">
+                                <EyeOff size={16} />
+                        </div>
+                {:else if mode === 'host'}
                         {#if item.tracked}
                                 <div class="text-success-color bg-success-color/10 p-1 rounded-md">
                                         <ShieldCheck size={16} />
@@ -142,12 +148,13 @@
         </div>
 
         <!-- NAME & ICON -->
-        <div class="flex flex-1 items-center gap-3 min-w-0 px-4 h-full border-r border-border-color/10">
+        <div class="flex flex-auto min-w-[200px] items-center gap-3 px-4 h-full border-r border-border-color/10 overflow-hidden">
                 <div class="shrink-0 relative">
                         <FileIcon
                                 size={18}
                                 class={cn(
-                                        item.type === "directory" ? "text-yellow-500/80 fill-yellow-500/10" : "text-text-secondary"
+                                        item.type === "directory" ? "text-yellow-500/80 fill-yellow-500/10" : "text-text-secondary",
+                                        item.ignored && "text-text-secondary/40"
                                 )}
                         ></FileIcon>
                         {#if item.type === "link"}
@@ -164,17 +171,18 @@
                                 <span
                                         class={cn(
                                                 "truncate text-[13px] transition-colors",
-                                                item.tracked
+                                                !item.ignored && item.tracked
                                                         ? "text-success-color font-bold"
                                                         : isSelected
                                                                 ? "text-text-primary font-medium"
-                                                                : "text-text-secondary group-hover:text-text-primary"
+                                                                : "text-text-secondary group-hover:text-text-primary",
+                                                item.ignored && "line-through decoration-text-secondary/40"
                                         )}
                                 >
                                         {item.name}
                                 </span>
                                 {#if mode === "index" && item.media && item.media.length > 0}
-                                        <div class="flex gap-1 overflow-hidden">
+                                        <div class="flex gap-1 overflow-hidden shrink-0">
                                                 {#each item.media as m}
                                                         <span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[9px] px-1.5 py-0.5 rounded border border-blue-500/20 font-bold uppercase tracking-wider">
                                                                 <CassetteTape size={10} />
@@ -184,11 +192,6 @@
                                         </div>
                                 {/if}
                         </div>
-                        {#if item.type === "link" && item.target}
-                                <span class="text-[10px] text-text-secondary/50 truncate italic flex items-center gap-1">
-                                        <LinkIcon size={10} /> {item.target}
-                                </span>
-                        {/if}
                 </div>
         </div>
 

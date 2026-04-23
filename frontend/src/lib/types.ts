@@ -3,11 +3,13 @@ export interface FileItem {
     path: string;
     type: 'file' | 'directory' | 'link';
     target?: string; // For links
-    size?: number;
-    mtime?: number;
-    tracked?: boolean;
+    size?: number | null;
+    mtime?: number | null;
+    tracked?: boolean | null;
+    ignored?: boolean | null;
     media?: string[]; // Media it's on (for index browsing)
     selected?: boolean; // For restore cart
+    sha256_hash?: string | null;
 }
 
 export interface TreeNode {

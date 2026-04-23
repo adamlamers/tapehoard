@@ -1,19 +1,29 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import { Save, PlayCircle, FolderTree, FileCheck, Database, HardDrive, LayoutGrid, RotateCw, Search } from 'lucide-svelte';
+    import { onMount, onDestroy } from 'svelte';
+    import { Save, FolderTree, Database, HardDrive, LayoutGrid, RotateCw, Activity, FileCheck } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import { Card } from '$lib/components/ui/card';
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
     import type { FileItem } from '$lib/types';
-    import { browsePathSystemBrowseGet, trackBatchSystemTrackBatchPost } from '$lib/api/sdk.gen';
+    import {
+        browsePathSystemBrowseGet,
+        trackBatchSystemTrackBatchPost,
+        triggerScanSystemScanPost,
+        getScanStatusSystemScanStatusGet,
+        type ScanStatusSchema
+    } from '$lib/api';
     import { toast } from "svelte-sonner";
     import { cn } from "$lib/utils";
 
     // Current directory state
-    let currentPath = $state('/source_data');
+    let currentPath = $state('ROOT');
     let files = $state<FileItem[]>([]);
     let loading = $state(false);
     let committing = $state(false);
+
+    // Scanner Status (local for button state only)
+    let scanRunning = $state(false);
+    let pollInterval: any;
 
     // Staging area for tracking changes: path -> desired tracked state
     let pendingChanges = $state<Map<string, boolean>>(new Map());
@@ -26,8 +36,14 @@
             });
             if (response.data) {
                 files = response.data.map(f => ({
-                    ...f,
-                    type: f.type as 'file' | 'directory' | 'link'
+                    name: f.name,
+                    path: f.path,
+                    type: f.type as 'file' | 'directory' | 'link',
+                    size: f.size ?? null,
+                    mtime: f.mtime ?? null,
+                    tracked: f.tracked ?? false,
+                    ignored: f.ignored ?? false,
+                    sha256_hash: null // Not returned in browse but kept for state consistency
                 }));
             }
         } catch (error) {
@@ -38,8 +54,39 @@
         }
     }
 
+    async function updateScanStatus() {
+        try {
+            const response = await getScanStatusSystemScanStatusGet();
+            if (response.data) {
+                const wasRunning = scanRunning;
+                scanRunning = response.data.is_running;
+
+                if (wasRunning && !scanRunning) {
+                    loadFiles(currentPath);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to get scan status:", error);
+        }
+    }
+
+    async function startScan() {
+        try {
+            await triggerScanSystemScanPost();
+            updateScanStatus();
+        } catch (error: any) {
+            toast.error(error.body?.detail || "Failed to start scan");
+        }
+    }
+
     onMount(() => {
         loadFiles(currentPath);
+        updateScanStatus();
+        pollInterval = setInterval(updateScanStatus, 2000);
+    });
+
+    onDestroy(() => {
+        if (pollInterval) clearInterval(pollInterval);
     });
 
     $effect(() => {
@@ -52,29 +99,25 @@
         currentPath = path;
     }
 
-    // Toggle track locally (staging)
     function handleToggleTrack(item: FileItem) {
         const path = item.path;
-        const currentlyTracked = item.tracked;
+        const currentlyTracked = item.tracked || false;
         const stagedState = pendingChanges.get(path);
 
         if (stagedState !== undefined) {
-            // If already staged, revert to original state if toggled back
             if (stagedState === !currentlyTracked) {
                 pendingChanges.delete(path);
-                pendingChanges = new Map(pendingChanges); // Trigger reactivity
+                pendingChanges = new Map(pendingChanges);
             } else {
                 pendingChanges.set(path, !stagedState);
                 pendingChanges = new Map(pendingChanges);
             }
         } else {
-            // Stage the flip
             pendingChanges.set(path, !currentlyTracked);
             pendingChanges = new Map(pendingChanges);
         }
     }
 
-    // Computed files that merge original state with pending changes
     const displayFiles = $derived(files.map(f => {
         const pending = pendingChanges.get(f.path);
         return {
@@ -140,9 +183,20 @@
         </div>
 
         <div class="flex gap-4 relative z-10">
-            <Button variant="secondary" size="lg" class="px-6 h-12 border-border-color font-bold uppercase tracking-widest text-[11px]">
-                <PlayCircle size={20} class="mr-2 text-action-color" />
-                Simulate Scan
+            <Button
+                variant="secondary"
+                size="lg"
+                class="px-6 h-12 border-border-color font-bold uppercase tracking-widest text-[11px]"
+                onclick={startScan}
+                disabled={scanRunning}
+            >
+                {#if scanRunning}
+                    <RotateCw size={20} class="mr-2 animate-spin text-action-color" />
+                    Scanning...
+                {:else}
+                    <Activity size={20} class="mr-2 text-action-color" />
+                    Run Scanner
+                {/if}
             </Button>
             <Button
                 variant="default"
@@ -172,7 +226,9 @@
             </div>
             <div>
                 <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Tracked Items</span>
-                <span class="text-xl font-black text-text-primary mono">14,203</span>
+                <span class="text-xl font-black text-text-primary mono">
+                    {files.filter(f => f.tracked).length}
+                </span>
             </div>
         </Card>
 
@@ -181,8 +237,10 @@
                 <Database size={24} />
             </div>
             <div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Est. Payload</span>
-                <span class="text-xl font-black text-action-color mono">4.2 TB</span>
+                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Sync Items</span>
+                <span class="text-xl font-black text-action-color mono">
+                    {files.length}
+                </span>
             </div>
         </Card>
 
@@ -191,8 +249,10 @@
                 <HardDrive size={24} />
             </div>
             <div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Media Load</span>
-                <span class="text-xl font-black text-success-color mono">2 x LTO-6</span>
+                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Eligible Items</span>
+                <span class="text-xl font-black text-success-color mono">
+                    {files.filter(f => !f.ignored).length}
+                </span>
             </div>
         </Card>
 
@@ -201,8 +261,10 @@
                 <FileCheck size={24} />
             </div>
             <div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Last Simulation</span>
-                <span class="text-xl font-black text-text-primary mono">2h ago</span>
+                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Pending Actions</span>
+                <span class="text-xl font-black text-text-primary mono">
+                    {pendingChanges.size}
+                </span>
             </div>
         </Card>
     </div>
@@ -217,6 +279,7 @@
                 </div>
             </div>
         {/if}
+
         <FileBrowser
             bind:currentPath
             files={displayFiles}

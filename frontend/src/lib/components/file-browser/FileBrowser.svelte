@@ -6,20 +6,8 @@
                 RotateCw,
                 Search,
                 Folder,
-                Home,
                 ArrowUpDown,
-                MoreHorizontal,
-                Plus,
-                Scissors,
-                Copy,
-                Clipboard,
-                Trash2,
-                Type,
-                LayoutGrid,
                 CheckSquare,
-                HardDrive,
-                ShieldCheck,
-                ShieldAlert,
                 Square
         } from "lucide-svelte";
         import { Button } from "$lib/components/ui/button";
@@ -28,20 +16,22 @@
         import { Input } from "$lib/components/ui/input";
         import FileBrowserTreeItem from "./FileBrowserTreeItem.svelte";
         import FileBrowserRowItem from "./FileBrowserRowItem.svelte";
-        import type { FileItem, Breadcrumb, TreeNode } from "$lib/types";
+        import type { FileItem, Breadcrumb } from "$lib/types";
         import { cn } from "$lib/utils";
 
         let {
-                currentPath = $bindable("/source_data"),
+                currentPath = $bindable("ROOT"),
                 files = [],
                 onNavigate = (path: string) => {},
                 onToggleTrack = (item: FileItem) => {},
+                onSelect = (item: FileItem) => {},
                 mode = "host"
         } = $props<{
                 currentPath: string;
                 files: FileItem[];
                 onNavigate?: (path: string) => void;
                 onToggleTrack?: (item: FileItem) => void;
+                onSelect?: (item: FileItem) => void;
                 mode?: "host" | "index";
         }>();
 
@@ -97,16 +87,16 @@
         // --- Navigation Tree Definition ---
 
         const sourceDataRoot = $derived({
-                name: "Source Data",
-                path: "/source_data",
+                name: "All Sources",
+                path: "ROOT",
                 expanded: true,
                 children: [],
                 hasChildren: true
         });
 
         const virtualIndexRoot = $derived({
-                name: "Virtual Index",
-                path: "/",
+                name: "Index Browser",
+                path: "ROOT",
                 expanded: true,
                 children: [],
                 hasChildren: true
@@ -117,37 +107,32 @@
         // --- Logic ---
 
         const breadcrumbs = $derived.by(() => {
+                if (currentPath === "ROOT") {
+                    return [{ name: mode === "host" ? "All Sources" : "Index Browser", path: "ROOT" }];
+                }
+
                 const parts = currentPath.split("/").filter(Boolean);
                 const crumbs: Breadcrumb[] = [];
 
-                if (mode === "host") {
-                    crumbs.push({ name: "Source Data", path: "/source_data" });
-                    let current = "/source_data";
-                    const subParts = parts[0] === "source_data" ? parts.slice(1) : parts;
-                    for (const part of subParts) {
-                        current += `/${part}`;
-                        crumbs.push({ name: part, path: current });
-                    }
-                } else {
-                    crumbs.push({ name: "Virtual Index", path: "/" });
-                    let current = "";
-                    for (const part of parts) {
-                        current += `/${part}`;
-                        crumbs.push({ name: part, path: current });
-                    }
+                crumbs.push({ name: mode === "host" ? "All Sources" : "Index Browser", path: "ROOT" });
+
+                let current = "";
+                for (const part of parts) {
+                    current += `/${part}`;
+                    crumbs.push({ name: part, path: current });
                 }
                 return crumbs;
         });
 
         const filteredFiles = $derived.by(() => {
-                let result = files.filter((f) => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
+                let result = files.filter((f: FileItem) => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-                result.sort((a, b) => {
+                result.sort((a: FileItem, b: FileItem) => {
                         const valA = sortColumn === "type" ? a.type : a[sortColumn as keyof FileItem] || 0;
                         const valB = sortColumn === "type" ? b.type : b[sortColumn as keyof FileItem] || 0;
 
-                        if (valA < valB) return sortDirection === "asc" ? -1 : 1;
-                        if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+                        if (valA < (valB as any)) return sortDirection === "asc" ? -1 : 1;
+                        if (valA > (valB as any)) return sortDirection === "asc" ? 1 : -1;
                         return 0;
                 });
 
@@ -165,8 +150,8 @@
 
         function handleRowClick(e: MouseEvent, item: FileItem) {
                 if (e.shiftKey && lastSelectedPath) {
-                        const lastIndex = filteredFiles.findIndex(f => f.path === lastSelectedPath);
-                        const currentIndex = filteredFiles.findIndex(f => f.path === item.path);
+                        const lastIndex = filteredFiles.findIndex((f: FileItem) => f.path === lastSelectedPath);
+                        const currentIndex = filteredFiles.findIndex((f: FileItem) => f.path === item.path);
                         const start = Math.min(lastIndex, currentIndex);
                         const end = Math.max(lastIndex, currentIndex);
 
@@ -188,6 +173,9 @@
                         selectedPaths = new Set([item.path]);
                         lastSelectedPath = item.path;
                 }
+
+                // Signal selection to parent
+                onSelect(item);
         }
 
         function handleRowDoubleClick(item: FileItem) {
@@ -198,32 +186,32 @@
                 }
         }
 
-        function handleSelectAll(checked: boolean) {
-                if (checked) {
-                        selectedPaths = new Set(filteredFiles.map(f => f.path));
+        function handleSelectAll(checked: boolean | "indeterminate") {
+                if (checked === true) {
+                        selectedPaths = new Set(filteredFiles.map((f: FileItem) => f.path));
                 } else {
                         selectedPaths = new Set();
                 }
         }
 
         function bulkToggle(track: boolean) {
-                const selectedItems = files.filter(f => selectedPaths.has(f.path) && f.tracked !== track);
-                selectedItems.forEach(item => onToggleTrack(item));
+                const selectedItems = files.filter((f: FileItem) => selectedPaths.has(f.path) && f.tracked !== track);
+                selectedItems.forEach((item: FileItem) => onToggleTrack(item));
         }
 </script>
 
 <div
-        class="file-browser flex h-full flex-col overflow-hidden rounded-lg border border-border-color bg-bg-secondary shadow-2xl"
+        class="file-browser flex h-full flex-col overflow-hidden rounded-lg border border-border-color bg-bg-secondary shadow-2xl min-w-0"
 >
         <!-- ZONE A: TOP BAR -->
         <div class="flex h-14 shrink-0 items-center justify-between border-b border-border-color bg-bg-tertiary/50 px-6 shadow-sm">
-                <div class="flex items-center gap-4 flex-1">
+                <div class="flex items-center gap-4 flex-1 min-w-0">
                         <!-- Navigation Buttons -->
-                        <div class="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" class="h-8 w-8 text-text-secondary hover:text-text-primary hover:bg-white/5">
+                        <div class="flex items-center gap-1 shrink-0">
+                                <Button variant="ghost" size="icon" class="h-8 w-8 text-text-secondary hover:text-text-primary hover:bg-white/5" onclick={() => window.history.back()}>
                                         <ChevronLeft size={18}></ChevronLeft>
                                 </Button>
-                                <Button variant="ghost" size="icon" class="h-8 w-8 text-text-secondary hover:text-text-primary hover:bg-white/5">
+                                <Button variant="ghost" size="icon" class="h-8 w-8 text-text-secondary hover:text-text-primary hover:bg-white/5" onclick={() => window.history.forward()}>
                                         <ChevronRight size={18}></ChevronRight>
                                 </Button>
                                 <Button
@@ -231,10 +219,13 @@
                                         size="icon"
                                         class="h-8 w-8 text-text-secondary hover:text-text-primary hover:bg-white/5"
                                         onclick={() => {
-                                                if (mode === "host" && currentPath === "/source_data") return;
-                                                if (mode === "index" && currentPath === "/") return;
-                                                const parent = currentPath.split("/").slice(0, -1).join("/") || "/";
-                                                onNavigate(parent);
+                                                if (currentPath === "ROOT") return;
+                                                const parts = currentPath.split("/").filter(Boolean);
+                                                if (parts.length === 1) {
+                                                    onNavigate("ROOT");
+                                                } else {
+                                                    onNavigate("/" + parts.slice(0, -1).join("/"));
+                                                }
                                         }}
                                 >
                                         <ChevronUp size={18}></ChevronUp>
@@ -242,7 +233,7 @@
                         </div>
 
                         <!-- Address Bar -->
-                        <div class="flex-1 flex items-center bg-bg-primary border border-border-color/40 rounded-md px-3 h-9 shadow-inner overflow-hidden max-w-3xl group transition-all focus-within:border-action-color/50">
+                        <div class="flex-1 flex items-center bg-bg-primary border border-border-color/40 rounded-md px-3 h-9 shadow-inner overflow-hidden max-w-3xl group transition-all focus-within:border-action-color/50 min-w-0">
                                 <Folder size={16} class="text-yellow-500/80 mr-2 shrink-0"></Folder>
                                 <div class="flex-1 flex items-center overflow-x-auto scrollbar-hide">
                                         {#each breadcrumbs as crumb, i}
@@ -260,7 +251,7 @@
                                                 </button>
                                         {/each}
                                 </div>
-                                <button class="ml-2 text-text-secondary hover:text-text-primary p-1 transition-colors cursor-pointer" onclick={() => onNavigate(currentPath)}>
+                                <button class="ml-2 text-text-secondary hover:text-text-primary p-1 transition-colors cursor-pointer shrink-0" onclick={() => onNavigate(currentPath)}>
                                         <RotateCw size={14}></RotateCw>
                                 </button>
                         </div>
@@ -268,7 +259,7 @@
 
                 <!-- Search Input -->
                 <div class="flex items-center shrink-0 ml-12">
-                        <div class="relative w-64 sm:w-80 group">
+                        <div class="relative w-48 sm:w-64 group">
                                 <Search
                                         size={14}
                                         class="absolute left-3 top-3 text-text-secondary group-focus-within:text-action-color transition-colors"
@@ -295,115 +286,115 @@
                 </aside>
 
                 <!-- ZONE C: DETAILS PANE -->
-                <div class="flex min-w-0 flex-1 flex-col bg-bg-primary shadow-inner">
-                        <!-- Column Headers -->
-                        <div class="flex h-10 items-center border-b border-border-color bg-bg-tertiary/30 shrink-0 select-none">
-                                <div class="flex w-12 shrink-0 justify-center">
-                                        <Checkbox
-                                                checked={selectedPaths.size === filteredFiles.length && filteredFiles.length > 0}
-                                                onCheckedChange={handleSelectAll}
-                                        />
-                                </div>
+                <div class="flex min-w-0 flex-1 flex-col bg-bg-primary shadow-inner overflow-hidden">
+                        <div class="flex flex-col flex-1 min-w-0 overflow-x-auto scrollbar-hide">
+                                <div class="min-w-max flex flex-col flex-1">
+                                        <!-- Column Headers -->
+                                        <div class="flex h-10 items-center border-b border-border-color bg-bg-tertiary/30 shrink-0 select-none border-l-2 border-l-transparent">
+                                                <div class="flex w-12 shrink-0 justify-center">
+                                                        <Checkbox
+                                                                checked={selectedPaths.size === filteredFiles.length && filteredFiles.length > 0}
+                                                                onCheckedChange={handleSelectAll}
+                                                        />
+                                                </div>
 
-                                <div class="flex flex-1 items-center min-w-0 h-full relative group/col">
-                                        <button
-                                                class="flex w-full items-center justify-between text-[11px] font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
-                                                onclick={() => toggleSort("name")}
-                                        >
-                                                Name
-                                                {#if sortColumn === "name"}
-                                                        <ArrowUpDown size={10} class={cn(sortDirection === "desc" && "rotate-180")}></ArrowUpDown>
-                                                {/if}
-                                        </button>
-                                        <!-- Vertical Separator & Resizer -->
-                                        <div class="absolute right-0 top-0 w-px h-full bg-border-color/30"></div>
-                                        <div
-                                                class="absolute -right-1 top-0 w-2 h-full cursor-col-resize z-10"
-                                                role="none"
-                                        ></div>
-                                </div>
+                                                <div class="flex flex-auto min-w-[300px] items-center h-full relative group/col">
+                                                        <button
+                                                                class="flex w-full items-center justify-between text-[11px] font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
+                                                                onclick={() => toggleSort("name")}
+                                                        >
+                                                                Name
+                                                                {#if sortColumn === "name"}
+                                                                        <ArrowUpDown size={10} class={cn(sortDirection === "desc" && "rotate-180")}></ArrowUpDown>
+                                                                {/if}
+                                                        </button>
+                                                        <div class="absolute right-0 top-0 w-px h-full bg-border-color/30"></div>
+                                                        <div
+                                                                class="absolute -right-1 top-0 w-2 h-full cursor-col-resize z-10"
+                                                                role="none"
+                                                        ></div>
+                                                </div>
 
-                                <div class="flex items-center h-full relative group/col shrink-0" style="width: {mtimeWidth}px">
-                                        <button
-                                                class="flex w-full items-center justify-between text-[11px] font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
-                                                onclick={() => toggleSort("mtime")}
-                                        >
-                                                Date modified
-                                                {#if sortColumn === "mtime"}
-                                                        <ArrowUpDown size={10} class={cn(sortDirection === "desc" && "rotate-180")}></ArrowUpDown>
-                                                {/if}
-                                        </button>
-                                        <!-- Vertical Separator & Resizer -->
-                                        <div class="absolute right-0 top-0 w-px h-full bg-border-color/30"></div>
-                                        <div
-                                                class="absolute -right-1 top-0 w-2 h-full cursor-col-resize z-10"
-                                                onmousedown={(e) => startResize(e, 'mtime')}
-                                                role="none"
-                                        ></div>
-                                </div>
+                                                <div class="flex items-center h-full relative group/col shrink-0" style="width: {mtimeWidth}px">
+                                                        <button
+                                                                class="flex w-full items-center justify-between text-[11px] font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
+                                                                onclick={() => toggleSort("mtime")}
+                                                        >
+                                                                Date modified
+                                                                {#if sortColumn === "mtime"}
+                                                                        <ArrowUpDown size={10} class={cn(sortDirection === "desc" && "rotate-180")}></ArrowUpDown>
+                                                                {/if}
+                                                        </button>
+                                                        <div class="absolute right-0 top-0 w-px h-full bg-border-color/30"></div>
+                                                        <div
+                                                                class="absolute -right-1 top-0 w-2 h-full cursor-col-resize z-10"
+                                                                onmousedown={(e) => startResize(e, 'mtime')}
+                                                                role="none"
+                                                        ></div>
+                                                </div>
 
-                                <div class="flex items-center h-full relative group/col shrink-0" style="width: {typeWidth}px">
-                                        <button
-                                                class="flex w-full items-center justify-between text-[11px] font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
-                                                onclick={() => toggleSort("type")}
-                                        >
-                                                Type
-                                                {#if sortColumn === "type"}
-                                                        <ArrowUpDown size={10} class={cn(sortDirection === "desc" && "rotate-180")}></ArrowUpDown>
-                                                {/if}
-                                        </button>
-                                        <!-- Vertical Separator & Resizer -->
-                                        <div class="absolute right-0 top-0 w-px h-full bg-border-color/30"></div>
-                                        <div
-                                                class="absolute -right-1 top-0 w-2 h-full cursor-col-resize z-10"
-                                                onmousedown={(e) => startResize(e, 'type')}
-                                                role="none"
-                                        ></div>
-                                </div>
+                                                <div class="flex items-center h-full relative group/col shrink-0" style="width: {typeWidth}px">
+                                                        <button
+                                                                class="flex w-full items-center justify-between text-[11px] font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
+                                                                onclick={() => toggleSort("type")}
+                                                        >
+                                                                Type
+                                                                {#if sortColumn === "type"}
+                                                                        <ArrowUpDown size={10} class={cn(sortDirection === "desc" && "rotate-180")}></ArrowUpDown>
+                                                                {/if}
+                                                        </button>
+                                                        <div class="absolute right-0 top-0 w-px h-full bg-border-color/30"></div>
+                                                        <div
+                                                                class="absolute -right-1 top-0 w-2 h-full cursor-col-resize z-10"
+                                                                onmousedown={(e) => startResize(e, 'type')}
+                                                                role="none"
+                                                        ></div>
+                                                </div>
 
-                                <div class="flex items-center h-full relative group/col shrink-0" style="width: {sizeWidth}px">
-                                        <button
-                                                class="flex w-full items-center justify-between text-[11px] font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors text-right"
-                                                onclick={() => toggleSort("size")}
-                                        >
-                                                Size
-                                                {#if sortColumn === "size"}
-                                                        <ArrowUpDown size={10} class={cn(sortDirection === "desc" && "rotate-180")}></ArrowUpDown>
-                                                {/if}
-                                        </button>
-                                        <!-- Vertical Separator & Resizer -->
-                                        <div class="absolute right-0 top-0 w-px h-full bg-border-color/30"></div>
-                                        <div
-                                                class="absolute -right-1 top-0 w-2 h-full cursor-col-resize z-10"
-                                                onmousedown={(e) => startResize(e, 'size')}
-                                                role="none"
-                                        ></div>
-                                </div>
+                                                <div class="flex items-center h-full relative group/col shrink-0" style="width: {sizeWidth}px">
+                                                        <button
+                                                                class="flex w-full items-center justify-between text-[11px] font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors text-right"
+                                                                onclick={() => toggleSort("size")}
+                                                        >
+                                                                Size
+                                                                {#if sortColumn === "size"}
+                                                                        <ArrowUpDown size={10} class={cn(sortDirection === "desc" && "rotate-180")}></ArrowUpDown>
+                                                                {/if}
+                                                        </button>
+                                                        <div class="absolute right-0 top-0 w-px h-full bg-border-color/30"></div>
+                                                        <div
+                                                                class="absolute -right-1 top-0 w-2 h-full cursor-col-resize z-10"
+                                                                onmousedown={(e) => startResize(e, 'size')}
+                                                                role="none"
+                                                        ></div>
+                                                </div>
 
-                                <div class="w-10 shrink-0"></div>
-                        </div>
-
-                        <!-- Scrollable File List -->
-                        <ScrollArea class="flex-1">
-                                {#if filteredFiles.length === 0}
-                                        <div class="flex h-full flex-col items-center justify-center p-12 text-center opacity-30">
-                                                <Search size={48} class="mb-4" strokeWidth={1}></Search>
-                                                <p class="text-sm font-medium uppercase tracking-widest">Folder is empty</p>
+                                                <div class="w-10 shrink-0"></div>
                                         </div>
-                                {:else}
-                                        {#each filteredFiles as item}
-                                                <FileBrowserRowItem
-                                                        {item}
-                                                        {mode}
-                                                        {colWidths}
-                                                        isSelected={selectedPaths.has(item.path)}
-                                                        onClick={(e) => handleRowClick(e, item)}
-                                                        onDoubleClick={() => handleRowDoubleClick(item)}
-                                                        onToggleTrack={() => onToggleTrack(item)}
-                                                />
-                                        {/each}
-                                {/if}
-                        </ScrollArea>
+
+                                        <!-- Scrollable File List -->
+                                        <div class="flex-1 overflow-y-auto min-h-0">
+                                                {#if filteredFiles.length === 0}
+                                                        <div class="flex h-full flex-col items-center justify-center p-12 text-center opacity-30">
+                                                                <Search size={48} class="mb-4" strokeWidth={1}></Search>
+                                                                <p class="text-sm font-medium uppercase tracking-widest">Folder is empty</p>
+                                                        </div>
+                                                {:else}
+                                                        {#each filteredFiles as item (item.path)}
+                                                                <FileBrowserRowItem
+                                                                        {item}
+                                                                        {mode}
+                                                                        {colWidths}
+                                                                        isSelected={selectedPaths.has(item.path)}
+                                                                        onClick={(e) => handleRowClick(e, item)}
+                                                                        onDoubleClick={() => handleRowDoubleClick(item)}
+                                                                        onToggleTrack={() => onToggleTrack(item)}
+                                                                />
+                                                        {/each}
+                                                {/if}
+                                        </div>
+                                </div>
+                        </div>
                 </div>
         </div>
 
@@ -425,9 +416,9 @@
                                 <CheckSquare size={10}></CheckSquare>
                                 <span class="font-bold uppercase tracking-wider">
                                         {#if mode === 'host'}
-                                                {files.filter((f) => f.tracked).length} Tracked
+                                                {files.filter((f: FileItem) => f.tracked).length} Tracked
                                         {:else}
-                                                {files.filter((f) => f.selected).length} Selected
+                                                {files.filter((f: FileItem) => f.selected).length} Selected
                                         {/if}
                                 </span>
                         </div>

@@ -1,9 +1,9 @@
 <script lang="ts">
-        import { ChevronRight, Folder, Home, HardDrive, Monitor, Download, FileText, Image } from "lucide-svelte";
+        import { ChevronRight, Folder, HardDrive } from "lucide-svelte";
         import type { TreeNode } from "$lib/types";
         import { cn } from "$lib/utils";
         import FileBrowserTreeItem from "./FileBrowserTreeItem.svelte";
-        import { getTreeSystemTreeGet } from "$lib/api/sdk.gen";
+        import { getTreeSystemTreeGet, getIndexTreeInventoryTreeGet, type TreeNodeSchema } from "$lib/api";
 
         let {
                 node,
@@ -21,10 +21,18 @@
                 mode?: "host" | "index";
         }>();
 
-        let expanded = $state(node.expanded || false);
-        let children = $state<TreeNode[]>(node.children || []);
+        let expanded = $state(false);
+        let children = $state<TreeNode[]>([]);
         let loading = $state(false);
         let loaded = $state(false);
+
+        // Initialize state from props once
+        onMount(() => {
+                if (node.expanded) expanded = true;
+                if (node.children) children = node.children;
+        });
+
+        import { onMount } from 'svelte';
 
         // Auto-load if started expanded
         $effect(() => {
@@ -34,15 +42,19 @@
         });
 
         async function loadSubdirs() {
-                if (loaded || mode === "index") return; // Index mode lazy loading not yet implemented
+                if (loaded) return;
 
                 loading = true;
                 try {
-                        const response = await getTreeSystemTreeGet({
+                        const fetchFn = mode === "host" ? getTreeSystemTreeGet : getIndexTreeInventoryTreeGet;
+                        const response = await fetchFn({
                                 query: { path: node.path }
                         });
-                        if (response.data) {
-                                children = response.data.map(d => ({
+
+                        const data = (response.data as any) as TreeNodeSchema[];
+
+                        if (data && Array.isArray(data)) {
+                                children = data.map((d: TreeNodeSchema) => ({
                                         name: d.name,
                                         path: d.path,
                                         children: [],
@@ -71,15 +83,7 @@
 
         const specialIcon = $derived.by(() => {
                 if (!isSpecial) return null;
-                switch (node.name.toLowerCase()) {
-                        case "source data":
-                        case "this pc":
-                        case "root":
-                        case "virtual index":
-                                return HardDrive;
-                        default:
-                                return HardDrive;
-                }
+                return HardDrive;
         });
 
         const hasSubdirs = $derived((children && children.length > 0) || (node as any).hasChildren);
@@ -161,7 +165,7 @@
 
         {#if expanded && children.length > 0}
                 <div role="group">
-                        {#each children as child}
+                        {#each children as child (child.path)}
                                 <FileBrowserTreeItem node={child} {selectedPath} {onSelect} level={level + 1} {mode} />
                         {/each}
                 </div>

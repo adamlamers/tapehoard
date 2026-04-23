@@ -1,88 +1,88 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import {
-        Play,
+        History,
         Trash2,
-        CassetteTape,
-        ChevronRight,
-        CheckCircle2,
-        AlertCircle,
-        Download,
         RotateCw,
+        Database,
+        CassetteTape,
+        HardDrive,
+        ArrowRight,
         X,
-        Search
+        FileText,
+        Info,
+        ShieldCheck,
+        MapPin
     } from 'lucide-svelte';
-    import { fade, fly } from 'svelte/transition';
-    import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
-    import type { FileItem } from '$lib/types';
-    import { browseIndexInventoryBrowseGet } from '$lib/api/sdk.gen';
+    import { Button } from '$lib/components/ui/button';
+    import { Card } from '$lib/components/ui/card';
+    import { ScrollArea } from '$lib/components/ui/scroll-area';
+    import {
+        listCartRestoresCartGet,
+        getManifestRestoresManifestGet,
+        removeFromCartRestoresCartItemIdDelete,
+        clearCartRestoresCartClearPost,
+        getSettingsSystemSettingsGet,
+        type CartItemSchema,
+        type RestoreManifestSchema
+    } from '$lib/api';
+    import { cn } from '$lib/utils';
+    import { toast } from 'svelte-sonner';
 
-    // Wizard State
-    let currentStep = $state(1);
+    let cartItems = $state<CartItemSchema[]>([]);
+    let manifest = $state<RestoreManifestSchema | null>(null);
+    let restoreDests = $state<string[]>([]);
+    let selectedDest = $state("");
+    let loading = $state(true);
 
-    // File Browser State
-    let currentPath = $state('/');
-    let indexedFiles = $state<FileItem[]>([]);
-    let loading = $state(false);
-
-    // Restore Cart (Selected Files)
-    let restoreCart = $state<FileItem[]>([]);
-
-    async function loadIndexedFiles(path: string) {
+    async function loadData() {
         loading = true;
         try {
-            const response = await browseIndexInventoryBrowseGet({
-                query: { path }
-            });
-            if (response.data) {
-                // Map API response and preserve selection state if already in cart
-                indexedFiles = response.data.map(f => ({
-                    ...f,
-                    type: f.type as 'file' | 'directory' | 'link',
-                    selected: restoreCart.some(cartItem => cartItem.path === f.path)
-                }));
+            const [cartRes, manifestRes, settingsRes] = await Promise.all([
+                listCartRestoresCartGet(),
+                getManifestRestoresManifestGet(),
+                getSettingsSystemSettingsGet()
+            ]);
+
+            if (cartRes.data) cartItems = cartRes.data;
+            if (manifestRes.data) manifest = manifestRes.data;
+
+            if (settingsRes.data?.restore_destinations) {
+                restoreDests = JSON.parse(settingsRes.data.restore_destinations);
+                if (restoreDests.length > 0) selectedDest = restoreDests[0];
             }
         } catch (error) {
-            console.error("Failed to load indexed files:", error);
+            toast.error("Failed to load restore details");
         } finally {
             loading = false;
         }
     }
 
-    onMount(() => {
-        loadIndexedFiles(currentPath);
-    });
-
-    $effect(() => {
-        if (currentPath) {
-            loadIndexedFiles(currentPath);
-        }
-    });
-
-    function handleToggleSelect(item: FileItem) {
-        const index = restoreCart.findIndex(i => i.path === item.path);
-        if (index > -1) {
-            restoreCart = restoreCart.filter((_, i) => i !== index);
-            item.selected = false;
-        } else {
-            restoreCart = [...restoreCart, { ...item, selected: true }];
-            item.selected = true;
+    async function removeItem(itemId: number) {
+        try {
+            await removeFromCartRestoresCartItemIdDelete({ path: { item_id: itemId } });
+            await loadData();
+        } catch (error) {
+            toast.error("Failed to remove item");
         }
     }
 
-    function removeFromCart(path: string) {
-        restoreCart = restoreCart.filter(i => i.path !== path);
-        // Update selection in current view if visible
-        const visibleItem = indexedFiles.find(f => f.path === path);
-        if (visibleItem) visibleItem.selected = false;
+    async function clearCart() {
+        if (!confirm("Clear entire restore cart?")) return;
+        try {
+            await clearCartRestoresCartClearPost();
+            await loadData();
+            toast.info("Cart cleared");
+        } catch (error) {
+            toast.error("Failed to clear cart");
+        }
     }
 
-    const totalSize = $derived(restoreCart.reduce((acc, item) => acc + (item.size || 0), 0));
-    const requiredMedia = $derived([...new Set(restoreCart.flatMap(item => item.media || []))]);
+    onMount(loadData);
 
     function formatSize(bytes: number) {
         if (bytes === 0) return "0 B";
-        const units = ["B", "KB", "MB", "GB", "TB"];
+        const units = ["B", "KB", "MB", "GB", "TB", "PB"];
         let unitIndex = 0;
         let size = bytes;
         while (size >= 1024 && unitIndex < units.length - 1) {
@@ -91,161 +91,170 @@
         }
         return `${size.toFixed(1)} ${units[unitIndex]}`;
     }
-
-    function nextStep() {
-        if (currentStep < 4) currentStep++;
-    }
-
-    function cancel() {
-        currentStep = 1;
-    }
 </script>
 
 <svelte:head>
-    <title>Restore Wizard - TapeHoard</title>
+    <title>Restore Management - TapeHoard</title>
 </svelte:head>
 
 <div class="flex flex-col gap-6 h-full">
+    <!-- HEADER -->
     <header class="flex justify-between items-center bg-bg-secondary px-8 py-5 rounded-xl border border-border-color shadow-2xl relative overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent pointer-events-none"></div>
+        <div class="absolute inset-0 bg-gradient-to-r from-success-color/5 to-transparent pointer-events-none"></div>
         <div class="relative z-10">
             <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
-                <RotateCw class="text-blue-500" size={28} />
-                Restore Wizard
+                <History class="text-success-color" size={28} />
+                Restore Management
             </h1>
             <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
-                Step {currentStep} of 4: {['Browse & Select', 'Insert Media', 'Swap Media', 'Finalize'][currentStep-1]}
+                Cart Review & Physical Media Manifest
             </p>
         </div>
 
-        {#if currentStep === 1}
-            <div class="flex gap-4 relative z-10">
-                <Button variant="default" size="lg" class="px-8 h-12" disabled={restoreCart.length === 0} onclick={nextStep}>
-                    <Play size={20} class="mr-2" />
-                    Execute Restore
-                </Button>
-            </div>
-        {/if}
+        <div class="flex gap-3 z-10">
+            <Button variant="outline" class="h-10 px-6 font-black uppercase tracking-widest text-[10px] border-border-color hover:bg-error-color/5 hover:text-error-color hover:border-error-color/30" onclick={clearCart} disabled={cartItems.length === 0}>
+                <Trash2 size={14} class="mr-2" /> Clear Cart
+            </Button>
+            <Button variant="default" class="h-10 px-6 font-black uppercase tracking-widest text-[10px] bg-success-color hover:bg-success-color/90" disabled={cartItems.length === 0 || !selectedDest}>
+                <ShieldCheck size={14} class="mr-2" /> Initiate Restore
+            </Button>
+        </div>
     </header>
 
-    {#if currentStep === 1}
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-            <!-- LEFT: VIRTUAL FILESYSTEM BROWSER -->
-            <div class="lg:col-span-2 flex flex-col min-h-0 relative">
-                <div class="mb-2 flex items-center justify-between">
-                    <h3 class="text-sm font-bold uppercase tracking-widest text-text-secondary">Virtual Filesystem</h3>
-                    <span class="text-[10px] bg-white/5 px-2 py-1 rounded text-text-secondary font-mono">Indexing: {currentPath}</span>
-                </div>
-                {#if loading}
-                    <div class="absolute inset-0 bg-bg-primary/50 z-50 flex items-center justify-center top-8">
-                        <span class="text-text-secondary animate-pulse">Querying Index...</span>
+    {#if loading && cartItems.length === 0}
+        <div class="flex flex-col items-center justify-center py-24 gap-4 opacity-50">
+            <RotateCw size={48} class="animate-spin text-success-color" />
+            <span class="text-xs font-black uppercase tracking-widest">Generating Manifest...</span>
+        </div>
+    {:else if cartItems.length === 0}
+        <Card class="flex-1 border-2 border-dashed border-border-color flex flex-col items-center justify-center p-12 text-center opacity-30">
+            <History size={64} class="mb-4" strokeWidth={1} />
+            <p class="text-lg font-black uppercase tracking-widest">Restore Cart is Empty</p>
+            <p class="text-[11px] font-bold uppercase tracking-[0.2em] mt-2">Go to the Index Browser to select files for recovery.</p>
+            <Button variant="outline" class="mt-8 border-border-color" href="/index-browser">
+                Browse Index <ArrowRight size={14} class="ml-2" />
+            </Button>
+        </Card>
+    {:else}
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 min-h-0">
+            <!-- CART LIST -->
+            <div class="lg:col-span-2 flex flex-col min-h-0">
+                <Card class="flex-1 overflow-hidden flex flex-col bg-bg-secondary border-border-color shadow-xl">
+                    <div class="p-6 border-b border-border-color flex justify-between items-center bg-bg-tertiary/30">
+                        <h3 class="text-[11px] font-black uppercase tracking-widest text-text-primary">Queued for Restore ({cartItems.length})</h3>
+                        <span class="text-xs font-bold mono text-text-secondary">{formatSize(manifest?.total_size || 0)}</span>
                     </div>
-                {/if}
-                <FileBrowser
-                    bind:currentPath
-                    files={indexedFiles}
-                    mode="index"
-                    onNavigate={(path) => currentPath = path}
-                    onToggleTrack={handleToggleSelect}
-                />
+                    <ScrollArea class="flex-1">
+                        <div class="divide-y divide-border-color/30">
+                            {#each cartItems as item (item.id)}
+                                <div class="p-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors group">
+                                    <div class="flex items-center gap-4 min-w-0">
+                                        <div class="p-2 bg-bg-primary rounded-lg border border-border-color/50 text-text-secondary">
+                                            <FileText size={18} />
+                                        </div>
+                                        <div class="flex flex-col min-w-0">
+                                            <span class="text-[13px] font-bold text-text-primary truncate">{item.file_path.split('/').pop()}</span>
+                                            <span class="text-[10px] mono text-text-secondary/50 truncate italic">{item.file_path}</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-6 shrink-0">
+                                        <div class="flex gap-1">
+                                            {#each item.media_identifiers as media}
+                                                <span class="text-[9px] font-black uppercase tracking-tighter bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20">{media}</span>
+                                            {/each}
+                                        </div>
+                                        <span class="text-xs font-bold mono text-text-secondary w-20 text-right">{formatSize(item.size)}</span>
+                                        <button class="text-text-secondary hover:text-error-color opacity-0 group-hover:opacity-100 transition-all p-1" onclick={() => removeItem(item.id)}>
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+                    </ScrollArea>
+                </Card>
             </div>
 
-            <!-- RIGHT: RESTORE CART -->
-            <div class="flex flex-col gap-4 min-h-0">
-                <div class="bg-bg-secondary border border-border-color rounded-xl p-6 flex flex-col h-full shadow-lg">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-black uppercase tracking-tight text-text-primary flex items-center gap-2">
-                            <Download size={20} class="text-blue-400" />
-                            Restore Cart
-                        </h3>
-                        <span class="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            {restoreCart.length}
-                        </span>
+            <!-- MANIFEST SIDEBAR -->
+            <div class="flex flex-col gap-6">
+                <!-- Recovery Destination Card -->
+                <Card class="p-8 bg-bg-secondary border-border-color shadow-xl">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-text-primary mb-6 flex items-center gap-2">
+                        <MapPin size={14} class="text-action-color" />
+                        Recovery Destination
+                    </h3>
+
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 gap-2">
+                            {#each restoreDests as dest}
+                                <button
+                                    class={cn(
+                                        "flex items-center gap-3 p-3 rounded-lg border transition-all text-left group",
+                                        selectedDest === dest
+                                            ? "bg-action-color/10 border-action-color text-text-primary shadow-[0_0_15px_rgba(52,152,219,0.1)]"
+                                            : "bg-bg-primary/50 border-border-color text-text-secondary hover:border-text-secondary/30"
+                                    )}
+                                    onclick={() => selectedDest = dest}
+                                >
+                                    <div class={cn(
+                                        "w-2 h-2 rounded-full",
+                                        selectedDest === dest ? "bg-action-color animate-pulse" : "bg-border-color"
+                                    )}></div>
+                                    <span class="text-[11px] font-bold mono truncate">{dest}</span>
+                                </button>
+                            {:else}
+                                <div class="p-4 border-2 border-dashed border-border-color rounded-lg text-center">
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-text-secondary/50">No targets defined in settings</p>
+                                </div>
+                            {/each}
+                        </div>
+                        <p class="text-[9px] font-bold text-text-secondary/50 uppercase tracking-tight italic">Files will be extracted into this directory using their original folder structure.</p>
+                    </div>
+                </Card>
+
+                <Card class="p-8 bg-gradient-to-br from-bg-secondary to-bg-tertiary border-border-color shadow-2xl relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                        <Database size={120} />
                     </div>
 
-                    <div class="flex-1 overflow-y-auto mb-4 pr-2">
-                        {#if restoreCart.length === 0}
-                            <div class="h-full flex flex-col items-center justify-center text-center opacity-20 py-12">
-                                <Search size={48} class="mb-4" />
-                                <p class="text-xs font-bold uppercase tracking-widest leading-relaxed">
-                                    Your cart is empty.<br>Select files from the index.
-                                </p>
-                            </div>
-                        {:else}
-                            <div class="flex flex-col gap-2">
-                                {#each restoreCart as item}
-                                    <div class="bg-bg-primary/50 border border-border-color/50 rounded-lg p-3 group transition-all hover:border-blue-500/30">
-                                        <div class="flex justify-between items-start gap-2">
-                                            <div class="min-w-0">
-                                                <p class="text-[12px] font-bold text-text-primary truncate">{item.name}</p>
-                                                <p class="text-[10px] text-text-secondary truncate mono opacity-50">{item.path}</p>
-                                            </div>
-                                            <button
-                                                class="text-text-secondary hover:text-error-color transition-colors p-1"
-                                                onclick={() => removeFromCart(item.path)}
-                                            >
-                                                <X size={14} />
-                                            </button>
+                    <div class="relative z-10">
+                        <h3 class="text-lg font-black uppercase tracking-tighter text-text-primary mb-6 flex items-center gap-2">
+                            <Info size={18} class="text-blue-500" />
+                            Physical Manifest
+                        </h3>
+
+                        <div class="space-y-4">
+                            {#if manifest}
+                                {#each manifest.media_required as req}
+                                    <div class="p-4 bg-bg-primary/50 border border-border-color rounded-xl flex items-center gap-4 group hover:border-blue-500/30 transition-colors">
+                                        <div class={cn(
+                                            "p-3 rounded-lg border shadow-inner",
+                                            req.media_type === 'tape' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                        )}>
+                                            {#if req.media_type === 'tape'}<CassetteTape size={20} />{:else}<HardDrive size={20} />{/if}
                                         </div>
-                                        <div class="flex items-center gap-3 mt-2">
-                                            <span class="text-[10px] mono text-text-secondary font-bold">{formatSize(item.size || 0)}</span>
-                                            <div class="flex gap-1">
-                                                {#each (item.media || []) as m}
-                                                    <span class="flex items-center gap-1 text-[9px] bg-blue-500/10 text-blue-400 px-1 rounded font-bold">
-                                                        <CassetteTape size={10} /> {m}
-                                                    </span>
-                                                {/each}
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex justify-between items-center mb-1">
+                                                <span class="text-sm font-black text-text-primary mono">{req.identifier}</span>
+                                                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary">{req.media_type}</span>
+                                            </div>
+                                            <div class="flex justify-between text-[10px] font-bold text-text-secondary opacity-60">
+                                                <span>{req.file_count} FILES</span>
+                                                <span>{formatSize(req.total_size)}</span>
                                             </div>
                                         </div>
                                     </div>
                                 {/each}
-                            </div>
-                        {/if}
-                    </div>
-
-                    <div class="pt-4 border-t border-border-color mt-auto">
-                        <div class="flex justify-between mb-2">
-                            <span class="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Total Payload</span>
-                            <span class="text-sm font-black text-text-primary mono">{formatSize(totalSize)}</span>
+                            {/if}
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Media Required</span>
-                            <span class="text-sm font-black text-blue-400 mono">{requiredMedia.length} Tapes</span>
+
+                        <div class="mt-8 p-4 bg-blue-500/5 border border-dashed border-blue-500/20 rounded-lg">
+                            <p class="text-[10px] font-bold text-blue-300/70 leading-relaxed italic">
+                                Note: Recovery will proceed sequentially by media to minimize hardware cycles.
+                            </p>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-
-    {:else if currentStep === 2}
-        <!-- (Step 2-4 keep the same design as before but with Tailwind classes) -->
-        <div in:fly={{ y: 20, duration: 300 }} class="flex flex-col items-center justify-center flex-1">
-            <div class="bg-bg-secondary border-2 border-border-color rounded-2xl p-12 text-center shadow-2xl max-w-lg w-full">
-                <div class="w-20 h-20 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
-                    <CassetteTape size={48} />
-                </div>
-                <h2 class="text-2xl font-black text-text-primary uppercase tracking-tight mb-2">Insert Tape</h2>
-                <p class="text-text-secondary mb-8">
-                    Please insert the following tape into the drive to begin extraction.
-                </p>
-
-                <div class="bg-bg-primary border-2 border-dashed border-border-color rounded-xl p-8 mb-8">
-                    <span class="text-4xl font-black text-text-primary mono">{requiredMedia[0] || 'BUP-00001'}</span>
-                </div>
-
-                <div class="flex items-center justify-center gap-3 text-text-secondary text-sm font-bold uppercase tracking-widest mb-10">
-                    <RotateCw size={18} class="animate-spin text-blue-500" />
-                    <span>Waiting for drive status...</span>
-                </div>
-
-                <div class="flex gap-4 justify-center">
-                    <Button variant="secondary" onclick={cancel}>
-                        <X size={18} class="mr-2" /> Cancel
-                    </Button>
-                    <Button variant="default" onclick={nextStep}>
-                        Simulate Load <ChevronRight size={18} class="ml-2" />
-                    </Button>
-                </div>
+                </Card>
             </div>
         </div>
     {/if}

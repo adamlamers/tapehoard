@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 
-from sqlalchemy import Integer, String, Float, ForeignKey, DateTime, Boolean
+from sqlalchemy import Integer, String, Float, ForeignKey, DateTime, Boolean, BigInteger
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -14,10 +14,18 @@ class FilesystemState(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     file_path: Mapped[str] = mapped_column(String, index=True, unique=True)
-    size: Mapped[int] = mapped_column(Integer)
+    size: Mapped[int] = mapped_column(BigInteger)
     mtime: Mapped[float] = mapped_column(Float)
-    sha256_hash: Mapped[Optional[str]] = mapped_column(String, index=True)
-    last_seen_timestamp: Mapped[datetime] = mapped_column(DateTime)
+    sha256_hash: Mapped[Optional[str]] = mapped_column(
+        String, index=True, nullable=True
+    )
+    is_indexed: Mapped[bool] = mapped_column(Boolean, default=False)  # True if hashed
+    is_ignored: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # True if matches exclusion
+    last_seen_timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     versions: Mapped[List["FileVersion"]] = relationship(back_populates="file_state")
 
@@ -33,12 +41,15 @@ class StorageMedia(Base):
     generation_tier: Mapped[Optional[str]] = mapped_column(
         String
     )  # e.g., LTO-6, S3 Standard
-    capacity: Mapped[int] = mapped_column(Integer)  # Native capacity in bytes
-    bytes_used: Mapped[int] = mapped_column(Integer, default=0)
+    capacity: Mapped[int] = mapped_column(BigInteger)  # Native capacity in bytes
+    bytes_used: Mapped[int] = mapped_column(BigInteger, default=0)
     location: Mapped[Optional[str]] = mapped_column(String)
     status: Mapped[str] = mapped_column(
         String, default="active"
     )  # active, full, retired, offline
+    extra_config: Mapped[Optional[str]] = mapped_column(
+        String
+    )  # JSON config for type-specific details
 
     versions: Mapped[List["FileVersion"]] = relationship(back_populates="media")
 
@@ -75,7 +86,52 @@ class TrackedSource(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     path: Mapped[str] = mapped_column(String, unique=True, index=True)
     is_directory: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    action: Mapped[str] = mapped_column(String, default="include")  # include, exclude
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class RestoreCart(Base):
+    __tablename__ = "restore_cart"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    filesystem_state_id: Mapped[int] = mapped_column(ForeignKey("filesystem_state.id"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    file_state: Mapped["FilesystemState"] = relationship()
+
+
+class Job(Base):
+    __tablename__ = "jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_type: Mapped[str] = mapped_column(String)  # SCAN, BACKUP, RESTORE
+    status: Mapped[str] = mapped_column(
+        String, default="PENDING"
+    )  # PENDING, RUNNING, COMPLETED, FAILED
+    progress: Mapped[float] = mapped_column(Float, default=0.0)
+    current_task: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[str] = mapped_column(String)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
 
 class JobLog(Base):
@@ -83,8 +139,10 @@ class JobLog(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     backup_id: Mapped[int] = mapped_column(ForeignKey("backups.id"))
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    log_level: Mapped[str] = mapped_column(String)  # INFO, WARN, ERROR
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    log_level: Mapped[str] = mapped_column(String)  # INFO, ERROR, WARN
     message: Mapped[str] = mapped_column(String)
 
     backup: Mapped["BackupJob"] = relationship(back_populates="logs")

@@ -30,7 +30,7 @@ lint:
     @echo "Linting Python (Ruff)..."
     cd backend && uv run ruff check .
     @echo "Type checking Python (ty)..."
-    cd backend && uv run ty
+    cd backend && uv run ty check
     @echo "Type checking Svelte..."
     cd frontend && npm run check
 

@@ -1,9 +1,318 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
+    import {
+        ShieldCheck,
+        ShieldAlert,
+        FileText,
+        Database,
+        Clock,
+        RotateCw,
+        Activity,
+        HardDrive,
+        Cloud,
+        ArrowRight,
+        EyeOff
+    } from 'lucide-svelte';
+    import { Card } from '$lib/components/ui/card';
+    import { Button } from '$lib/components/ui/button';
+    import { getDashboardStatsSystemDashboardStatsGet, triggerScanSystemScanPost, type DashboardStatsSchema } from '$lib/api';
+    import { cn } from '$lib/utils';
+    import { toast } from 'svelte-sonner';
+
+    let stats = $state<DashboardStatsSchema | null>(null);
+    let loading = $state(true);
+    let scanning = $state(false);
+
+    async function loadStats() {
+        loading = true;
+        try {
+            const response = await getDashboardStatsSystemDashboardStatsGet();
+            if (response.data) {
+                stats = response.data;
+            }
+        } catch (error) {
+            console.error("Failed to load dashboard stats:", error);
+        } finally {
+            loading = false;
+        }
+    }
+
+    async function startScan() {
+        scanning = true;
+        try {
+            await triggerScanSystemScanPost();
+            toast.success("Scan job initiated successfully");
+        } catch (error: any) {
+            toast.error(error.body?.detail || "Failed to start scan");
+        } finally {
+            scanning = false;
+        }
+    }
+
+    onMount(loadStats);
+
+    function formatSize(bytes: number) {
+        if (bytes === 0) return "0 B";
+        const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+        let unitIndex = 0;
+        let size = bytes;
+        while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex++;
+        }
+        return `${size.toFixed(1)} ${units[unitIndex]}`;
+    }
+
+    const protectionPercent = $derived.by(() => {
+        if (!stats || stats.total_files_indexed === 0) return 0;
+        const eligible_count = stats.total_files_indexed - stats.ignored_files_count;
+        if (eligible_count <= 0) return 0;
+        const protected_count = eligible_count - stats.unprotected_files_count;
+        return Math.round((protected_count / eligible_count) * 100);
+    });
+
+    const dataProtectionPercent = $derived.by(() => {
+        if (!stats || stats.total_data_size === 0) return 0;
+        const eligible_size = stats.total_data_size - stats.ignored_data_size;
+        if (eligible_size <= 0) return 0;
+        const protected_size = eligible_size - stats.unprotected_data_size;
+        return Math.round((protected_size / eligible_size) * 100);
+    });
 </script>
 
 <svelte:head>
-	<title>TapeHoard - Dashboard</title>
+    <title>Dashboard - TapeHoard</title>
 </svelte:head>
 
-<h1>Dashboard</h1>
-<p>Welcome to TapeHoard.</p>
+<div class="space-y-8 animate-in fade-in duration-700">
+    <!-- HERO SECTION -->
+    <div class="flex justify-between items-start">
+        <div>
+            <h1 class="text-4xl font-black uppercase tracking-tighter text-text-primary">Operational Status</h1>
+            <p class="text-text-secondary mt-1 font-bold uppercase tracking-widest text-[11px] opacity-70">Fleet-wide data protection & index health</p>
+        </div>
+        <div class="flex gap-3">
+            <Button variant="outline" class="h-10 px-6 font-black uppercase tracking-widest text-[10px] border-border-color" onclick={loadStats}>
+                <RotateCw size={14} class={cn("mr-2", loading && "animate-spin")} /> Refresh
+            </Button>
+            <Button variant="default" class="h-10 px-6 font-black uppercase tracking-widest text-[10px]" onclick={startScan} disabled={scanning}>
+                {#if scanning}
+                    <RotateCw size={14} class="mr-2 animate-spin" /> Starting...
+                {:else}
+                    <Activity size={14} class="mr-2" /> Start Full Scan
+                {/if}
+            </Button>
+        </div>
+    </div>
+
+    {#if loading && !stats}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {#each Array(4) as _}
+                <div class="h-32 bg-bg-secondary animate-pulse rounded-xl border border-border-color/50"></div>
+            {/each}
+        </div>
+    {:else if stats}
+        <!-- TOP STATS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card class="p-6 bg-gradient-to-br from-bg-secondary to-bg-tertiary border-border-color hover:border-blue-500/30 transition-all group relative overflow-hidden">
+                <div class="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="flex items-center gap-4 relative z-10">
+                    <div class="p-3 bg-blue-500/10 rounded-lg text-blue-500 border border-blue-500/20 shadow-inner">
+                        <FileText size={24} />
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Total Files</span>
+                        <span class="text-2xl font-black text-text-primary mono tracking-tight">{stats.total_files_indexed.toLocaleString()}</span>
+                    </div>
+                </div>
+            </Card>
+
+            <Card class="p-6 bg-gradient-to-br from-bg-secondary to-bg-tertiary border-border-color hover:border-action-color/30 transition-all group relative overflow-hidden">
+                <div class="absolute inset-0 bg-action-color/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="flex items-center gap-4 relative z-10">
+                    <div class="p-3 bg-action-color/10 rounded-lg text-action-color border border-action-color/20 shadow-inner">
+                        <Database size={24} />
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Data Volume</span>
+                        <span class="text-2xl font-black text-text-primary mono tracking-tight">{formatSize(stats.total_data_size)}</span>
+                    </div>
+                </div>
+            </Card>
+
+            <Card class="p-6 bg-gradient-to-br from-bg-secondary to-bg-tertiary border-border-color hover:border-success-color/30 transition-all group relative overflow-hidden">
+                <div class="absolute inset-0 bg-success-color/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="flex items-center gap-4 relative z-10">
+                    <div class="p-3 bg-success-color/10 rounded-lg text-success-color border border-success-color/20 shadow-inner">
+                        <ShieldCheck size={24} />
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Redundancy Ratio</span>
+                        <span class="text-2xl font-black text-text-primary mono tracking-tight">{stats.redundancy_ratio}x</span>
+                    </div>
+                </div>
+            </Card>
+
+            <Card class="p-6 bg-gradient-to-br from-bg-secondary to-bg-tertiary border-border-color hover:border-orange-500/30 transition-all group relative overflow-hidden">
+                <div class="absolute inset-0 bg-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="flex items-center gap-4 relative z-10">
+                    <div class="p-3 bg-orange-500/10 rounded-lg text-orange-500 border border-orange-500/20 shadow-inner">
+                        <Clock size={24} />
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Last Scan</span>
+                        <span class="text-xl font-black text-text-primary tracking-tight">
+                            {stats.last_scan_time ? new Date(stats.last_scan_time).toLocaleDateString() : 'Never'}
+                        </span>
+                    </div>
+                </div>
+            </Card>
+        </div>
+
+        <!-- MAIN GRID -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Protection Health -->
+            <Card class="lg:col-span-2 p-8 bg-bg-secondary border-border-color shadow-xl overflow-hidden relative">
+                <div class="absolute top-0 right-0 p-8 opacity-5">
+                    <ShieldCheck size={200} />
+                </div>
+
+                <h3 class="text-lg font-black uppercase tracking-tighter text-text-primary mb-8 flex items-center gap-2">
+                    <Activity size={18} class="text-blue-500" />
+                    Protection Health Score
+                </h3>
+
+                <div class="space-y-12 relative z-10">
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary">Tracked File Coverage</span>
+                                <h4 class="text-3xl font-black text-text-primary">{protectionPercent}%</h4>
+                            </div>
+                            <span class="text-xs font-bold mono text-text-secondary">
+                                {stats.total_files_indexed - stats.ignored_files_count - stats.unprotected_files_count} / {stats.total_files_indexed - stats.ignored_files_count} ELIGIBLE FILES
+                            </span>
+                        </div>
+                        <div class="w-full bg-bg-primary h-4 rounded-full border border-border-color shadow-inner overflow-hidden">
+                            <div class="bg-gradient-to-r from-blue-600 to-blue-400 h-full transition-all duration-1000 shadow-[0_0_15px_rgba(59,130,246,0.3)]" style="width: {protectionPercent}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary">Active Data Redundancy</span>
+                                <h4 class="text-3xl font-black text-text-primary">{dataProtectionPercent}%</h4>
+                            </div>
+                            <span class="text-xs font-bold mono text-text-secondary">
+                                {formatSize(stats.total_data_size - stats.ignored_data_size - stats.unprotected_data_size)} / {formatSize(stats.total_data_size - stats.ignored_data_size)}
+                            </span>
+                        </div>
+                        <div class="w-full bg-bg-primary h-4 rounded-full border border-border-color shadow-inner overflow-hidden">
+                            <div class="bg-gradient-to-r from-success-color to-emerald-400 h-full transition-all duration-1000 shadow-[0_0_15px_rgba(46,204,113,0.3)]" style="width: {dataProtectionPercent}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-bg-tertiary/50 rounded-xl border border-border-color">
+                    <div class="flex gap-4">
+                        <div class="p-2 bg-error-color/10 rounded-lg text-error-color h-fit shrink-0">
+                            <ShieldAlert size={18} />
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block mb-1">Unprotected</span>
+                            <span class="text-lg font-black text-error-color mono">{stats.unprotected_files_count.toLocaleString()}</span>
+                            <p class="text-[9px] font-bold text-text-secondary uppercase tracking-tight mt-1">Files pending archival</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4 border-l border-border-color/30 pl-4">
+                        <div class="p-2 bg-text-secondary/10 rounded-lg text-text-secondary h-fit shrink-0">
+                            <EyeOff size={18} />
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block mb-1">Ignored</span>
+                            <span class="text-lg font-black text-text-secondary mono">{stats.ignored_files_count.toLocaleString()}</span>
+                            <p class="text-[9px] font-bold text-text-secondary uppercase tracking-tight mt-1">Bypassed by policy</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4 border-l border-border-color/30 pl-4">
+                        <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500 h-fit shrink-0">
+                            <Database size={18} />
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block mb-1">Ignored Vol</span>
+                            <span class="text-lg font-black text-blue-400 mono">{formatSize(stats.ignored_data_size)}</span>
+                            <p class="text-[9px] font-bold text-text-secondary uppercase tracking-tight mt-1">Filtered from index</p>
+                        </div>
+                    </div>
+                </div>
+            </Card>
+
+            <!-- Quick Actions & Media -->
+            <div class="space-y-8">
+                <Card class="p-8 bg-bg-secondary border-border-color shadow-xl h-fit">
+                    <h3 class="text-lg font-black uppercase tracking-tighter text-text-primary mb-6">Quick Directives</h3>
+                    <div class="space-y-3">
+                        <Button variant="outline" class="w-full justify-between h-12 font-black uppercase tracking-widest text-[10px] border-border-color hover:border-blue-500/50 hover:bg-blue-500/5 group" href="/tracking">
+                            Review Tracking Rules <ArrowRight size={14} class="group-hover:translate-x-1 transition-transform" />
+                        </Button>
+                        <Button variant="outline" class="w-full justify-between h-12 font-black uppercase tracking-widest text-[10px] border-border-color hover:border-success-color/50 hover:bg-success-color/5 group" href="/index-browser">
+                            Browse Indexed Files <ArrowRight size={14} class="group-hover:translate-x-1 transition-transform" />
+                        </Button>
+                        <Button variant="outline" class="w-full justify-between h-12 font-black uppercase tracking-widest text-[10px] border-border-color hover:border-action-color/50 hover:bg-action-color/5 group" href="/inventory">
+                            Register New Media <ArrowRight size={14} class="group-hover:translate-x-1 transition-transform" />
+                        </Button>
+                    </div>
+                </Card>
+
+                <Card class="p-8 bg-bg-secondary border-border-color shadow-xl h-fit">
+                    <h3 class="text-lg font-black uppercase tracking-tighter text-text-primary mb-6">Media distribution</h3>
+                    <div class="space-y-6">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-500">
+                                <RotateCw size={20} />
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-[10px] font-black uppercase tracking-widest text-text-primary">LTO Tapes</span>
+                                    <span class="text-[10px] font-bold mono">0 Items</span>
+                                </div>
+                                <div class="w-full bg-bg-primary h-1.5 rounded-full overflow-hidden">
+                                    <div class="bg-blue-500 h-full w-0"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 bg-yellow-500/10 rounded-lg flex items-center justify-center text-yellow-500">
+                                <HardDrive size={20} />
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-[10px] font-black uppercase tracking-widest text-text-primary">HDD Storage</span>
+                                    <span class="text-[10px] font-bold mono">0 Items</span>
+                                </div>
+                                <div class="w-full bg-bg-primary h-1.5 rounded-full overflow-hidden">
+                                    <div class="bg-yellow-500 h-full w-0"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 bg-green-500/10 rounded-lg flex items-center justify-center text-green-500">
+                                <Cloud size={20} />
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-[10px] font-black uppercase tracking-widest text-text-primary">Cloud Vaults</span>
+                                    <span class="text-[10px] font-bold mono">0 Items</span>
+                                </div>
+                                <div class="w-full bg-bg-primary h-1.5 rounded-full overflow-hidden">
+                                    <div class="bg-green-500 h-full w-0"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+        </div>
+    {/if}
+</div>
