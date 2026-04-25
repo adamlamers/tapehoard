@@ -222,10 +222,10 @@
         <div class="relative z-10">
             <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
                 <FolderTree class="text-action-color" size={28} />
-                Tracking Policy
+                Live Filesystem
             </h1>
             <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
-                Data Provisioning & Indexing Configuration
+                Select files and directories for duplication in physical archives
             </p>
         </div>
 
@@ -264,57 +264,6 @@
             </Button>
         </div>
     </header>
-
-    <!-- BACKUP DELTA STATS (FULL WIDTH) -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card class="bg-gradient-to-br from-bg-secondary to-bg-tertiary border-border-color shadow-lg p-4 flex items-center gap-4">
-            <div class="p-3 bg-action-color/10 rounded-lg text-action-color border border-action-color/20">
-                <LayoutGrid size={24} />
-            </div>
-            <div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Selection Set</span>
-                <span class="text-xl font-black text-text-primary mono">
-                    {files.filter(f => f.tracked).length}
-                </span>
-            </div>
-        </Card>
-
-        <Card class="bg-gradient-to-br from-bg-secondary to-bg-tertiary border-border-color shadow-lg p-4 flex items-center gap-4">
-            <div class="p-3 bg-action-color/10 rounded-lg text-action-color border border-action-color/20">
-                <Database size={24} />
-            </div>
-            <div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Directory Index</span>
-                <span class="text-xl font-black text-action-color mono">
-                    {files.length}
-                </span>
-            </div>
-        </Card>
-
-        <Card class="bg-gradient-to-br from-bg-secondary to-bg-tertiary border-border-color shadow-lg p-4 flex items-center gap-4">
-            <div class="p-3 bg-success-color/10 rounded-lg text-success-color border border-success-color/20">
-                <HardDrive size={24} />
-            </div>
-            <div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Tracked Files</span>
-                <span class="text-xl font-black text-success-color mono">
-                    {files.filter(f => !f.ignored).length}
-                </span>
-            </div>
-        </Card>
-
-        <Card class="bg-gradient-to-br from-bg-secondary to-bg-tertiary border-border-color shadow-lg p-4 flex items-center gap-4">
-            <div class="p-3 bg-orange-500/10 rounded-lg text-orange-500 border border-orange-500/20">
-                <FileCheck size={24} />
-            </div>
-            <div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Pending Actions</span>
-                <span class="text-xl font-black text-text-primary mono">
-                    {pendingChanges.size}
-                </span>
-            </div>
-        </Card>
-    </div>
 
     <!-- FULL WIDTH FILE BROWSER -->
     <div class="flex-1 min-h-0 relative">

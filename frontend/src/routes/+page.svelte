@@ -90,8 +90,8 @@
     <!-- HERO SECTION -->
     <div class="flex justify-between items-start">
         <div>
-            <h1 class="text-4xl font-black uppercase tracking-tighter text-text-primary">Operational Status</h1>
-            <p class="text-text-secondary mt-1 font-bold uppercase tracking-widest text-[11px] opacity-70">Fleet-wide data protection & index health</p>
+            <h1 class="text-4xl font-black uppercase tracking-tighter text-text-primary">Fleet Overview</h1>
+            <p class="text-text-secondary mt-1 font-bold uppercase tracking-widest text-[11px] opacity-70">Operational health & protection coverage</p>
         </div>
         <div class="flex gap-3">
             <Button variant="outline" class="h-10 px-6 font-black uppercase tracking-widest text-[10px] border-border-color" onclick={loadStats}>

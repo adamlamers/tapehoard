@@ -21,11 +21,11 @@
 	let { children } = $props();
 
 	const navItems = [
-		{ name: 'Dashboard', href: '/', icon: LayoutDashboard },
-		{ name: 'Index Browser', href: '/index-browser', icon: Library },
-		{ name: 'Tracking Policy', href: '/tracking', icon: FolderTree },
-		{ name: 'System Activity', href: '/jobs', icon: Activity },
-		{ name: 'Media Fleet', href: '/inventory', icon: CassetteTape },
+		{ name: 'Overview', href: '/', icon: LayoutDashboard },
+		{ name: 'Virtual Index', href: '/index-browser', icon: Library },
+		{ name: 'Live Filesystem', href: '/tracking', icon: FolderTree },
+		{ name: 'Jobs', href: '/jobs', icon: Activity },
+		{ name: 'Media Inventory', href: '/inventory', icon: CassetteTape },
 		{ name: 'Data Recovery', href: '/restores', icon: History }
 	];
 
@@ -73,14 +73,14 @@
 			<div class="grid grid-cols-2 gap-x-12 gap-y-6">
 				<div class="space-y-4">
 					<h3 class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Navigation</h3>
-					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Dashboard</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">D</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Index Browser</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">I</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Tracking Policy</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">T</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">System Activity</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">A</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Overview</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">D</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Virtual Index</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">I</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Live Filesystem</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">T</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Jobs</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">A</kbd></div>
 				</div>
 				<div class="space-y-4">
 					<h3 class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Operations</h3>
-					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Media Fleet</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">M</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Media Inventory</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">M</kbd></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Data Recovery</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">R</kbd></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">System Settings</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">S</kbd></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Close Menu</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">ESC</kbd></div>

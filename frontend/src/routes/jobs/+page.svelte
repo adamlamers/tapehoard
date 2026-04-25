@@ -80,7 +80,7 @@
 </script>
 
 <svelte:head>
-    <title>System Activity - TapeHoard</title>
+    <title>Jobs - TapeHoard</title>
 </svelte:head>
 
 <div class="space-y-8 animate-in fade-in duration-700">
@@ -90,13 +90,13 @@
         <div class="relative z-10">
             <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
                 <Activity class="text-blue-500" size={28} />
-                System Activity
+                Jobs
             </h1>
             <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
                 Real-time task monitoring & operational history
             </p>
         </div>
-
+    </header>
         <div class="flex gap-4 z-10">
             <div class="flex items-center gap-2 px-4 py-2 bg-bg-primary rounded-lg border border-border-color shadow-inner">
                 <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>

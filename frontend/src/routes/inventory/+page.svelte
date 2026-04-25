@@ -189,7 +189,7 @@
 </script>
 
 <svelte:head>
-    <title>Media Fleet - TapeHoard</title>
+    <title>Media Inventory - TapeHoard</title>
 </svelte:head>
 
 <div class="flex flex-col gap-8 h-full overflow-hidden animate-in fade-in duration-700">
@@ -199,7 +199,7 @@
         <div class="relative z-10">
             <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
                 <CassetteTape class="text-blue-500" size={28} />
-                Media Fleet
+                Media Inventory
             </h1>
             <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
                 Physical Asset Management & Archival Targets

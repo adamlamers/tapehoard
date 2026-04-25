@@ -266,10 +266,10 @@
         <div class="relative z-10">
             <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
                 <Library class="text-blue-500" size={28} />
-                Index Browser
+                Virtual Index
             </h1>
             <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
-                Unified Filesystem View across all media
+                Unified filesystem view across all physical media
             </p>
         </div>
 
