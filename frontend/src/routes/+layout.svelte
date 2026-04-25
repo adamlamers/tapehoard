@@ -1,7 +1,8 @@
 <script lang="ts">
-	import '../app.css';
-	import { page } from '$app/stores';
-	import {
+        // @ts-ignore
+        import '../app.css';
+        // @ts-ignore
+        import { page } from '$app/stores';	import {
 		LayoutDashboard,
 		Library,
 		FolderTree,
@@ -22,17 +23,76 @@
 	const navItems = [
 		{ name: 'Dashboard', href: '/', icon: LayoutDashboard },
 		{ name: 'Index Browser', href: '/index-browser', icon: Library },
-		{ name: 'File Tracking', href: '/tracking', icon: FolderTree },
+		{ name: 'Tracking Policy', href: '/tracking', icon: FolderTree },
 		{ name: 'System Activity', href: '/jobs', icon: Activity },
-		{ name: 'Physical Media', href: '/inventory', icon: CassetteTape },
-		{ name: 'Restores', href: '/restores', icon: History }
+		{ name: 'Media Fleet', href: '/inventory', icon: CassetteTape },
+		{ name: 'Data Recovery', href: '/restores', icon: History }
 	];
 
 	let isSidebarOpen = $state(true);
+	let showShortcuts = $state(false);
+
+	function handleGlobalKeyDown(e: KeyboardEvent) {
+		if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+			showShortcuts = !showShortcuts;
+		}
+		if (showShortcuts && e.key === 'Escape') {
+			showShortcuts = false;
+		}
+
+		// Navigation Shortcuts (Single keys only, no modifiers)
+		if (!['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+			if (e.key === 'd') window.location.href = '/';
+			if (e.key === 'i') window.location.href = '/index-browser';
+			if (e.key === 't') window.location.href = '/tracking';
+			if (e.key === 'a') window.location.href = '/jobs';
+			if (e.key === 'm') window.location.href = '/inventory';
+			if (e.key === 'r') window.location.href = '/restores';
+			if (e.key === 's') window.location.href = '/settings';
+		}
+	}
 </script>
 
-<Toaster position="top-right" richColors />
+<svelte:window onkeydown={handleGlobalKeyDown} />
+
+<Toaster position="top-left" richColors />
 <ScanStatusOverlay />
+
+<!-- Shortcuts Overlay -->
+{#if showShortcuts}
+	<div class="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300" onclick={() => showShortcuts = false} role="presentation">
+		<div class="w-[500px] bg-bg-secondary border border-border-color shadow-2xl rounded-2xl p-10 flex flex-col gap-8" onclick={(e) => e.stopPropagation()} role="dialog">
+			<header>
+				<h2 class="text-2xl font-black text-text-primary uppercase tracking-tighter flex items-center gap-3">
+					<span class="p-2 bg-action-color/10 rounded-lg text-action-color"><Settings size={24} /></span>
+					Fleet Command Shortcuts
+				</h2>
+				<p class="text-[11px] font-bold text-text-secondary uppercase tracking-widest mt-2 opacity-60">Universal system navigation & control.</p>
+			</header>
+
+			<div class="grid grid-cols-2 gap-x-12 gap-y-6">
+				<div class="space-y-4">
+					<h3 class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Navigation</h3>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Dashboard</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">D</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Index Browser</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">I</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Tracking Policy</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">T</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">System Activity</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">A</kbd></div>
+				</div>
+				<div class="space-y-4">
+					<h3 class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Operations</h3>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Media Fleet</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">M</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Data Recovery</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">R</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">System Settings</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">S</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Close Menu</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">ESC</kbd></div>
+				</div>
+			</div>
+
+			<footer class="pt-6 border-t border-border-color flex justify-center">
+				<p class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 italic">Press '?' at any time to toggle this command set.</p>
+			</footer>
+		</div>
+	</div>
+{/if}
 
 <div class="app-container flex h-screen w-full overflow-hidden bg-bg-primary text-text-primary font-sans selection:bg-action-color/30">
 	<!-- SIDEBAR -->
@@ -98,14 +158,13 @@
 			>
 				<Settings size={18} class="shrink-0" />
 				{#if isSidebarOpen}
-					<span class="truncate text-[12px] font-bold uppercase tracking-wider animate-in fade-in slide-in-from-left-2 duration-300">Settings</span>
+					<span class="text-[12px] font-bold uppercase tracking-wider animate-in fade-in slide-in-from-left-2 duration-300">Settings</span>
 				{/if}
 			</a>
 
-			<!-- COLLAPSE TOGGLE -->
 			<button
+				class="flex h-12 items-center justify-center border-t border-border-color bg-bg-secondary text-text-secondary hover:text-text-primary transition-colors shrink-0"
 				onclick={() => isSidebarOpen = !isSidebarOpen}
-				class="h-10 w-full flex items-center justify-center hover:bg-white/5 text-text-secondary hover:text-text-primary transition-colors border-t border-border-color/50"
 			>
 				{#if isSidebarOpen}
 					<ChevronLeft size={16} />
@@ -117,27 +176,17 @@
 	</aside>
 
 	<!-- MAIN CONTENT -->
-	<main class="flex-1 overflow-hidden relative flex flex-col min-w-0">
-		<!-- Subtle background gradient -->
-		<div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(59,130,246,0.03),transparent_50%)] pointer-events-none"></div>
-
-		<div class="flex-1 overflow-y-auto p-8 relative z-10">
-			<div class="max-w-[1600px] mx-auto h-full">
-				{@render children()}
-			</div>
+	<main class="flex-1 min-w-0 flex flex-col relative overflow-hidden">
+		<div class="flex-1 overflow-y-auto p-8 relative scrollbar-hide">
+			{@render children()}
 		</div>
 	</main>
 </div>
 
 <style>
-	:global(body) {
-		background-color: #000;
-	}
-
-	/* Custom scrollbar for brutalist look */
 	:global(::-webkit-scrollbar) {
-		width: 8px;
-		height: 8px;
+		width: 6px;
+		height: 6px;
 	}
 	:global(::-webkit-scrollbar-track) {
 		background: #0a0a0a;

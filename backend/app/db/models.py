@@ -76,6 +76,17 @@ class FileVersion(Base):
     file_number: Mapped[str] = mapped_column(String)  # Tape position or object path
     offset_in_tar: Mapped[Optional[int]] = mapped_column(Integer)
 
+    # Split File Support
+    is_split: Mapped[bool] = mapped_column(Boolean, default=False)
+    split_id: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True
+    )  # UUID grouping parts
+    offset_start: Mapped[int] = mapped_column(BigInteger, default=0)
+    offset_end: Mapped[int] = mapped_column(BigInteger, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
     file_state: Mapped["FilesystemState"] = relationship(back_populates="versions")
     media: Mapped["StorageMedia"] = relationship(back_populates="versions")
 

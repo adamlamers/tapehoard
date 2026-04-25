@@ -1,0 +1,23 @@
+services:
+  tapehoard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: tapehoard
+    ports:
+      - "8000:8000"
+    volumes:
+      # - ./data:/app/data
+      - ./staging:/staging
+      - /Users/alamers/git/:/source_data:ro
+      - /Users/alamers/restore/:/restores
+      - /Users/alamers/backup/:/mnt/HDD-001
+      # - /mnt/storage:/source_data:ro
+      # - /mnt/restores:/restores
+    # devices:
+      # - /dev/nst0:/dev/nst0
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    restart: unless-stopped

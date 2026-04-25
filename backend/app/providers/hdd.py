@@ -45,6 +45,21 @@ class OfflineHDDProvider(AbstractStorageProvider):
 
         return None
 
+    def initialize_media(self, media_id: str) -> bool:
+        """Initializes HDD by writing the .tapehoard_id file"""
+        try:
+            os.makedirs(self.mount_base, exist_ok=True)
+            id_file = os.path.join(self.mount_base, ".tapehoard_id")
+            with open(id_file, "w") as f:
+                f.write(media_id)
+            archive_dir = os.path.join(self.mount_base, "tapehoard_backups", "archives")
+            os.makedirs(archive_dir, exist_ok=True)
+            logger.info(f"Initialized HDD media {media_id} at {self.mount_base}")
+            return True
+        except Exception as e:
+            logger.error(f"HDD Provider: Failed to initialize media: {e}")
+            return False
+
     def prepare_for_write(self, media_id: str) -> bool:
         """Verifies the disk is mounted and the identifier matches"""
         current_id = self.identify_media()

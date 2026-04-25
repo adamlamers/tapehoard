@@ -323,18 +323,24 @@ class ScannerService:
                             self.files_processed += 1
                             if self.files_processed % 50 == 0:
                                 db.commit()
-                                if job_id is not None and self.total_files_found > 0:
-                                    prog = 10.0 + (
-                                        90.0
-                                        * (
-                                            self.files_processed
-                                            / self.total_files_found
+                                if job_id is not None:
+                                    if self.total_files_found > 0:
+                                        prog = 10.0 + (
+                                            90.0
+                                            * (
+                                                self.files_processed
+                                                / self.total_files_found
+                                            )
                                         )
-                                    )
+                                        status_text = f"Indexing: {self.files_processed}/{self.total_files_found} items"
+                                    else:
+                                        prog = (
+                                            10.0  # Keep it at a steady "working" phase
+                                        )
+                                        status_text = f"Scanning: {self.files_processed} items discovered..."
+
                                     JobManager.update_job(
-                                        job_id,
-                                        round(prog, 1),
-                                        f"Hashing & Indexing: {self.files_processed}/{self.total_files_found}...",
+                                        job_id, round(prog, 1), status_text
                                     )
 
             if job_id is not None and JobManager.is_cancelled(job_id):
@@ -344,12 +350,24 @@ class ScannerService:
             self.last_run_time = datetime.now(timezone.utc)
             if job_id is not None:
                 JobManager.complete_job(job_id)
+                from app.services.notifications import notification_manager
+
+                notification_manager.notify(
+                    "Scan Completed",
+                    f"System scan finished. {self.files_processed} files processed, {self.files_hashed} new hashes computed.",
+                    "success",
+                )
 
         except Exception as e:
             logger.exception(f"Scan failed: {e}")
             db.rollback()
             if job_id is not None:
                 JobManager.fail_job(job_id, str(e))
+                from app.services.notifications import notification_manager
+
+                notification_manager.notify(
+                    "Scan Failed", f"System scan failed: {str(e)}", "failure"
+                )
         finally:
             self.is_running = False
             self.current_path = ""

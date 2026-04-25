@@ -1,4 +1,5 @@
 <script lang="ts">
+        import { onMount } from 'svelte';
         import { ChevronRight, Folder, HardDrive } from "lucide-svelte";
         import type { TreeNode } from "$lib/types";
         import { cn } from "$lib/utils";
@@ -26,17 +27,29 @@
         let loading = $state(false);
         let loaded = $state(false);
 
-        // Initialize state from props once
+        // Initialize state from props
         onMount(() => {
                 if (node.expanded) expanded = true;
-                if (node.children) children = node.children;
+                if (node.children && node.children.length > 0) {
+                    children = node.children;
+                    loaded = true;
+                }
         });
 
-        import { onMount } from 'svelte';
-
-        // Auto-load if started expanded
+        // AUTO-EXPAND LOGIC:
+        // If the current global path is a child of this node, we should expand to show it.
         $effect(() => {
-                if (expanded && !loaded) {
+            if (selectedPath && node.path !== "ROOT") {
+                // If selectedPath starts with node.path, we are a parent of the active view
+                if (selectedPath.startsWith(node.path + "/")) {
+                    expanded = true;
+                }
+            }
+        });
+
+        // Auto-load if expanded
+        $effect(() => {
+                if (expanded && !loaded && !loading) {
                         loadSubdirs();
                 }
         });
@@ -51,7 +64,7 @@
                                 query: { path: node.path }
                         });
 
-                        const data = (response.data as any) as TreeNodeSchema[];
+                        const data = response.data as TreeNodeSchema[];
 
                         if (data && Array.isArray(data)) {
                                 children = data.map((d: TreeNodeSchema) => ({
@@ -72,9 +85,6 @@
 
         async function toggle() {
                 expanded = !expanded;
-                if (expanded && !loaded) {
-                        await loadSubdirs();
-                }
         }
 
         function select() {
@@ -86,16 +96,16 @@
                 return HardDrive;
         });
 
-        const hasSubdirs = $derived((children && children.length > 0) || (node as any).hasChildren);
+        const hasSubdirs = $derived((children && children.length > 0) || node.hasChildren);
 
         function handleKeyDown(e: KeyboardEvent) {
                 if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         select();
                 } else if (e.key === "ArrowRight") {
-                        if (!expanded) toggle();
+                        if (!expanded) expanded = true;
                 } else if (e.key === "ArrowLeft") {
-                        if (expanded) toggle();
+                        if (expanded) expanded = false;
                 }
         }
 </script>
@@ -103,7 +113,7 @@
 <div class="tree-item-group">
         <div
                 class={cn(
-                        "group flex items-center gap-2 py-1.5 px-3 cursor-pointer select-none transition-all rounded-sm",
+                        "group flex items-center gap-2 py-1.5 px-3 cursor-pointer select-none transition-all rounded-sm outline-none focus:ring-1 focus:ring-blue-500/30",
                         selectedPath === node.path
                                 ? "bg-blue-500/15 text-text-primary shadow-sm border-l-2 border-blue-500"
                                 : "text-text-secondary hover:bg-white/5 hover:text-text-primary border-l-2 border-transparent"

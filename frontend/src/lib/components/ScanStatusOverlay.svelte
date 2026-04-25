@@ -51,7 +51,7 @@
                 <div class="flex-1">
                     <div class="flex justify-between items-center mb-1">
                         <span class="text-xs font-black uppercase tracking-widest text-text-primary">System Scanner Active</span>
-                        <span class="text-sm font-black mono text-blue-400">{scanProgress}%</span>
+                        <span class="text-sm font-black mono text-blue-400">INDEXING</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <div class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
@@ -61,18 +61,14 @@
             </div>
 
             <div class="space-y-4">
-                <div class="w-full bg-bg-primary h-2.5 rounded-full overflow-hidden shadow-inner border border-white/5">
-                    <div class="bg-gradient-to-r from-blue-600 to-blue-400 h-full transition-all duration-1000 shadow-[0_0_15px_rgba(59,130,246,0.4)]" style="width: {scanProgress}%"></div>
-                </div>
-
                 <div class="flex flex-col gap-2">
                     <div class="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-text-secondary">
                         <span class="flex items-center gap-2">
                             <Activity size={12} class="opacity-50" />
-                            Throughput
+                            Progress
                         </span>
                         <span class="mono text-text-primary">
-                            {scanStatus.files_processed.toLocaleString()} <span class="opacity-40">/</span> {scanStatus.total_files_found.toLocaleString()} ITEMS
+                            {scanStatus.files_processed.toLocaleString()} ITEMS SCANNED
                         </span>
                     </div>
 

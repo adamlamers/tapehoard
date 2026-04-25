@@ -10,6 +10,7 @@
         trackBatchSystemTrackBatchPost,
         triggerScanSystemScanPost,
         getScanStatusSystemScanStatusGet,
+        searchSystemSystemSearchGet,
         type ScanStatusSchema
     } from '$lib/api';
     import { toast } from "svelte-sonner";
@@ -17,18 +18,22 @@
 
     // Current directory state
     let currentPath = $state('ROOT');
+    let searchQuery = $state('');
     let files = $state<FileItem[]>([]);
     let loading = $state(false);
+    let searchLoading = $state(false);
     let committing = $state(false);
 
     // Scanner Status (local for button state only)
     let scanRunning = $state(false);
     let pollInterval: any;
+    let searchTimeout: any;
 
     // Staging area for tracking changes: path -> desired tracked state
     let pendingChanges = $state<Map<string, boolean>>(new Map());
 
     async function loadFiles(path: string) {
+        if (searchQuery.trim().length >= 3) return; // Prevent loading path if searching
         loading = true;
         try {
             const response = await browsePathSystemBrowseGet({
@@ -53,6 +58,48 @@
             loading = false;
         }
     }
+
+    async function searchFiles(query: string) {
+        searchLoading = true;
+        try {
+            const response = await searchSystemSystemSearchGet({
+                query: { q: query }
+            });
+            if (response.data) {
+                files = response.data.map(f => ({
+                    name: f.name,
+                    path: f.path,
+                    type: f.type as 'file' | 'directory' | 'link',
+                    size: f.size ?? null,
+                    mtime: f.mtime ?? null,
+                    tracked: f.tracked ?? false,
+                    ignored: f.ignored ?? false,
+                    sha256_hash: null
+                }));
+            }
+        } catch (error) {
+            console.error("Failed to search files:", error);
+            toast.error("Search failed");
+        } finally {
+            searchLoading = false;
+        }
+    }
+
+    $effect(() => {
+        const query = searchQuery.trim();
+        if (searchTimeout) clearTimeout(searchTimeout);
+
+        if (query.length >= 3) {
+            searchTimeout = setTimeout(() => {
+                searchFiles(query);
+            }, 300);
+        } else if (query.length === 0) {
+            // Wait slightly so we don't immediately fetch while user is deleting text rapidly
+            searchTimeout = setTimeout(() => {
+                loadFiles(currentPath);
+            }, 50);
+        }
+    });
 
     async function updateScanStatus() {
         try {
@@ -175,7 +222,7 @@
         <div class="relative z-10">
             <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
                 <FolderTree class="text-action-color" size={28} />
-                File Tracking
+                Tracking Policy
             </h1>
             <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
                 Data Provisioning & Indexing Configuration
@@ -225,7 +272,7 @@
                 <LayoutGrid size={24} />
             </div>
             <div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Tracked Items</span>
+                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Selection Set</span>
                 <span class="text-xl font-black text-text-primary mono">
                     {files.filter(f => f.tracked).length}
                 </span>
@@ -237,7 +284,7 @@
                 <Database size={24} />
             </div>
             <div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Sync Items</span>
+                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Directory Index</span>
                 <span class="text-xl font-black text-action-color mono">
                     {files.length}
                 </span>
@@ -249,7 +296,7 @@
                 <HardDrive size={24} />
             </div>
             <div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Eligible Items</span>
+                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Tracked Files</span>
                 <span class="text-xl font-black text-success-color mono">
                     {files.filter(f => !f.ignored).length}
                 </span>
@@ -282,9 +329,10 @@
 
         <FileBrowser
             bind:currentPath
+            bind:searchQuery
             files={displayFiles}
+            isSearching={searchLoading}
             onNavigate={handleNavigate}
             onToggleTrack={handleToggleTrack}
-        />
-    </div>
+        />    </div>
 </div>

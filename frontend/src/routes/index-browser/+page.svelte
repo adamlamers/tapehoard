@@ -6,11 +6,13 @@
         Info,
         X,
         ShieldCheck,
+        ShieldAlert,
         FileText,
         Folder,
         ListPlus,
         FolderTree,
-        Clock
+        Clock,
+        ArrowRight
     } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import { Card } from '$lib/components/ui/card';
@@ -24,18 +26,23 @@
         addToCartRestoresCartFileIdPost,
         removeFromCartRestoresCartItemIdDelete,
         addDirectoryToCartRestoresCartDirectoryPost,
+        searchIndexInventorySearchGet,
         type ItemMetadataSchema,
         type CartItemSchema
     } from '$lib/api';
     import { toast } from 'svelte-sonner';
+    import { cn } from '$lib/utils';
 
     let currentPath = $state('ROOT');
+    let searchQuery = $state('');
     let indexedFiles = $state<FileItem[]>([]);
     let loading = $state(false);
+    let searchLoading = $state(false);
     let selectedItemMetadata = $state<ItemMetadataSchema | null>(null);
     let metadataLoading = $state(false);
+    let searchTimeout: any;
 
-    // This handles the restore cart selection
+    // This handles the recovery queue status bar
     let restoreCartItems = $state<CartItemSchema[]>([]);
     const restoreCartPaths = $derived(new Set(restoreCartItems.map(i => i.file_path)));
 
@@ -51,20 +58,23 @@
     }
 
     async function loadIndexedFiles(path: string) {
+        if (searchQuery.trim().length >= 3) return;
         loading = true;
         try {
             const response = await browseIndexInventoryBrowseGet({
                 query: { path }
             });
             if (response.data) {
-                indexedFiles = response.data.map(f => ({
+                indexedFiles = (response.data as any[]).map(f => ({
                     name: f.name,
                     path: f.path,
                     type: f.type as 'file' | 'directory' | 'link',
                     size: f.size ?? null,
                     mtime: f.mtime ?? null,
                     media: f.media ?? [],
-                    selected: restoreCartPaths.has(f.path)
+                    vulnerable: f.vulnerable,
+                    selected: f.selected,
+                    indeterminate: f.indeterminate
                 }));
             }
         } catch (error) {
@@ -74,6 +84,48 @@
             loading = false;
         }
     }
+
+    async function searchFiles(query: string) {
+        searchLoading = true;
+        try {
+            const response = await searchIndexInventorySearchGet({
+                query: { q: query }
+            });
+            if (response.data) {
+                indexedFiles = (response.data as any[]).map(f => ({
+                    name: f.name,
+                    path: f.path,
+                    type: f.type as 'file' | 'directory' | 'link',
+                    size: f.size ?? null,
+                    mtime: f.mtime ?? null,
+                    media: f.media ?? [],
+                    vulnerable: f.vulnerable,
+                    selected: f.selected,
+                    indeterminate: f.indeterminate
+                }));
+            }
+        } catch (error) {
+            console.error("Failed to search index:", error);
+            toast.error("Search failed");
+        } finally {
+            searchLoading = false;
+        }
+    }
+
+    $effect(() => {
+        const query = searchQuery.trim();
+        if (searchTimeout) clearTimeout(searchTimeout);
+
+        if (query.length >= 3) {
+            searchTimeout = setTimeout(() => {
+                searchFiles(query);
+            }, 300);
+        } else if (query.length === 0) {
+            searchTimeout = setTimeout(() => {
+                loadIndexedFiles(currentPath);
+            }, 50);
+        }
+    });
 
     async function fetchMetadata(item: FileItem) {
         metadataLoading = true;
@@ -93,35 +145,65 @@
     }
 
     async function handleToggleCart(item: FileItem) {
-        if (item.type !== 'file') return;
+        const isCurrentlyInCart = item.selected;
 
-        const isCurrentlyInCart = restoreCartPaths.has(item.path);
+        if (!isCurrentlyInCart) {
+            // Check for vulnerability before adding
+            if (item.type === 'file' && (!item.media || item.media.length === 0)) {
+                toast.error(`Cannot add "${item.name}": This file has not been backed up to any media yet.`);
+                return;
+            }
+        }
 
         try {
             if (isCurrentlyInCart) {
-                const cartItem = restoreCartItems.find(i => i.file_path === item.path);
-                if (cartItem) {
-                    await removeFromCartRestoresCartItemIdDelete({
-                        path: { item_id: cartItem.id }
-                    });
-                    toast.info(`Removed ${item.name} from restore cart`);
+                if (item.type === 'file') {
+                    const cartItem = restoreCartItems.find(i => i.file_path === item.path);
+                    if (cartItem) {
+                        await removeFromCartRestoresCartItemIdDelete({
+                            path: { item_id: cartItem.id }
+                        });
+                        toast.info(`Removed ${item.name} from recovery queue`);
+                    }
+                } else {
+                    // Toggling a directory off is currently not supported as a bulk op
+                    // The user should manage this in the Recovery Queue page
+                    toast.warning("To remove a folder, please manage items in the Data Recovery page.");
+                    return;
                 }
             } else {
-                // Fetch metadata to get the DB ID
-                const metaResponse = await getItemMetadataInventoryMetadataGet({
-                    query: { path: item.path }
-                });
-
-                if (metaResponse.data?.id) {
-                    await addToCartRestoresCartFileIdPost({
-                        path: { file_id: metaResponse.data.id }
+                if (item.type === 'file') {
+                    // Fetch metadata to get the DB ID
+                    const metaResponse = await getItemMetadataInventoryMetadataGet({
+                        query: { path: item.path }
                     });
-                    toast.success(`Added ${item.name} to restore cart`);
+
+                    if (metaResponse.data?.id) {
+                        await addToCartRestoresCartFileIdPost({
+                            path: { file_id: metaResponse.data.id }
+                        });
+                        toast.success(`Added ${item.name} to recovery queue`);
+                    }
+                } else {
+                    // It's a directory
+                    const response = await addDirectoryToCartRestoresCartDirectoryPost({
+                        body: { path: item.path }
+                    });
+                    const msg = (response.data as any)?.message || `Added folder to recovery queue`;
+                    toast.success(msg);
                 }
             }
-            await loadCart();
-            // Refresh file list for checkbox state
-            loadIndexedFiles(currentPath);
+
+            // Refresh everything
+            await Promise.all([
+                loadCart(),
+                searchQuery.length >= 3 ? searchFiles(searchQuery) : loadIndexedFiles(currentPath)
+            ]);
+
+            // Refresh metadata if it's the selected item
+            if (selectedItemMetadata && selectedItemMetadata.file_path === item.path) {
+                fetchMetadata(item);
+            }
         } catch (error: any) {
             toast.error(error.body?.detail || "Action failed");
         }
@@ -132,9 +214,18 @@
             const response = await addDirectoryToCartRestoresCartDirectoryPost({
                 body: { path: itemPath }
             });
-            toast.success((response.data as any)?.message || "Folder contents added to cart");
-            await loadCart();
-            loadIndexedFiles(currentPath);
+            toast.success((response.data as any)?.message || "Folder added to recovery queue");
+
+            // Refresh everything
+            await Promise.all([
+                loadCart(),
+                searchQuery.length >= 3 ? searchFiles(searchQuery) : loadIndexedFiles(currentPath)
+            ]);
+
+            if (selectedItemMetadata && selectedItemMetadata.file_path === itemPath) {
+                const dummyItem = { path: itemPath, name: '', type: 'directory' } as FileItem;
+                fetchMetadata(dummyItem);
+            }
         } catch (error: any) {
             toast.error(error.body?.detail || "Action failed");
         }
@@ -185,10 +276,10 @@
         {#if restoreCartItems.length > 0}
             <div class="flex items-center gap-4 z-10 animate-in fade-in zoom-in duration-300">
                 <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary bg-bg-primary px-3 py-1.5 rounded-full border border-border-color">
-                    {restoreCartItems.length} items in cart
+                    {restoreCartItems.length} items in queue
                 </span>
                 <Button variant="default" class="bg-success-color hover:bg-success-color/90 text-white font-black uppercase tracking-widest text-[11px] px-6 h-10 shadow-lg shadow-success-color/20" href="/restores">
-                    Review Restore Manifest
+                    Review Recovery Manifest
                 </Button>
             </div>
         {/if}
@@ -204,13 +295,14 @@
             {/if}
             <FileBrowser
                 bind:currentPath
+                bind:searchQuery
                 files={indexedFiles}
+                isSearching={searchLoading}
                 mode="index"
                 onNavigate={(path) => currentPath = path}
                 onToggleTrack={handleToggleCart}
                 onSelect={fetchMetadata}
-            />
-        </div>
+            />        </div>
 
         <!-- Metadata Sidebar -->
         <aside class="w-96 flex flex-col gap-4 shrink-0">
@@ -308,16 +400,29 @@
 
                     {#if selectedItemMetadata.type === 'file' && (selectedItemMetadata.versions?.length ?? 0) > 0}
                         <div class="p-6 bg-bg-tertiary/30 border-t border-border-color mt-auto">
-                            <Button class="w-full h-11 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/10" onclick={() => handleToggleCart({path: selectedItemMetadata?.file_path || '', type: 'file', name: ''} as FileItem)}>
+                            <Button class="w-full h-11 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/10" onclick={() => handleToggleCart({path: selectedItemMetadata?.file_path || '', type: 'file', name: '', media: (selectedItemMetadata?.versions || []).map(v => v.media_identifier), selected: (selectedItemMetadata as any).selected} as FileItem)}>
                                 <ShieldCheck size={16} class="mr-2" />
-                                {restoreCartPaths.has(selectedItemMetadata?.file_path || '') ? 'Remove from Cart' : 'Add to Restore Cart'}
+                                {(selectedItemMetadata as any).selected ? 'Remove from Queue' : 'Add to Recovery Queue'}
+                            </Button>
+                        </div>
+                    {:else if selectedItemMetadata.type === 'file'}
+                        <div class="p-6 bg-bg-tertiary/30 border-t border-border-color mt-auto opacity-50">
+                            <Button disabled class="w-full h-11 font-black uppercase tracking-widest text-[11px] border-error-color/30 text-error-color">
+                                <ShieldAlert size={16} class="mr-2" />
+                                File Vulnerable (Not Backed Up)
                             </Button>
                         </div>
                     {:else if selectedItemMetadata.type === 'directory' && (selectedItemMetadata.child_count || 0) > 0}
                         <div class="p-6 bg-bg-tertiary/30 border-t border-border-color mt-auto">
-                            <Button variant="outline" class="w-full h-11 font-black uppercase tracking-widest text-[11px] border-blue-500/30 text-blue-400 hover:bg-blue-500/10" onclick={() => handleToggleDirectoryCart(selectedItemMetadata?.file_path || '')}>
+                            <Button variant="outline" class={cn("w-full h-11 font-black uppercase tracking-widest text-[11px]", (selectedItemMetadata as any).vulnerable ? "border-orange-500/30 text-orange-400 hover:bg-orange-500/10" : "border-success-color/30 text-success-color hover:bg-success-color/10")} onclick={() => handleToggleDirectoryCart(selectedItemMetadata?.file_path || '')} disabled={(selectedItemMetadata as any).selected}>
                                 <ListPlus size={16} class="mr-2" />
-                                Add Folder Contents to Cart
+                                {#if (selectedItemMetadata as any).selected}
+                                    Folder Fully Queued
+                                {:else if (selectedItemMetadata as any).vulnerable}
+                                    Add Backed Up Items to Queue
+                                {:else}
+                                    Add Folder to Recovery Queue
+                                {/if}
                             </Button>
                         </div>
                     {/if}
@@ -325,7 +430,7 @@
             {:else}
                 <div class="flex-1 border-2 border-dashed border-border-color rounded-xl flex flex-col items-center justify-center p-12 text-center opacity-20">
                     <Library size={48} class="mb-4 text-blue-500" />
-                    <p class="textxs font-black uppercase tracking-widest leading-relaxed">
+                    <p class="text-xs font-black uppercase tracking-widest leading-relaxed">
                         Select an item from the index<br>to view detailed metadata and<br>storage locations.
                     </p>
                 </div>

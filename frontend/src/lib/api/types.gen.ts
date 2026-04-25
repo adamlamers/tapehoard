@@ -19,6 +19,42 @@ export type BatchTrackRequest = {
 };
 
 /**
+ * Body_import_database_system_database_import_post
+ */
+export type BodyImportDatabaseSystemDatabaseImportPost = {
+    /**
+     * File
+     */
+    file: Blob | File;
+};
+
+/**
+ * CartFileItemSchema
+ */
+export type CartFileItemSchema = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * Type
+     */
+    type: string;
+    /**
+     * Size
+     */
+    size?: number | null;
+    /**
+     * Media
+     */
+    media?: Array<string>;
+};
+
+/**
  * CartItemSchema
  */
 export type CartItemSchema = {
@@ -38,6 +74,24 @@ export type CartItemSchema = {
      * Media Identifiers
      */
     media_identifiers: Array<string>;
+};
+
+/**
+ * CartTreeNodeSchema
+ */
+export type CartTreeNodeSchema = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * Has Children
+     */
+    has_children?: boolean;
 };
 
 /**
@@ -170,6 +224,18 @@ export type ItemMetadataSchema = {
      * Child Count
      */
     child_count?: number | null;
+    /**
+     * Vulnerable
+     */
+    vulnerable?: boolean;
+    /**
+     * Selected
+     */
+    selected?: boolean;
+    /**
+     * Indeterminate
+     */
+    indeterminate?: boolean;
 };
 
 /**
@@ -351,6 +417,16 @@ export type RestoreManifestSchema = {
 };
 
 /**
+ * RestoreRequest
+ */
+export type RestoreRequest = {
+    /**
+     * Destination
+     */
+    destination: string;
+};
+
+/**
  * ScanStatusSchema
  */
 export type ScanStatusSchema = {
@@ -392,6 +468,16 @@ export type SettingSchema = {
      * Value
      */
     value: string;
+};
+
+/**
+ * TestNotificationRequest
+ */
+export type TestNotificationRequest = {
+    /**
+     * Url
+     */
+    url: string;
 };
 
 /**
@@ -468,6 +554,18 @@ export type AppApiInventoryFileItemSchema = {
      * Media
      */
     media?: Array<string>;
+    /**
+     * Vulnerable
+     */
+    vulnerable?: boolean;
+    /**
+     * Selected
+     */
+    selected?: boolean;
+    /**
+     * Indeterminate
+     */
+    indeterminate?: boolean;
 };
 
 /**
@@ -656,6 +754,42 @@ export type BrowsePathSystemBrowseGetResponses = {
 
 export type BrowsePathSystemBrowseGetResponse = BrowsePathSystemBrowseGetResponses[keyof BrowsePathSystemBrowseGetResponses];
 
+export type SearchSystemSystemSearchGetData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Q
+         */
+        q: string;
+        /**
+         * Include Ignored
+         */
+        include_ignored?: boolean;
+    };
+    url: '/system/search';
+};
+
+export type SearchSystemSystemSearchGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SearchSystemSystemSearchGetError = SearchSystemSystemSearchGetErrors[keyof SearchSystemSystemSearchGetErrors];
+
+export type SearchSystemSystemSearchGetResponses = {
+    /**
+     * Response Search System System Search Get
+     *
+     * Successful Response
+     */
+    200: Array<AppApiSystemFileItemSchema>;
+};
+
+export type SearchSystemSystemSearchGetResponse = SearchSystemSystemSearchGetResponses[keyof SearchSystemSystemSearchGetResponses];
+
 export type TrackBatchSystemTrackBatchPostData = {
     body: BatchTrackRequest;
     path?: never;
@@ -716,6 +850,66 @@ export type UpdateSettingSystemSettingsPostErrors = {
 export type UpdateSettingSystemSettingsPostError = UpdateSettingSystemSettingsPostErrors[keyof UpdateSettingSystemSettingsPostErrors];
 
 export type UpdateSettingSystemSettingsPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type TestNotificationSystemNotificationsTestPostData = {
+    body: TestNotificationRequest;
+    path?: never;
+    query?: never;
+    url: '/system/notifications/test';
+};
+
+export type TestNotificationSystemNotificationsTestPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TestNotificationSystemNotificationsTestPostError = TestNotificationSystemNotificationsTestPostErrors[keyof TestNotificationSystemNotificationsTestPostErrors];
+
+export type TestNotificationSystemNotificationsTestPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ExportDatabaseSystemDatabaseExportGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/database/export';
+};
+
+export type ExportDatabaseSystemDatabaseExportGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ImportDatabaseSystemDatabaseImportPostData = {
+    body: BodyImportDatabaseSystemDatabaseImportPost;
+    path?: never;
+    query?: never;
+    url: '/system/database/import';
+};
+
+export type ImportDatabaseSystemDatabaseImportPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ImportDatabaseSystemDatabaseImportPostError = ImportDatabaseSystemDatabaseImportPostErrors[keyof ImportDatabaseSystemDatabaseImportPostErrors];
+
+export type ImportDatabaseSystemDatabaseImportPostResponses = {
     /**
      * Successful Response
      */
@@ -851,6 +1045,34 @@ export type UpdateMediaInventoryMediaMediaIdPatchResponses = {
 
 export type UpdateMediaInventoryMediaMediaIdPatchResponse = UpdateMediaInventoryMediaMediaIdPatchResponses[keyof UpdateMediaInventoryMediaMediaIdPatchResponses];
 
+export type InitializeMediaInventoryMediaMediaIdInitializePostData = {
+    body?: never;
+    path: {
+        /**
+         * Media Id
+         */
+        media_id: number;
+    };
+    query?: never;
+    url: '/inventory/media/{media_id}/initialize';
+};
+
+export type InitializeMediaInventoryMediaMediaIdInitializePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type InitializeMediaInventoryMediaMediaIdInitializePostError = InitializeMediaInventoryMediaMediaIdInitializePostErrors[keyof InitializeMediaInventoryMediaMediaIdInitializePostErrors];
+
+export type InitializeMediaInventoryMediaMediaIdInitializePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type BrowseIndexInventoryBrowseGetData = {
     body?: never;
     path?: never;
@@ -886,6 +1108,42 @@ export type BrowseIndexInventoryBrowseGetResponses = {
 };
 
 export type BrowseIndexInventoryBrowseGetResponse = BrowseIndexInventoryBrowseGetResponses[keyof BrowseIndexInventoryBrowseGetResponses];
+
+export type SearchIndexInventorySearchGetData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Q
+         */
+        q: string;
+        /**
+         * Include Ignored
+         */
+        include_ignored?: boolean;
+    };
+    url: '/inventory/search';
+};
+
+export type SearchIndexInventorySearchGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SearchIndexInventorySearchGetError = SearchIndexInventorySearchGetErrors[keyof SearchIndexInventorySearchGetErrors];
+
+export type SearchIndexInventorySearchGetResponses = {
+    /**
+     * Response Search Index Inventory Search Get
+     *
+     * Successful Response
+     */
+    200: Array<AppApiInventoryFileItemSchema>;
+};
+
+export type SearchIndexInventorySearchGetResponse = SearchIndexInventorySearchGetResponses[keyof SearchIndexInventorySearchGetResponses];
 
 export type GetIndexTreeInventoryTreeGetData = {
     body?: never;
@@ -1009,6 +1267,93 @@ export type ListBackupsBackupsGetResponses = {
     200: unknown;
 };
 
+export type TriggerRestoreRestoresTriggerPostData = {
+    body: RestoreRequest;
+    path?: never;
+    query?: never;
+    url: '/restores/trigger';
+};
+
+export type TriggerRestoreRestoresTriggerPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TriggerRestoreRestoresTriggerPostError = TriggerRestoreRestoresTriggerPostErrors[keyof TriggerRestoreRestoresTriggerPostErrors];
+
+export type TriggerRestoreRestoresTriggerPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type BrowseCartRestoresCartBrowseGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Path
+         */
+        path?: string | null;
+    };
+    url: '/restores/cart/browse';
+};
+
+export type BrowseCartRestoresCartBrowseGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BrowseCartRestoresCartBrowseGetError = BrowseCartRestoresCartBrowseGetErrors[keyof BrowseCartRestoresCartBrowseGetErrors];
+
+export type BrowseCartRestoresCartBrowseGetResponses = {
+    /**
+     * Response Browse Cart Restores Cart Browse Get
+     *
+     * Successful Response
+     */
+    200: Array<CartFileItemSchema>;
+};
+
+export type BrowseCartRestoresCartBrowseGetResponse = BrowseCartRestoresCartBrowseGetResponses[keyof BrowseCartRestoresCartBrowseGetResponses];
+
+export type GetCartTreeRestoresCartTreeGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Path
+         */
+        path?: string | null;
+    };
+    url: '/restores/cart/tree';
+};
+
+export type GetCartTreeRestoresCartTreeGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCartTreeRestoresCartTreeGetError = GetCartTreeRestoresCartTreeGetErrors[keyof GetCartTreeRestoresCartTreeGetErrors];
+
+export type GetCartTreeRestoresCartTreeGetResponses = {
+    /**
+     * Response Get Cart Tree Restores Cart Tree Get
+     *
+     * Successful Response
+     */
+    200: Array<CartTreeNodeSchema>;
+};
+
+export type GetCartTreeRestoresCartTreeGetResponse = GetCartTreeRestoresCartTreeGetResponses[keyof GetCartTreeRestoresCartTreeGetResponses];
+
 export type ListCartRestoresCartGetData = {
     body?: never;
     path?: never;
@@ -1027,28 +1372,14 @@ export type ListCartRestoresCartGetResponses = {
 
 export type ListCartRestoresCartGetResponse = ListCartRestoresCartGetResponses[keyof ListCartRestoresCartGetResponses];
 
-export type AddToCartRestoresCartFileIdPostData = {
+export type ClearCartRestoresCartClearPostData = {
     body?: never;
-    path: {
-        /**
-         * File Id
-         */
-        file_id: number;
-    };
+    path?: never;
     query?: never;
-    url: '/restores/cart/{file_id}';
+    url: '/restores/cart/clear';
 };
 
-export type AddToCartRestoresCartFileIdPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type AddToCartRestoresCartFileIdPostError = AddToCartRestoresCartFileIdPostErrors[keyof AddToCartRestoresCartFileIdPostErrors];
-
-export type AddToCartRestoresCartFileIdPostResponses = {
+export type ClearCartRestoresCartClearPostResponses = {
     /**
      * Successful Response
      */
@@ -1072,6 +1403,34 @@ export type AddDirectoryToCartRestoresCartDirectoryPostErrors = {
 export type AddDirectoryToCartRestoresCartDirectoryPostError = AddDirectoryToCartRestoresCartDirectoryPostErrors[keyof AddDirectoryToCartRestoresCartDirectoryPostErrors];
 
 export type AddDirectoryToCartRestoresCartDirectoryPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type AddToCartRestoresCartFileIdPostData = {
+    body?: never;
+    path: {
+        /**
+         * File Id
+         */
+        file_id: number;
+    };
+    query?: never;
+    url: '/restores/cart/{file_id}';
+};
+
+export type AddToCartRestoresCartFileIdPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddToCartRestoresCartFileIdPostError = AddToCartRestoresCartFileIdPostErrors[keyof AddToCartRestoresCartFileIdPostErrors];
+
+export type AddToCartRestoresCartFileIdPostResponses = {
     /**
      * Successful Response
      */
@@ -1106,20 +1465,6 @@ export type RemoveFromCartRestoresCartItemIdDeleteResponses = {
     200: unknown;
 };
 
-export type ClearCartRestoresCartClearPostData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/restores/cart/clear';
-};
-
-export type ClearCartRestoresCartClearPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
 export type GetManifestRestoresManifestGetData = {
     body?: never;
     path?: never;
@@ -1136,14 +1481,14 @@ export type GetManifestRestoresManifestGetResponses = {
 
 export type GetManifestRestoresManifestGetResponse = GetManifestRestoresManifestGetResponses[keyof GetManifestRestoresManifestGetResponses];
 
-export type ReadRootGetData = {
+export type HealthCheckHealthGetData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/';
+    url: '/health';
 };
 
-export type ReadRootGetResponses = {
+export type HealthCheckHealthGetResponses = {
     /**
      * Successful Response
      */

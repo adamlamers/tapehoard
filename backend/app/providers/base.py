@@ -17,6 +17,13 @@ class AbstractStorageProvider(ABC):
         pass
 
     @abstractmethod
+    def initialize_media(self, media_id: str) -> bool:
+        """
+        Initializes raw media by writing the tapehoard identifier/label.
+        """
+        pass
+
+    @abstractmethod
     def prepare_for_write(self, media_id: str) -> bool:
         """
         Performs any necessary setup (e.g., mounting, winding) before writing.

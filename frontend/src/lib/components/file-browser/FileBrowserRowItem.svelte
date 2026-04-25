@@ -110,7 +110,8 @@
                 isSelected
                         ? "bg-blue-500/15 border-l-2 border-l-blue-500"
                         : "hover:bg-white/5 border-l-2 border-l-transparent",
-                item.ignored && "opacity-40 grayscale-[0.5]"
+                item.ignored && "opacity-40 grayscale-[0.5]",
+                (mode === 'index' && item.type === 'file' && item.vulnerable) && "opacity-60 cursor-not-allowed"
         )}
         role="button"
         tabindex="0"
@@ -123,7 +124,9 @@
                 class="flex h-10 w-12 shrink-0 items-center justify-center border-r border-border-color/10"
                 onclick={(e) => {
                         e.stopPropagation();
-                        if (!item.ignored) onToggleTrack();
+                        if (item.ignored) return;
+                        if (mode === 'index' && item.type === 'file' && item.vulnerable) return;
+                        onToggleTrack();
                 }}
                 onkeydown={(e) => e.key === " " && e.stopPropagation()}
                 role="none"
@@ -143,7 +146,12 @@
                                 </div>
                         {/if}
                 {:else}
-                        <Checkbox checked={item.selected} onCheckedChange={onToggleTrack} />
+                        <Checkbox
+                                checked={item.selected}
+                                indeterminate={item.indeterminate}
+                                onCheckedChange={onToggleTrack}
+                                disabled={item.type === 'file' && item.vulnerable}
+                        />
                 {/if}
         </div>
 
@@ -181,15 +189,32 @@
                                 >
                                         {item.name}
                                 </span>
-                                {#if mode === "index" && item.media && item.media.length > 0}
-                                        <div class="flex gap-1 overflow-hidden shrink-0">
-                                                {#each item.media as m}
-                                                        <span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[9px] px-1.5 py-0.5 rounded border border-blue-500/20 font-bold uppercase tracking-wider">
-                                                                <CassetteTape size={10} />
-                                                                {m}
-                                                        </span>
-                                                {/each}
-                                        </div>
+                                {#if mode === "index"}
+                                        {#if item.media && item.media.length > 0}
+                                                <div class="flex gap-1 overflow-hidden shrink-0">
+                                                        {#each item.media as m}
+                                                                <span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[9px] px-1.5 py-0.5 rounded border border-blue-500/20 font-bold uppercase tracking-wider">
+                                                                        <CassetteTape size={10} />
+                                                                        {m}
+                                                                </span>
+                                                        {/each}
+                                                </div>
+                                        {:else if item.vulnerable}
+                                                <span class="inline-flex items-center gap-1 bg-error-color/10 text-error-color text-[8px] px-1.5 py-0.5 rounded border border-error-color/20 font-black uppercase tracking-widest">
+                                                        <ShieldAlert size={10} />
+                                                        Vulnerable
+                                                </span>
+                                        {:else if item.type === 'directory'}
+                                                <span class="inline-flex items-center gap-1 bg-success-color/10 text-success-color text-[8px] px-1.5 py-0.5 rounded border border-success-color/20 font-black uppercase tracking-widest">
+                                                        <ShieldCheck size={10} />
+                                                        Protected
+                                                </span>
+                                        {:else if item.type === 'file'}
+                                                <span class="inline-flex items-center gap-1 bg-error-color/10 text-error-color text-[8px] px-1.5 py-0.5 rounded border border-error-color/20 font-black uppercase tracking-widest">
+                                                        <ShieldAlert size={10} />
+                                                        Vulnerable
+                                                </span>
+                                        {/if}
                                 {/if}
                         </div>
                 </div>

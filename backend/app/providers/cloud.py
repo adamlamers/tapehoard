@@ -28,6 +28,21 @@ class CloudStorageProvider(AbstractStorageProvider):
             logger.error(f"Failed to identify cloud bucket {self.bucket_name}: {e}")
             return None
 
+    def initialize_media(self, media_id: str) -> bool:
+        """Initializes cloud media by writing a dummy object to verify access"""
+        try:
+            self.s3.head_bucket(Bucket=self.bucket_name)
+            self.s3.put_object(
+                Bucket=self.bucket_name,
+                Key=".tapehoard_id",
+                Body=media_id.encode("utf-8"),
+            )
+            logger.info(f"Initialized Cloud bucket {media_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize cloud bucket {self.bucket_name}: {e}")
+            return False
+
     def prepare_for_write(self, media_id: str) -> bool:
         return self.identify_media() == media_id
 

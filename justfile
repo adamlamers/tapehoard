@@ -58,3 +58,20 @@ generate-client:
     @echo "Generating TypeScript API client..."
     # Ensure backend is running first: `just backend`
     cd frontend && npx @hey-api/openapi-ts -i http://localhost:8000/openapi.json -o src/lib/api -c @hey-api/client-fetch
+
+# --- Docker ---
+
+# Build the production Docker image
+docker-build:
+    @echo "Building TapeHoard Docker image..."
+    docker build -t tapehoard:latest -f docker/Dockerfile .
+
+# Start the production stack using Docker Compose
+docker-up:
+    @echo "Starting TapeHoard stack..."
+    cd docker && docker-compose up -d
+
+# Stop the production stack
+docker-down:
+    @echo "Stopping TapeHoard stack..."
+    cd docker && docker-compose down

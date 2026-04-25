@@ -144,20 +144,33 @@
                                 <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary truncate max-w-[300px]">
                                     {job.current_task || 'Waiting in queue...'}
                                 </span>
-                                <span class="text-xs font-bold mono text-text-primary">
-                                    {job.progress.toFixed(1)}%
-                                </span>
+                                {#if job.job_type !== 'SCAN' || job.status === 'COMPLETED'}
+                                    <span class="text-xs font-bold mono text-text-primary">
+                                        {job.status === 'COMPLETED' ? '100.0' : job.progress.toFixed(1)}%
+                                    </span>
+                                {/if}
                             </div>
-                            <div class="w-full bg-bg-primary h-2 rounded-full border border-border-color shadow-inner overflow-hidden">
-                                <div
-                                    class={cn(
-                                        "h-full transition-all duration-500",
-                                        job.status === 'RUNNING' ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]' :
-                                        job.status === 'FAILED' ? 'bg-error-color' : 'bg-success-color'
-                                    )}
-                                    style="width: {job.progress}%"
-                                ></div>
-                            </div>
+                            {#if job.job_type !== 'SCAN' || job.status !== 'RUNNING'}
+                                <div class="w-full bg-bg-primary h-2.5 rounded-full border border-border-color shadow-inner overflow-hidden">
+                                    <div
+                                        class={cn(
+                                            "h-full transition-all duration-500",
+                                            job.status === 'RUNNING' ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]' :
+                                            job.status === 'FAILED' ? 'bg-error-color' : 'bg-success-color'
+                                        )}
+                                        style="width: {job.status === 'COMPLETED' ? 100 : job.progress}%"
+                                    ></div>
+                                </div>
+                            {:else}
+                                <div class="flex items-center gap-3 h-2.5">
+                                    <div class="flex-1 bg-bg-primary h-1 rounded-full border border-border-color/30 relative overflow-hidden">
+                                        <div class="absolute inset-0 bg-blue-500/20 animate-pulse"></div>
+                                    </div>
+                                    <span class="text-[9px] font-black uppercase tracking-widest text-blue-400 whitespace-nowrap animate-pulse">
+                                        Streaming Discovery
+                                    </span>
+                                </div>
+                            {/if}
                         </div>
 
                         <!-- Timing Stats -->

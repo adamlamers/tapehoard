@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, File, UploadFile
+from fastapi.responses import StreamingResponse, FileResponse
 import os
+import shutil
+import sqlite3
 import json
 import asyncio
 from datetime import datetime
@@ -77,6 +79,10 @@ class ScanStatusSchema(BaseModel):
 class SettingSchema(BaseModel):
     key: str
     value: str
+
+
+class TestNotificationRequest(BaseModel):
+    url: str
 
 
 # --- Helpers ---
@@ -176,6 +182,15 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     for mtype, count in media_counts:
         media_dist[mtype.upper()] = count
 
+    # Get last successful scan time from jobs history
+    last_scan = (
+        db.query(models.Job)
+        .filter(models.Job.job_type == "SCAN", models.Job.status == "COMPLETED")
+        .order_by(models.Job.completed_at.desc())
+        .first()
+    )
+    last_scan_time = last_scan.completed_at if last_scan else None
+
     return DashboardStatsSchema(
         total_files_indexed=total_count,
         total_data_size=total_size,
@@ -185,7 +200,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         ignored_files_count=ignored_count,
         ignored_data_size=ignored_size,
         redundancy_ratio=round(redundancy, 2),
-        last_scan_time=scanner_manager.last_run_time,
+        last_scan_time=last_scan_time,
         media_distribution=media_dist,
     )
 
@@ -224,7 +239,15 @@ async def stream_jobs():
                 db.close()
             await asyncio.sleep(1)
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Critical for Nginx
+        },
+    )
 
 
 @router.post("/scan")
@@ -305,6 +328,50 @@ def browse_path(path: Optional[str] = None, db: Session = Depends(get_db)):
     return results
 
 
+@router.get("/search", response_model=List[FileItemSchema])
+def search_system(q: str, include_ignored: bool = False, db: Session = Depends(get_db)):
+    if not q or len(q) < 3:
+        return []
+
+    ignore_filter = " AND fs.is_ignored = 0" if not include_ignored else ""
+
+    # Use FTS5 for instantaneous full-text search
+    sql = text(f"""
+        SELECT fs.file_path, fs.size, fs.mtime, fs.id, fs.is_ignored
+        FROM filesystem_fts
+        JOIN filesystem_state fs ON fs.id = filesystem_fts.rowid
+        WHERE filesystem_fts MATCH :query {ignore_filter}
+        LIMIT 200
+    """)
+
+    safe_query = f'"{q}"'
+    files = db.execute(sql, {"query": safe_query}).fetchall()
+
+    tracking_map = {s.path: s.action for s in db.query(models.TrackedSource).all()}
+    spec = get_exclusion_spec(db)
+
+    results = []
+    for f in files:
+        path = f[0]
+        name = path.split("/")[-1]
+        tracked, _ = get_tracking_status(path, tracking_map, spec)
+
+        results.append(
+            FileItemSchema(
+                name=name,
+                path=path,
+                type="file",
+                size=f[1],
+                mtime=f[2],
+                tracked=tracked,
+                ignored=f[4],
+            )
+        )
+
+    results.sort(key=lambda x: x.name.lower())
+    return results
+
+
 @router.post("/track/batch")
 def track_batch(req: BatchTrackRequest, db: Session = Depends(get_db)):
     for path in req.tracks:
@@ -339,6 +406,8 @@ def get_settings(db: Session = Depends(get_db)):
 
 @router.post("/settings")
 def update_setting(req: SettingSchema, db: Session = Depends(get_db)):
+    from app.services.scheduler import scheduler_manager
+
     setting = (
         db.query(models.SystemSetting)
         .filter(models.SystemSetting.key == req.key)
@@ -349,7 +418,101 @@ def update_setting(req: SettingSchema, db: Session = Depends(get_db)):
     else:
         db.add(models.SystemSetting(key=req.key, value=req.value))
     db.commit()
+
+    # Update scheduler if it's a schedule setting
+    if req.key == "schedule_scan":
+        scheduler_manager.add_job(
+            "system_scan", scheduler_manager.run_system_scan, req.value
+        )
+    elif req.key == "schedule_archival":
+        scheduler_manager.add_job(
+            "system_archival", scheduler_manager.run_system_archival, req.value
+        )
+
     return {"message": "Updated"}
+
+
+@router.post("/notifications/test")
+def test_notification(req: TestNotificationRequest):
+    from app.services.notifications import notification_manager
+
+    success = notification_manager.test_notification(req.url)
+    if success:
+        return {"message": "Test notification sent successfully"}
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to send test notification. Check your Apprise URL.",
+        )
+
+
+@router.get("/database/export")
+def export_database():
+    db_path = "tapehoard.db"
+    if not os.path.exists(db_path):
+        raise HTTPException(status_code=404, detail="Database file not found")
+
+    # We create a temporary copy to ensure we don't return a partially locked file
+    export_path = "tapehoard_export.db"
+    try:
+        # Use sqlite3 backup API for a clean copy of the live DB
+        src = sqlite3.connect(db_path)
+        dest = sqlite3.connect(export_path)
+        with dest:
+            src.backup(dest)
+        src.close()
+        dest.close()
+
+        return FileResponse(
+            export_path,
+            filename=f"tapehoard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db",
+            background=BackgroundTasks().add_task(
+                lambda: os.remove(export_path) if os.path.exists(export_path) else None
+            ),
+        )
+    except Exception as e:
+        if os.path.exists(export_path):
+            os.remove(export_path)
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+
+
+@router.post("/database/import")
+async def import_database(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    # Validate it's a sqlite file
+    filename = file.filename or ""
+    if not filename.endswith(".db"):
+        raise HTTPException(
+            status_code=400, detail="Invalid file type. Must be a .db file."
+        )
+
+    temp_path = "tapehoard_import.db"
+    try:
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Verify it's a valid SQLite DB
+        conn = sqlite3.connect(temp_path)
+        conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        conn.close()
+
+        # Replace the live DB
+        # To do this safely while running, we use the backup API to overwrite our own live DB
+        db_path = "tapehoard.db"
+        src = sqlite3.connect(temp_path)
+        dest = sqlite3.connect(db_path)
+        with dest:
+            src.backup(dest)
+        src.close()
+        dest.close()
+
+        return {
+            "message": "Database restored successfully. Application state has been updated."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 @router.get("/tree")
@@ -357,4 +520,33 @@ def get_tree(path: Optional[str] = None, db: Session = Depends(get_db)):
     roots = get_source_roots(db)
     if path is None or path == "ROOT":
         return [{"name": r, "path": r, "has_children": True} for r in roots]
-    return []
+
+    if not os.path.exists(path) or not os.path.isdir(path):
+        return []
+
+    results = []
+    try:
+        with os.scandir(path) as it:
+            for entry in it:
+                if entry.is_dir():
+                    # Check if it has any children to determine has_children
+                    has_children = False
+                    try:
+                        with os.scandir(entry.path) as sub_it:
+                            if any(sub_entry.is_dir() for sub_entry in sub_it):
+                                has_children = True
+                    except Exception:
+                        pass
+
+                    results.append(
+                        {
+                            "name": entry.name,
+                            "path": entry.path,
+                            "has_children": has_children,
+                        }
+                    )
+    except Exception:
+        return []
+
+    results.sort(key=lambda x: x["name"].lower())
+    return results

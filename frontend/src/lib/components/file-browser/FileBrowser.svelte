@@ -21,21 +21,24 @@
 
         let {
                 currentPath = $bindable("ROOT"),
+                searchQuery = $bindable(""),
                 files = [],
                 onNavigate = (path: string) => {},
                 onToggleTrack = (item: FileItem) => {},
                 onSelect = (item: FileItem) => {},
-                mode = "host"
+                mode = "host",
+                isSearching = false
         } = $props<{
-                currentPath: string;
-                files: FileItem[];
+                currentPath?: string;
+                searchQuery?: string;
+                files?: FileItem[];
                 onNavigate?: (path: string) => void;
                 onToggleTrack?: (item: FileItem) => void;
                 onSelect?: (item: FileItem) => void;
-                mode?: "host" | "index";
+                mode?: "host" | "index" | "cart";
+                isSearching?: boolean;
         }>();
 
-        let searchQuery = $state("");
         let selectedPaths = $state<Set<string>>(new Set());
         let lastSelectedPath = $state<string | null>(null);
         let sortColumn = $state<"name" | "size" | "mtime" | "type">("name");
@@ -102,19 +105,37 @@
                 hasChildren: true
         });
 
-        const activeRoot = $derived(mode === "host" ? sourceDataRoot : virtualIndexRoot);
+        const recoveryQueueRoot = $derived({
+                name: "Recovery Queue",
+                path: "ROOT",
+                expanded: true,
+                children: [],
+                hasChildren: true
+        });
+
+        const activeRoot = $derived(
+                mode === "host" ? sourceDataRoot :
+                mode === "index" ? virtualIndexRoot :
+                recoveryQueueRoot
+        );
 
         // --- Logic ---
 
         const breadcrumbs = $derived.by(() => {
                 if (currentPath === "ROOT") {
-                    return [{ name: mode === "host" ? "All Sources" : "Index Browser", path: "ROOT" }];
+                    let name = "All Sources";
+                    if (mode === "index") name = "Index Browser";
+                    if (mode === "cart") name = "Recovery Queue";
+                    return [{ name, path: "ROOT" }];
                 }
 
                 const parts = currentPath.split("/").filter(Boolean);
                 const crumbs: Breadcrumb[] = [];
 
-                crumbs.push({ name: mode === "host" ? "All Sources" : "Index Browser", path: "ROOT" });
+                let rootName = "All Sources";
+                if (mode === "index") rootName = "Index Browser";
+                if (mode === "cart") rootName = "Recovery Queue";
+                crumbs.push({ name: rootName, path: "ROOT" });
 
                 let current = "";
                 for (const part of parts) {
@@ -125,7 +146,10 @@
         });
 
         const filteredFiles = $derived.by(() => {
-                let result = files.filter((f: FileItem) => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
+                // When doing backend search, the parent feeds us already-filtered results.
+                // We'll still do a light local filter to ensure things like name matching,
+                // but we should match on the full path just in case.
+                let result = files.filter((f: FileItem) => f.path.toLowerCase().includes((searchQuery || "").toLowerCase()));
 
                 result.sort((a: FileItem, b: FileItem) => {
                         const valA = sortColumn === "type" ? a.type : a[sortColumn as keyof FileItem] || 0;
@@ -194,14 +218,55 @@
                 }
         }
 
-        function bulkToggle(track: boolean) {
-                const selectedItems = files.filter((f: FileItem) => selectedPaths.has(f.path) && f.tracked !== track);
-                selectedItems.forEach((item: FileItem) => onToggleTrack(item));
+        let isEditingPath = $state(false);
+        let pathInputValue = $state("");
+
+        function handleAddressClick() {
+                pathInputValue = currentPath;
+                isEditingPath = true;
+        }
+
+        function handlePathSubmit() {
+                onNavigate(pathInputValue);
+                isEditingPath = false;
+        }
+
+        function handleKeyDown(e: KeyboardEvent) {
+                if (isEditingPath) {
+                        if (e.key === "Enter") handlePathSubmit();
+                        if (e.key === "Escape") isEditingPath = false;
+                        return;
+                }
+
+                if (e.key === "Enter" && selectedPaths.size === 1) {
+                        const item = files.find((f: FileItem) => f.path === Array.from(selectedPaths)[0]);
+                        if (item && item.type === "directory") {
+                                handleRowDoubleClick(item);
+                        }
+                }
+                if (e.key === "Backspace") {
+                        if (currentPath === "ROOT") return;
+                        const parts = currentPath.split("/").filter(Boolean);
+                        if (parts.length === 1) {
+                                onNavigate("ROOT");
+                        } else {
+                                onNavigate("/" + parts.slice(0, -1).join("/"));
+                        }
+                }
+                if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+                        e.preventDefault();
+                        const searchInput = document.getElementById("browser-search") as HTMLInputElement;
+                        searchInput?.focus();
+                }
         }
 </script>
 
 <div
         class="file-browser flex h-full flex-col overflow-hidden rounded-lg border border-border-color bg-bg-secondary shadow-2xl min-w-0"
+        onkeydown={handleKeyDown}
+        tabindex="0"
+        role="application"
+        aria-label="File Browser"
 >
         <!-- ZONE A: TOP BAR -->
         <div class="flex h-14 shrink-0 items-center justify-between border-b border-border-color bg-bg-tertiary/50 px-6 shadow-sm">
@@ -233,25 +298,42 @@
                         </div>
 
                         <!-- Address Bar -->
-                        <div class="flex-1 flex items-center bg-bg-primary border border-border-color/40 rounded-md px-3 h-9 shadow-inner overflow-hidden max-w-3xl group transition-all focus-within:border-action-color/50 min-w-0">
+                        <div
+                                class="flex-1 flex items-center bg-bg-primary border border-border-color/40 rounded-md px-3 h-9 shadow-inner overflow-hidden max-w-3xl group transition-all focus-within:border-action-color/50 min-w-0"
+                                onclick={handleAddressClick}
+                                role="button"
+                                tabindex="-1"
+                        >
                                 <Folder size={16} class="text-yellow-500/80 mr-2 shrink-0"></Folder>
-                                <div class="flex-1 flex items-center overflow-x-auto scrollbar-hide">
-                                        {#each breadcrumbs as crumb, i}
-                                                {#if i > 0}
-                                                        <ChevronRight size={14} class="mx-1 text-text-secondary/30 shrink-0"></ChevronRight>
-                                                {/if}
-                                                <button
-                                                        class={cn(
-                                                                "px-2 py-0.5 rounded-md text-[13px] transition-colors hover:bg-white/5 whitespace-nowrap cursor-pointer",
-                                                                i === breadcrumbs.length - 1 ? "text-text-primary font-bold" : "text-text-secondary hover:text-text-primary"
-                                                        )}
-                                                        onclick={() => onNavigate(crumb.path)}
-                                                >
-                                                        {crumb.name}
-                                                </button>
-                                        {/each}
-                                </div>
-                                <button class="ml-2 text-text-secondary hover:text-text-primary p-1 transition-colors cursor-pointer shrink-0" onclick={() => onNavigate(currentPath)}>
+
+                                {#if isEditingPath}
+                                        <input
+                                                type="text"
+                                                class="flex-1 bg-transparent border-none outline-none text-[13px] text-text-primary mono"
+                                                bind:value={pathInputValue}
+                                                onblur={() => setTimeout(() => isEditingPath = false, 100)}
+                                                autoFocus
+                                        />
+                                {:else}
+                                        <div class="flex-1 flex items-center overflow-x-auto scrollbar-hide">
+                                                {#each breadcrumbs as crumb, i}
+                                                        {#if i > 0}
+                                                                <ChevronRight size={14} class="mx-1 text-text-secondary/30 shrink-0"></ChevronRight>
+                                                        {/if}
+                                                        <button
+                                                                class={cn(
+                                                                        "px-2 py-0.5 rounded-md text-[13px] transition-colors hover:bg-white/5 whitespace-nowrap cursor-pointer",
+                                                                        i === breadcrumbs.length - 1 ? "text-text-primary font-bold" : "text-text-secondary hover:text-text-primary"
+                                                                )}
+                                                                onclick={(e) => { e.stopPropagation(); onNavigate(crumb.path); }}
+                                                        >
+                                                                {crumb.name}
+                                                        </button>
+                                                {/each}
+                                        </div>
+                                {/if}
+
+                                <button class="ml-2 text-text-secondary hover:text-text-primary p-1 transition-colors cursor-pointer shrink-0" onclick={(e) => { e.stopPropagation(); onNavigate(currentPath); }}>
                                         <RotateCw size={14}></RotateCw>
                                 </button>
                         </div>
@@ -260,11 +342,16 @@
                 <!-- Search Input -->
                 <div class="flex items-center shrink-0 ml-12">
                         <div class="relative w-48 sm:w-64 group">
-                                <Search
-                                        size={14}
-                                        class="absolute left-3 top-3 text-text-secondary group-focus-within:text-action-color transition-colors"
-                                ></Search>
+                                {#if isSearching}
+                                        <RotateCw size={14} class="absolute left-3 top-3 text-action-color animate-spin"></RotateCw>
+                                {:else}
+                                        <Search
+                                                size={14}
+                                                class="absolute left-3 top-3 text-text-secondary group-focus-within:text-action-color transition-colors"
+                                        ></Search>
+                                {/if}
                                 <Input
+                                        id="browser-search"
                                         type="text"
                                         placeholder="Search folder"
                                         bind:value={searchQuery}
@@ -417,8 +504,10 @@
                                 <span class="font-bold uppercase tracking-wider">
                                         {#if mode === 'host'}
                                                 {files.filter((f: FileItem) => f.tracked).length} Tracked
-                                        {:else}
+                                        {:else if mode === 'index'}
                                                 {files.filter((f: FileItem) => f.selected).length} Selected
+                                        {:else}
+                                                {files.length} Queued
                                         {/if}
                                 </span>
                         </div>

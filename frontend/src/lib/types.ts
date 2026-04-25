@@ -10,6 +10,8 @@ export interface FileItem {
     media?: string[]; // Media it's on (for index browsing)
     selected?: boolean; // For restore cart
     sha256_hash?: string | null;
+    vulnerable?: boolean;
+    indeterminate?: boolean;
 }
 
 export interface TreeNode {

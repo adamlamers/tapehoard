@@ -11,7 +11,9 @@
         HardDrive,
         Cloud,
         ArrowRight,
-        EyeOff
+        EyeOff,
+        FolderTree,
+        CassetteTape
     } from 'lucide-svelte';
     import { Card } from '$lib/components/ui/card';
     import { Button } from '$lib/components/ui/button';
@@ -112,6 +114,50 @@
             {/each}
         </div>
     {:else if stats}
+        {#if stats.total_files_indexed === 0 && stats.media_distribution.LTO === 0 && stats.media_distribution.HDD === 0}
+            <!-- ONBOARDING SECTION -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 py-12">
+                <Card class="p-8 bg-gradient-to-br from-bg-secondary to-bg-tertiary border-dashed border-2 border-border-color flex flex-col items-center text-center gap-6 group hover:border-blue-500/50 transition-all">
+                    <div class="p-4 bg-blue-500/10 rounded-full text-blue-500 group-hover:scale-110 transition-transform">
+                        <FolderTree size={40} />
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-black uppercase tracking-tight text-text-primary">1. Define Policy</h3>
+                        <p class="text-xs text-text-secondary mt-2 leading-relaxed">Tell TapeHoard which directories to track and what patterns to ignore.</p>
+                    </div>
+                    <Button variant="outline" class="w-full mt-auto h-11 font-black uppercase tracking-widest text-[10px] border-blue-500/30 text-blue-400 hover:bg-blue-500/10" href="/tracking">
+                        Configure Tracking <ArrowRight size={14} class="ml-2" />
+                    </Button>
+                </Card>
+
+                <Card class="p-8 bg-gradient-to-br from-bg-secondary to-bg-tertiary border-dashed border-2 border-border-color flex flex-col items-center text-center gap-6 group hover:border-action-color/50 transition-all">
+                    <div class="p-4 bg-action-color/10 rounded-full text-action-color group-hover:scale-110 transition-transform">
+                        <Activity size={40} />
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-black uppercase tracking-tight text-text-primary">2. Scan Sources</h3>
+                        <p class="text-xs text-text-secondary mt-2 leading-relaxed">Run a system-wide scan to index your files and calculate protection hashes.</p>
+                    </div>
+                    <Button variant="default" class="w-full mt-auto h-11 font-black uppercase tracking-widest text-[10px]" onclick={startScan}>
+                        Start Discovery <ArrowRight size={14} class="ml-2" />
+                    </Button>
+                </Card>
+
+                <Card class="p-8 bg-gradient-to-br from-bg-secondary to-bg-tertiary border-dashed border-2 border-border-color flex flex-col items-center text-center gap-6 group hover:border-success-color/50 transition-all">
+                    <div class="p-4 bg-success-color/10 rounded-full text-success-color group-hover:scale-110 transition-transform">
+                        <CassetteTape size={40} />
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-black uppercase tracking-tight text-text-primary">3. Provision Media</h3>
+                        <p class="text-xs text-text-secondary mt-2 leading-relaxed">Register your LTO tapes or backup disks to create a destination for your data.</p>
+                    </div>
+                    <Button variant="outline" class="w-full mt-auto h-11 font-black uppercase tracking-widest text-[10px] border-success-color/30 text-success-color hover:bg-success-color/10" href="/inventory">
+                        Manage Fleet <ArrowRight size={14} class="ml-2" />
+                    </Button>
+                </Card>
+            </div>
+        {/if}
+
         <!-- TOP STATS -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card class="p-6 bg-gradient-to-br from-bg-secondary to-bg-tertiary border-border-color hover:border-blue-500/30 transition-all group relative overflow-hidden">
@@ -162,7 +208,14 @@
                     <div>
                         <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Last Scan</span>
                         <span class="text-xl font-black text-text-primary tracking-tight">
-                            {stats.last_scan_time ? new Date(stats.last_scan_time).toLocaleDateString() : 'Never'}
+                            {#if stats.last_scan_time}
+                                {new Date(stats.last_scan_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                <span class="text-[9px] block text-text-secondary opacity-50 uppercase font-black tracking-widest">
+                                    {new Date(stats.last_scan_time).toLocaleDateString()}
+                                </span>
+                            {:else}
+                                Never
+                            {/if}
                         </span>
                     </div>
                 </div>
@@ -186,11 +239,11 @@
                     <div class="space-y-4">
                         <div class="flex justify-between items-end">
                             <div>
-                                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary">Tracked File Coverage</span>
+                                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary">Tracking Coverage</span>
                                 <h4 class="text-3xl font-black text-text-primary">{protectionPercent}%</h4>
                             </div>
                             <span class="text-xs font-bold mono text-text-secondary">
-                                {stats.total_files_indexed - stats.ignored_files_count - stats.unprotected_files_count} / {stats.total_files_indexed - stats.ignored_files_count} ELIGIBLE FILES
+                                {stats.total_files_indexed - stats.ignored_files_count - stats.unprotected_files_count} / {stats.total_files_indexed - stats.ignored_files_count} TRACKED FILES
                             </span>
                         </div>
                         <div class="w-full bg-bg-primary h-4 rounded-full border border-border-color shadow-inner overflow-hidden">
@@ -201,7 +254,7 @@
                     <div class="space-y-4">
                         <div class="flex justify-between items-end">
                             <div>
-                                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary">Active Data Redundancy</span>
+                                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary">Archive Redundancy</span>
                                 <h4 class="text-3xl font-black text-text-primary">{dataProtectionPercent}%</h4>
                             </div>
                             <span class="text-xs font-bold mono text-text-secondary">
@@ -220,7 +273,7 @@
                             <ShieldAlert size={18} />
                         </div>
                         <div>
-                            <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block mb-1">Unprotected</span>
+                            <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block mb-1">Vulnerable</span>
                             <span class="text-lg font-black text-error-color mono">{stats.unprotected_files_count.toLocaleString()}</span>
                             <p class="text-[9px] font-bold text-text-secondary uppercase tracking-tight mt-1">Files pending archival</p>
                         </div>

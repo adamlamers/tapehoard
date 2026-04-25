@@ -50,6 +50,9 @@ class ItemMetadataSchema(BaseModel):
     sha256_hash: Optional[str] = None
     versions: List[FileVersionSchema] = []
     child_count: Optional[int] = None
+    vulnerable: bool = False
+    selected: bool = False
+    indeterminate: bool = False
 
 
 class FileItemSchema(BaseModel):
@@ -59,6 +62,9 @@ class FileItemSchema(BaseModel):
     size: Optional[int] = None
     mtime: Optional[float] = None
     media: List[str] = []
+    vulnerable: bool = False
+    selected: bool = False
+    indeterminate: bool = False
 
 
 class TreeNodeSchema(BaseModel):
@@ -68,10 +74,10 @@ class TreeNodeSchema(BaseModel):
 
 
 class MediaCreateSchema(BaseModel):
-    media_type: str  # tape, hdd, cloud
+    media_type: str
     identifier: str
     generation_tier: Optional[str] = None
-    capacity: int  # in bytes
+    capacity: int
     location: Optional[str] = None
     config: Dict[str, Any] = {}
 
@@ -93,34 +99,38 @@ class MediaSchema(BaseModel):
     status: str
     config: Dict[str, Any]
 
-    @classmethod
-    def from_orm_custom(cls, obj: models.StorageMedia):
-        config_data = {}
-        if obj.extra_config:
-            try:
-                config_data = json.loads(obj.extra_config)
-            except Exception:
-                pass
-        return cls(
-            id=obj.id,
-            media_type=obj.media_type,
-            identifier=obj.identifier,
-            generation_tier=obj.generation_tier,
-            capacity=obj.capacity,
-            bytes_used=obj.bytes_used,
-            location=obj.location,
-            status=obj.status,
-            config=config_data,
-        )
+    class Config:
+        from_attributes = True
 
 
-# --- Media Endpoints ---
+# --- Media Management ---
 
 
 @router.get("/media", response_model=List[MediaSchema])
 def list_media(db: Session = Depends(get_db)):
-    all_media = db.query(models.StorageMedia).all()
-    return [MediaSchema.from_orm_custom(m) for m in all_media]
+    media = db.query(models.StorageMedia).all()
+    results = []
+    for m in media:
+        config = {}
+        if m.extra_config:
+            try:
+                config = json.loads(m.extra_config)
+            except Exception:
+                pass
+        results.append(
+            MediaSchema(
+                id=m.id,
+                media_type=m.media_type,
+                identifier=m.identifier,
+                generation_tier=m.generation_tier,
+                capacity=m.capacity,
+                bytes_used=m.bytes_used,
+                location=m.location,
+                status=m.status,
+                config=config,
+            )
+        )
+    return results
 
 
 @router.post("/media", response_model=MediaSchema)
@@ -131,22 +141,35 @@ def register_media(req: MediaCreateSchema, db: Session = Depends(get_db)):
         .first()
     )
     if existing:
-        raise HTTPException(
-            status_code=400, detail="Media with this identifier already exists"
-        )
+        raise HTTPException(status_code=400, detail="Media already exists")
+
     new_media = models.StorageMedia(
         media_type=req.media_type,
         identifier=req.identifier,
         generation_tier=req.generation_tier,
         capacity=req.capacity,
         location=req.location,
-        status="active",
         extra_config=json.dumps(req.config),
     )
     db.add(new_media)
     db.commit()
     db.refresh(new_media)
-    return MediaSchema.from_orm_custom(new_media)
+
+    config = {}
+    if new_media.extra_config:
+        config = json.loads(new_media.extra_config)
+
+    return MediaSchema(
+        id=new_media.id,
+        media_type=new_media.media_type,
+        identifier=new_media.identifier,
+        generation_tier=new_media.generation_tier,
+        capacity=new_media.capacity,
+        bytes_used=new_media.bytes_used,
+        location=new_media.location,
+        status=new_media.status,
+        config=config,
+    )
 
 
 @router.patch("/media/{media_id}", response_model=MediaSchema)
@@ -154,22 +177,31 @@ def update_media(media_id: int, req: MediaUpdateSchema, db: Session = Depends(ge
     media = db.query(models.StorageMedia).get(media_id)
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
+
     if req.status:
         media.status = req.status
     if req.location:
         media.location = req.location
-    if req.config is not None:
-        current_config = {}
-        if media.extra_config:
-            try:
-                current_config = json.loads(media.extra_config)
-            except Exception:
-                pass
-        current_config.update(req.config)
-        media.extra_config = json.dumps(current_config)
+    if req.config:
+        media.extra_config = json.dumps(req.config)
+
     db.commit()
     db.refresh(media)
-    return MediaSchema.from_orm_custom(media)
+    config = {}
+    if media.extra_config:
+        config = json.loads(media.extra_config)
+
+    return MediaSchema(
+        id=media.id,
+        media_type=media.media_type,
+        identifier=media.identifier,
+        generation_tier=media.generation_tier,
+        capacity=media.capacity,
+        bytes_used=media.bytes_used,
+        location=media.location,
+        status=media.status,
+        config=config,
+    )
 
 
 @router.delete("/media/{media_id}")
@@ -184,7 +216,25 @@ def delete_media(media_id: int, db: Session = Depends(get_db)):
     return {"message": "Media deleted"}
 
 
-# --- Browsing Endpoints (Optimized) ---
+@router.post("/media/{media_id}/initialize")
+def initialize_media(media_id: int, db: Session = Depends(get_db)):
+    from app.services.archiver import archiver_manager
+
+    media = db.query(models.StorageMedia).get(media_id)
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    provider = archiver_manager._get_provider(media)
+    if not provider:
+        raise HTTPException(status_code=400, detail="Unsupported media type")
+
+    if provider.initialize_media(media.identifier):
+        return {"message": "Media initialized successfully"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to initialize media")
+
+
+# --- Browsing Endpoints (Highly Optimized) ---
 
 
 @router.get("/browse", response_model=List[FileItemSchema])
@@ -193,78 +243,177 @@ def browse_index(
     include_ignored: bool = False,
     db: Session = Depends(get_db),
 ):
+    roots = get_source_roots(db)
     if path is None or path == "ROOT":
-        roots = get_source_roots(db)
+        # OPTIMIZED: Fetch all root stats in a single complex SQL aggregate
         results = []
         for root in roots:
-            sql = text(
-                "SELECT COUNT(*), SUM(size), MAX(mtime) FROM filesystem_state WHERE file_path LIKE :prefix"
-                + (" AND is_ignored = 0" if not include_ignored else "")
-            )
-            row = db.execute(sql, {"prefix": f"{root}%"}).fetchone()
-            if row and row[0] > 0:
-                results.append(
-                    FileItemSchema(
-                        name=root,
-                        path=root,
-                        type="directory",
-                        size=row[1] or 0,
-                        mtime=row[2] or 0,
-                    )
+            prefix = root if root.endswith("/") else root + "/"
+            stats_sql = text("""
+                SELECT
+                    MAX(CASE WHEN fv.id IS NULL AND fs.is_ignored = 0 THEN 1 ELSE 0 END) as is_vulnerable,
+                    COUNT(DISTINCT CASE WHEN fv.id IS NOT NULL THEN fs.id END) as restorable_count,
+                    COUNT(DISTINCT CASE WHEN fv.id IS NOT NULL AND rc.id IS NOT NULL THEN fs.id END) as queued_count
+                FROM filesystem_state fs
+                LEFT JOIN file_versions fv ON fv.filesystem_state_id = fs.id
+                LEFT JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
+                WHERE fs.file_path LIKE :prefix
+            """)
+            stats = db.execute(stats_sql, {"prefix": f"{prefix}%"}).fetchone()
+
+            is_vuln = stats[0] if stats else 0
+            restorable = stats[1] if stats else 0
+            queued = stats[2] if stats else 0
+
+            is_selected = restorable > 0 and queued == restorable
+            is_indeterminate = 0 < queued < restorable
+
+            results.append(
+                FileItemSchema(
+                    name=root,
+                    path=root,
+                    type="directory",
+                    size=0,
+                    mtime=0,
+                    vulnerable=bool(is_vuln),
+                    selected=is_selected,
+                    indeterminate=is_indeterminate,
                 )
+            )
         return results
 
     prefix = path if path.endswith("/") else path + "/"
-    ignore_filter = " AND is_ignored = 0" if not include_ignored else ""
+    ignore_filter = " AND fs.is_ignored = 0" if not include_ignored else ""
     results = []
 
-    # Subdirectories
-    subdir_sql = text(
-        f"""
-        SELECT DISTINCT SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) as dirname
-        FROM filesystem_state WHERE file_path LIKE :search_prefix AND SUBSTR(file_path, LENGTH(:prefix) + 1) LIKE '%/%' {ignore_filter}
-    """
-    )
-    subdirs = db.execute(
-        subdir_sql, {"prefix": prefix, "search_prefix": f"{prefix}%"}
-    ).fetchall()
-    for sd in subdirs:
-        if sd[0]:
-            results.append(
-                FileItemSchema(
-                    name=sd[0], path=prefix + sd[0], type="directory", size=0, mtime=0
-                )
-            )
+    # OPTIMIZED: Fetch ALL subdirectory metadata in a SINGLE aggregate query
+    # This replaces the N+1 query pattern that was killing performance
+    subdir_agg_sql = text(f"""
+        SELECT
+            SUBSTR(fs.file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(fs.file_path, LENGTH(:prefix) + 1), '/') - 1) as dirname,
+            MAX(CASE WHEN fv.id IS NULL AND fs.is_ignored = 0 THEN 1 ELSE 0 END) as is_vulnerable,
+            COUNT(DISTINCT CASE WHEN fv.id IS NOT NULL THEN fs.id END) as restorable_count,
+            COUNT(DISTINCT CASE WHEN fv.id IS NOT NULL AND rc.id IS NOT NULL THEN fs.id END) as queued_count
+        FROM filesystem_state fs
+        LEFT JOIN file_versions fv ON fv.filesystem_state_id = fs.id
+        LEFT JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
+        WHERE fs.file_path LIKE :search_prefix
+        AND SUBSTR(fs.file_path, LENGTH(:prefix) + 1) LIKE '%/%' {ignore_filter}
+        GROUP BY dirname
+    """)
 
-    # Files
-    file_sql = text(
-        f"""
-        SELECT name, file_path, size, mtime, id FROM (
-            SELECT SUBSTR(file_path, LENGTH(:prefix) + 1) as name, file_path, size, mtime, id
-            FROM filesystem_state WHERE file_path LIKE :search_prefix {ignore_filter}
-        ) WHERE name NOT LIKE '%/%'
-    """
-    )
+    subdirs = db.execute(
+        subdir_agg_sql, {"prefix": prefix, "search_prefix": f"{prefix}%"}
+    ).fetchall()
+
+    for sd in subdirs:
+        name = sd[0]
+        is_vuln = sd[1]
+        restorable = sd[2]
+        queued = sd[3]
+
+        is_selected = restorable > 0 and queued == restorable
+        is_indeterminate = 0 < queued < restorable
+
+        results.append(
+            FileItemSchema(
+                name=name,
+                path=prefix + name,
+                type="directory",
+                size=0,
+                mtime=0,
+                vulnerable=bool(is_vuln),
+                selected=is_selected,
+                indeterminate=is_indeterminate,
+            )
+        )
+
+    # OPTIMIZED: Fetch files with version/cart status in a single joined query
+    file_sql = text(f"""
+        SELECT
+            fs.file_path, fs.size, fs.mtime, fs.id,
+            MAX(CASE WHEN fv.id IS NOT NULL THEN 1 ELSE 0 END) as has_version,
+            MAX(CASE WHEN rc.id IS NOT NULL THEN 1 ELSE 0 END) as is_selected,
+            GROUP_CONCAT(DISTINCT sm.identifier) as media_list
+        FROM filesystem_state fs
+        LEFT JOIN file_versions fv ON fv.filesystem_state_id = fs.id
+        LEFT JOIN storage_media sm ON sm.id = fv.media_id
+        LEFT JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
+        WHERE fs.file_path LIKE :search_prefix
+        AND SUBSTR(fs.file_path, LENGTH(:prefix) + 1) NOT LIKE '%/%' {ignore_filter}
+        GROUP BY fs.id
+    """)
+
     files = db.execute(
         file_sql, {"prefix": prefix, "search_prefix": f"{prefix}%"}
     ).fetchall()
+
     for f in files:
-        media_sql = text(
-            "SELECT m.identifier FROM storage_media m JOIN file_versions v ON v.media_id = m.id WHERE v.filesystem_state_id = :fid"
-        )
-        media_list = [m[0] for m in db.execute(media_sql, {"fid": f[4]}).fetchall()]
+        media_list = f[6].split(",") if f[6] else []
+        name = f[0].split("/")[-1]
         results.append(
             FileItemSchema(
-                name=f[0],
-                path=f[1],
+                name=name,
+                path=f[0],
                 type="file",
-                size=f[2],
-                mtime=f[3],
+                size=f[1],
+                mtime=f[2],
                 media=media_list,
+                vulnerable=not bool(f[4]),
+                selected=bool(f[5]),
             )
         )
 
     results.sort(key=lambda x: (x.type != "directory", x.name.lower()))
+    return results
+
+
+@router.get("/search", response_model=List[FileItemSchema])
+def search_index(q: str, include_ignored: bool = False, db: Session = Depends(get_db)):
+    if not q or len(q) < 3:
+        return []
+
+    ignore_filter = " AND fs.is_ignored = 0" if not include_ignored else ""
+
+    # Use FTS5 for instantaneous full-text search
+    sql = text(f"""
+        SELECT
+            fs.file_path, fs.size, fs.mtime, fs.id,
+            MAX(CASE WHEN fv.id IS NOT NULL THEN 1 ELSE 0 END) as has_version,
+            MAX(CASE WHEN rc.id IS NOT NULL THEN 1 ELSE 0 END) as is_selected,
+            GROUP_CONCAT(DISTINCT sm.identifier) as media_list
+        FROM filesystem_fts
+        JOIN filesystem_state fs ON fs.id = filesystem_fts.rowid
+        LEFT JOIN file_versions fv ON fv.filesystem_state_id = fs.id
+        LEFT JOIN storage_media sm ON sm.id = fv.media_id
+        LEFT JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
+        WHERE filesystem_fts MATCH :query {ignore_filter}
+        GROUP BY fs.id
+        LIMIT 200
+    """)
+
+    safe_query = f'"{q}"'
+    files = db.execute(sql, {"query": safe_query}).fetchall()
+
+    results = []
+    for f in files:
+        name = f[0].split("/")[-1]
+        media_list = f[6].split(",") if f[6] else []
+
+        results.append(
+            FileItemSchema(
+                name=name,
+                path=f[0],
+                type="file",
+                size=f[1],
+                mtime=f[2],
+                media=media_list,
+                vulnerable=not bool(f[4]),
+                selected=bool(f[5]),
+            )
+        )
+
+    results.sort(key=lambda x: x.name.lower())
     return results
 
 
@@ -311,6 +460,14 @@ def get_item_metadata(path: str, db: Session = Depends(get_db)):
             )
             for v in file_state.versions
         ]
+
+        is_selected = (
+            db.query(models.RestoreCart)
+            .filter(models.RestoreCart.filesystem_state_id == file_state.id)
+            .first()
+            is not None
+        )
+
         return ItemMetadataSchema(
             id=file_state.id,  # Now included
             file_path=file_state.file_path,
@@ -320,8 +477,30 @@ def get_item_metadata(path: str, db: Session = Depends(get_db)):
             last_seen_timestamp=file_state.last_seen_timestamp,
             sha256_hash=file_state.sha256_hash,
             versions=versions,
+            vulnerable=not bool(file_state.versions),
+            selected=is_selected,
         )
     prefix = path if path.endswith("/") else path + "/"
+    # Check recursive vulnerability and selection
+    stats_sql = text("""
+        SELECT
+            MAX(CASE WHEN fv.id IS NULL AND fs.is_ignored = 0 THEN 1 ELSE 0 END) as is_vulnerable,
+            COUNT(DISTINCT CASE WHEN fv.id IS NOT NULL THEN fs.id END) as restorable_count,
+            COUNT(DISTINCT CASE WHEN fv.id IS NOT NULL AND rc.id IS NOT NULL THEN fs.id END) as queued_count
+        FROM filesystem_state fs
+        LEFT JOIN file_versions fv ON fv.filesystem_state_id = fs.id
+        LEFT JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
+        WHERE fs.file_path LIKE :prefix
+    """)
+    stats = db.execute(stats_sql, {"prefix": f"{prefix}%"}).fetchone()
+
+    is_vuln = stats[0] if stats else 0
+    restorable = stats[1] if stats else 0
+    queued = stats[2] if stats else 0
+
+    is_selected = restorable > 0 and queued == restorable
+    is_indeterminate = 0 < queued < restorable
+
     sql = text(
         "SELECT COUNT(*), SUM(size), MAX(mtime), MAX(last_seen_timestamp) FROM filesystem_state WHERE file_path LIKE :prefix AND is_ignored = 0"
     )
@@ -334,6 +513,9 @@ def get_item_metadata(path: str, db: Session = Depends(get_db)):
             mtime=row[2] or 0,
             last_seen_timestamp=row[3] or datetime.now(timezone.utc),
             child_count=row[0],
+            vulnerable=bool(is_vuln),
+            selected=is_selected,
+            indeterminate=is_indeterminate,
         )
     raise HTTPException(status_code=404, detail="Item not found")
 
