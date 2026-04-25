@@ -255,13 +255,18 @@ def add_directory_to_cart(req: DirectoryCartRequest, db: Session = Depends(get_d
 
     logger.info(f"Adding directory to queue: {path} (prefix: {prefix_query})")
 
+    # Optimized SQL for lightning-fast bulk insert
+    # 1. Matches path prefix (using the new index)
+    # 2. Joins file_versions to ensure it's restorable
+    # 3. Left Joins restore_cart to skip already-queued items
     insert_sql = text("""
         INSERT INTO restore_cart (filesystem_state_id, created_at)
         SELECT DISTINCT fs.id, :now
         FROM filesystem_state fs
+        JOIN file_versions fv ON fv.filesystem_state_id = fs.id
+        LEFT JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
         WHERE (fs.file_path = :path OR fs.file_path LIKE :prefix)
-        AND EXISTS (SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id)
-        AND fs.id NOT IN (SELECT filesystem_state_id FROM restore_cart)
+        AND rc.id IS NULL
     """)
 
     db.execute(
@@ -291,7 +296,7 @@ def add_to_cart(file_id: int, db: Session = Depends(get_db)):
     if existing:
         return {"message": "Already in recovery queue"}
 
-    file_state = db.query(models.FilesystemState).get(file_id)
+    file_state = db.get(models.FilesystemState, file_id)
     if not file_state or not file_state.versions:
         raise HTTPException(status_code=400, detail="File has no backed up versions")
 
@@ -303,7 +308,7 @@ def add_to_cart(file_id: int, db: Session = Depends(get_db)):
 
 @router.delete("/cart/{item_id}")
 def remove_from_cart(item_id: int, db: Session = Depends(get_db)):
-    item = db.query(models.RestoreCart).get(item_id)
+    item = db.get(models.RestoreCart, item_id)
     if item:
         db.delete(item)
         db.commit()

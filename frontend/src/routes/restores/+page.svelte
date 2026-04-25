@@ -196,17 +196,19 @@
     </header>
 
     {#if (manifest?.total_files || 0) === 0 && !loading}
-        <div class="flex-1 flex flex-col items-center justify-center p-12 text-center animate-in fade-in zoom-in duration-500 w-full">
-            <div class="w-24 h-24 bg-bg-tertiary rounded-full flex items-center justify-center mb-8 border-2 border-dashed border-border-color opacity-50">
-                <History size={48} class="text-text-secondary" strokeWidth={1} />
+        <div class="flex-1 flex flex-col items-center justify-center p-12 text-center animate-in fade-in zoom-in duration-500">
+            <div class="max-w-2xl flex flex-col items-center">
+                <div class="w-24 h-24 bg-bg-tertiary rounded-full flex items-center justify-center mb-8 border-2 border-dashed border-border-color opacity-50">
+                    <History size={48} class="text-text-secondary" strokeWidth={1} />
+                </div>
+                <h2 class="text-2xl font-black uppercase tracking-tighter text-text-primary">Recovery Queue is Empty</h2>
+                <p class="text-[11px] font-bold uppercase tracking-[0.2em] mt-4 text-text-secondary leading-loose opacity-60">
+                    You haven't selected any files for restoration yet. Use the Index Browser to find and queue the items you need to recover from your fleet.
+                </p>
+                <Button variant="default" class="mt-10 h-12 px-10 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/20" href="/index-browser">
+                    Browse Virtual Index <ArrowRight size={14} class="ml-2" />
+                </Button>
             </div>
-            <h2 class="text-2xl font-black uppercase tracking-tighter text-text-primary">Recovery Queue is Empty</h2>
-            <p class="text-[11px] font-bold uppercase tracking-[0.2em] mt-3 text-text-secondary max-w-xl leading-relaxed opacity-60">
-                You haven't selected any files for restoration yet. Use the Index Browser to find and queue the items you need to recover from your fleet.
-            </p>
-            <Button variant="default" class="mt-10 h-12 px-8 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/20" href="/index-browser">
-                Browse Virtual Index <ArrowRight size={14} class="ml-2" />
-            </Button>
         </div>
     {:else}
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 min-h-0">

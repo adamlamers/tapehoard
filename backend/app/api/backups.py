@@ -12,7 +12,7 @@ router = APIRouter(prefix="/backups", tags=["Backups"])
 def trigger_backup(
     media_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
-    media = db.query(models.StorageMedia).get(media_id)
+    media = db.get(models.StorageMedia, media_id)
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
 

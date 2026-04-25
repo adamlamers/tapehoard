@@ -5,17 +5,15 @@ services:
       dockerfile: docker/Dockerfile
     container_name: tapehoard
     ports:
-      - "8000:8000"
+      - "9000:8000"
     volumes:
-      # - ./data:/app/data
+      - ./db:/database
       - ./staging:/staging
-      - /Users/alamers/git/:/source_data:ro
-      - /Users/alamers/restore/:/restores
-      - /Users/alamers/backup/:/mnt/HDD-001
-      # - /mnt/storage:/source_data:ro
-      # - /mnt/restores:/restores
+      - /Users/alamers/git/ditchcord:/source_data:ro
+      - /Users/alamers/restore:/restores
+    # Uncomment to enable LTO tape drive support
     # devices:
-      # - /dev/nst0:/dev/nst0
+    #   - /dev/nst0:/dev/nst0
     environment:
       - PUID=1000
       - PGID=1000

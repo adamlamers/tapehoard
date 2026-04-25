@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     mt-st \
     tar \
     sqlite3 \
+    passwd \
+    util-linux \
     build-essential \
     autoconf \
     automake \
@@ -44,12 +46,19 @@ COPY backend/ ./
 COPY --from=frontend-builder /app/frontend/build /app/backend/static
 
 # Setup volumes and permissions
-RUN mkdir -p /app/data /staging /source_data /restores
-ENV DATABASE_URL=sqlite:////app/data/tapehoard.db
+RUN mkdir -p /database /staging /source_data /restores /home/appuser /uv-cache && chmod 777 /uv-cache
+ENV DATABASE_URL=sqlite:////database/tapehoard.db
+ENV HOME=/home/appuser
+ENV UV_CACHE_DIR=/uv-cache
+ENV XDG_CACHE_HOME=/uv-cache
 
 # Entrypoint
 COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
+# Ensure the app can write to its volumes
+VOLUME ["/database", "/staging", "/restores"]
+
+ENV PORT=8000
 EXPOSE 8000
 ENTRYPOINT ["/app/entrypoint.sh"]

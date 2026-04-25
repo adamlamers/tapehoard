@@ -96,7 +96,10 @@ class ArchiverService:
         )
 
         return (
-            db.query(models.FilesystemState)
+            db.query(
+                models.FilesystemState,
+                func.coalesce(subquery.c.covered_size, 0).label("covered_size"),
+            )
             .outerjoin(
                 subquery, models.FilesystemState.id == subquery.c.filesystem_state_id
             )
@@ -113,7 +116,7 @@ class ArchiverService:
         self, db: Session, media_id: int, max_bytes: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Selects a batch of files/chunks that fit on the media's remaining capacity"""
-        media = db.query(models.StorageMedia).get(media_id)
+        media = db.get(models.StorageMedia, media_id)
         if not media:
             return []
 
@@ -129,22 +132,9 @@ class ArchiverService:
         # We need at least some space to make it worthwhile
         MIN_CHUNK_SIZE = 100 * 1024 * 1024  # 100MB
 
-        for f in eligible:
+        for f, covered_size in eligible:
             if current_size >= remaining_capacity:
                 break
-
-            # Calculate how much of this file is already backed up
-            # For simplicity, we assume we always backup from the end of the last chunk
-            covered_size = (
-                db.query(
-                    func.sum(
-                        models.FileVersion.offset_end - models.FileVersion.offset_start
-                    )
-                )
-                .filter(models.FileVersion.filesystem_state_id == f.id)
-                .scalar()
-                or 0
-            )
 
             remaining_file_size = f.size - covered_size
 
@@ -152,6 +142,8 @@ class ArchiverService:
             if remaining_file_size <= 0 and f.size > 0:
                 continue
             if f.size == 0:
+                if covered_size > 0:
+                    continue
                 # Check if it already has a version to avoid infinite loop
                 has_version = (
                     db.query(models.FileVersion)
@@ -193,7 +185,7 @@ class ArchiverService:
         return backup_set
 
     def run_backup(self, db: Session, media_id: int, job_id: int):
-        media = db.query(models.StorageMedia).get(media_id)
+        media = db.get(models.StorageMedia, media_id)
         if not media:
             JobManager.fail_job(job_id, "Media not found")
             return
@@ -447,7 +439,7 @@ class ArchiverService:
                 if JobManager.is_cancelled(job_id):
                     break
 
-                media = db.query(models.StorageMedia).get(media_id)
+                media = db.get(models.StorageMedia, media_id)
                 if not media:
                     continue
 

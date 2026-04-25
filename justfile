@@ -12,12 +12,12 @@ default:
 dev:
     @echo "Starting Backend (FastAPI) and Frontend (SvelteKit)..."
     @trap 'kill %1' SIGINT; \
-        (cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload) & \
-        (cd frontend && npm run dev)
+        (cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload) & \
+        (cd frontend && VITE_API_URL=http://localhost:${PORT:-8000} npm run dev)
 
 # Run just the backend
 backend:
-    cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload
 
 # Run just the frontend
 frontend:

@@ -174,7 +174,7 @@ def register_media(req: MediaCreateSchema, db: Session = Depends(get_db)):
 
 @router.patch("/media/{media_id}", response_model=MediaSchema)
 def update_media(media_id: int, req: MediaUpdateSchema, db: Session = Depends(get_db)):
-    media = db.query(models.StorageMedia).get(media_id)
+    media = db.get(models.StorageMedia, media_id)
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
 
@@ -206,7 +206,7 @@ def update_media(media_id: int, req: MediaUpdateSchema, db: Session = Depends(ge
 
 @router.delete("/media/{media_id}")
 def delete_media(media_id: int, db: Session = Depends(get_db)):
-    media = db.query(models.StorageMedia).get(media_id)
+    media = db.get(models.StorageMedia, media_id)
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
     if media.versions:
@@ -220,7 +220,7 @@ def delete_media(media_id: int, db: Session = Depends(get_db)):
 def initialize_media(media_id: int, db: Session = Depends(get_db)):
     from app.services.archiver import archiver_manager
 
-    media = db.query(models.StorageMedia).get(media_id)
+    media = db.get(models.StorageMedia, media_id)
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
 

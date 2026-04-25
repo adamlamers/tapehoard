@@ -1,7 +1,7 @@
 import os
 import hashlib
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Set, Tuple, Any, cast
+from typing import Dict, List, Optional, Tuple, Any, cast
 from loguru import logger
 from sqlalchemy.orm import Session
 from app.db import models
@@ -12,9 +12,6 @@ import json
 
 
 class JobManager:
-    # Set of job IDs that have been requested to cancel
-    _cancelled_jobs: Set[int] = set()
-
     @staticmethod
     def create_job(db: Session, job_type: str) -> models.Job:
         job = models.Job(job_type=job_type, status="PENDING")
@@ -57,8 +54,6 @@ class JobManager:
                 job.progress = 100.0
                 job.completed_at = datetime.now(timezone.utc)
                 db.commit()
-            if job_id in JobManager._cancelled_jobs:
-                JobManager._cancelled_jobs.remove(job_id)
         finally:
             db.close()
 
@@ -72,14 +67,11 @@ class JobManager:
                 job.error_message = error_message
                 job.completed_at = datetime.now(timezone.utc)
                 db.commit()
-            if job_id in JobManager._cancelled_jobs:
-                JobManager._cancelled_jobs.remove(job_id)
         finally:
             db.close()
 
     @staticmethod
     def cancel_job(job_id: int):
-        JobManager._cancelled_jobs.add(job_id)
         db = SessionLocal()
         try:
             job = db.get(models.Job, job_id)
@@ -93,7 +85,18 @@ class JobManager:
 
     @staticmethod
     def is_cancelled(job_id: int) -> bool:
-        return job_id in JobManager._cancelled_jobs
+        db = SessionLocal()
+        try:
+            job = db.get(models.Job, job_id)
+            if (
+                job
+                and job.status == "FAILED"
+                and job.error_message == "Cancelled by user"
+            ):
+                return True
+            return False
+        finally:
+            db.close()
 
 
 class ScannerService:
