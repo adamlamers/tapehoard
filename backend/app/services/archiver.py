@@ -455,9 +455,25 @@ class ArchiverService:
                 )
                 current_id = provider.identify_media()
                 if current_id != media.identifier:
-                    raise Exception(
-                        f"Media mismatch! Insert {media.identifier} (Found: {current_id})"
+                    from app.services.notifications import notification_manager
+
+                    notification_manager.notify(
+                        "Action Required: Media Needed",
+                        f"Recovery job is waiting for media: {media.identifier} ({media.media_type}). Please insert or mount it to continue.",
+                        "warning",
                     )
+
+                    # Re-check loop (simple implementation for now)
+                    while current_id != media.identifier:
+                        if JobManager.is_cancelled(job_id):
+                            break
+                        import time
+
+                        time.sleep(10)
+                        current_id = provider.identify_media()
+
+                    if JobManager.is_cancelled(job_id):
+                        break
 
                 # Sort location IDs for sequential access
                 for loc_id in sorted(locations.keys()):

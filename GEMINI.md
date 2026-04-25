@@ -34,7 +34,25 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
 *   You can manually format your changes by running `just format`.
 
 ## 3. Core Architectural Rules
-*   **Abstract Storage Providers:** The core archiver must never directly call `mt` or write `tar` streams. It must use the Abstract Storage Provider interfaces defined in `backend/app/providers/base.py` to seamlessly support Tapes, HDDs, and Cloud buckets.
-*   **File Hashing & Deduplication:** Never re-hash a file if its `mtime` and `size` remain unchanged in the `filesystem_state` table.
-*   **Local Staging (`/staging`):** All massive file manipulation, chunking, and restore compilations must occur in the temporary `/staging` directory before hitting the final media or user.
-*   **Docker PUID/PGID:** Always account for the fact that the container will be running under a dynamic User ID. Avoid writing files to directories where the `appuser` might lack permissions.
+
+### Hardware & Media Lifecycle
+*   **Abstract Storage Providers:** The core archiver must never directly call `mt` or write `tar` streams. It must use the interfaces in `backend/app/providers/base.py` (Tapes, HDDs, Cloud).
+*   **Pulse Checks:** Every media asset must support `check_online()` (hardware detection) and `check_existing_data()` (pre-initialization warning).
+*   **Sanitization:** Initializing a drive must perform a full purge of existing TapeHoard data if the `force` flag is set.
+
+### Database & Performance
+*   **High Concurrency:** SQLite must always run in **WAL (Write-Ahead Logging)** mode with a 30s busy timeout to support concurrent scans and UI operations.
+*   **Aggregate Intelligence:** Avoid N+1 query patterns. Use Raw SQL Aggregates for directory protection statuses, manifest generation, and dashboard statistics.
+*   **Indexing:** All path-based operations must be backed by the `ix_filesystem_state_file_path` index. All foreign keys must be indexed.
+*   **Search Engine:** The FTS5 index is a standalone table synchronized via triggers. Triggers must be optimized to only fire on `file_path` changes to minimize overhead during routine scans.
+
+### Archival & Recovery
+*   **Multi-Part Archiving:** Files larger than media capacity must be split using `RangeFile` and archived with `.part_OFFSET_SIZE` suffixes in the tar stream.
+*   **Deduplication:** Always check for existing hashes on the target media before writing to the tar stream. If a hash exists, record the new version pointing to the existing location.
+*   **Recovery Manifests:** Calculations must be sequential and media-aware. The system should group all files needed from a specific tape to minimize physical hardware swaps.
+*   **Local Staging:** Use the `/staging` directory for temporary file reassembly. Never perform complex I/O directly in the production data paths.
+
+### Deployment & Environment
+*   **Temporal Standard:** The backend strictly uses **UTC**. The frontend must use `parseUTCDate` from `lib/utils.ts` to convert timestamps to the browser's **Local Time** for display.
+*   **Docker Portability:** Native support for `PUID`, `PGID`, and `PORT` environment variables. The frontend uses **relative API paths** in production to remain port-agnostic.
+*   **Job Management:** The `JobManager` must be database-driven. Never use in-memory sets for job states (like cancellation), as they will not sync across multi-worker environments.
