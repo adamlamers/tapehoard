@@ -16,7 +16,8 @@
         Globe,
         Monitor,
         PlayCircle,
-        Star
+        Star,
+        GripVertical
     } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import { Card } from '$lib/components/ui/card';
@@ -28,16 +29,15 @@
         deleteMediaInventoryMediaMediaIdDelete,
         triggerBackupBackupsTriggerMediaIdPost,
         initializeMediaInventoryMediaMediaIdInitializePost,
-        getSettingsSystemSettingsGet,
-        updateSettingSystemSettingsPost,
+        reorderMediaInventoryMediaReorderPost,
         type MediaSchema
     } from '$lib/api';
+    import { dndzone } from 'svelte-dnd-action';
     import { toast } from 'svelte-sonner';
 
     let mediaList = $state<MediaSchema[]>([]);
     let loading = $state(true);
     let showRegisterDialog = $state(false);
-    let primaryTargetId = $state<string | null>(null);
 
     // New Media Form State
     let newMedia = $state({
@@ -60,16 +60,9 @@
     async function loadMedia() {
         loading = true;
         try {
-            const [mediaRes, settingsRes] = await Promise.all([
-                listMediaInventoryMediaGet(),
-                getSettingsSystemSettingsGet()
-            ]);
-
-            if (mediaRes.data) {
-                mediaList = mediaRes.data;
-            }
-            if (settingsRes.data?.primary_archival_target) {
-                primaryTargetId = settingsRes.data.primary_archival_target;
+            const response = await listMediaInventoryMediaGet();
+            if (response.data) {
+                mediaList = response.data;
             }
         } catch (error) {
             toast.error("Failed to load media fleet");
@@ -78,36 +71,50 @@
         }
     }
 
-    async function setPrimaryTarget(mediaId: number) {
+    function handleDndConsider(e: CustomEvent) {
+        mediaList = e.detail.items;
+    }
+
+    async function handleDndFinalize(e: CustomEvent) {
+        mediaList = e.detail.items;
         try {
-            const idStr = mediaId.toString();
-            await updateSettingSystemSettingsPost({
-                body: { key: "primary_archival_target", value: idStr }
+            await reorderMediaInventoryMediaReorderPost({
+                body: { media_ids: mediaList.map(m => m.id) },
+                throwOnError: true
             });
-            primaryTargetId = idStr;
-            toast.success("Primary archival target updated");
+            toast.success("Archival priority updated");
         } catch (error) {
-            toast.error("Failed to set primary target");
+            toast.error("Failed to save media order");
+            loadMedia(); // Revert on failure
         }
     }
 
-    async function handleInitialize(mediaId: number, identifier: string) {
-        if (!confirm(`Are you sure you want to initialize ${identifier}? This may wipe existing data on the media.`)) return;
+    async function handleInitialize(mediaId: number, identifier: string, force = false) {
+        if (!force && !confirm(`Are you sure you want to initialize ${identifier}? This may wipe existing data on the media.`)) return;
 
         try {
             toast.info(`Initializing ${identifier}...`);
             await initializeMediaInventoryMediaMediaIdInitializePost({
-                path: { media_id: mediaId }
+                path: { media_id: mediaId },
+                query: { force },
+                throwOnError: true
             });
             toast.success(`${identifier} initialized successfully`);
         } catch (error: any) {
-            toast.error(error.body?.detail || "Failed to initialize media");
+            if (error.status === 409) {
+                if (confirm(error.body?.detail || "Media already has backups. Overwrite?")) {
+                    handleInitialize(mediaId, identifier, true);
+                }
+            } else {
+                toast.error(error.body?.detail || "Failed to initialize media");
+            }
         }
     }
 
     async function handleStartBackup(mediaId: number, identifier: string) {        try {
             await triggerBackupBackupsTriggerMediaIdPost({
-                path: { media_id: mediaId }
+                path: { media_id: mediaId },
+                throwOnError: true
             });
             toast.success(`Archival job initiated for ${identifier}`);
         } catch (error: any) {
@@ -147,13 +154,14 @@
                     capacity: newMedia.capacity_gb * 1024 * 1024 * 1024,
                     location: newMedia.location,
                     config: config
-                }
+                },
+                throwOnError: true
             });
             toast.success(`${newMedia.identifier} registered in fleet`);
             showRegisterDialog = false;
             loadMedia();
-        } catch (error) {
-            toast.error("Failed to register media");
+        } catch (error: any) {
+            toast.error(error.body?.detail || "Failed to register media");
         }
     }
 
@@ -161,7 +169,8 @@
         if (!confirm("Are you sure? This will remove the media from the system index.")) return;
         try {
             await deleteMediaInventoryMediaMediaIdDelete({
-                path: { media_id: mediaId }
+                path: { media_id: mediaId },
+                throwOnError: true
             });
             toast.success("Media removed from fleet");
             loadMedia();
@@ -204,45 +213,72 @@
 
     <!-- Content -->
     <div class="flex-1 overflow-y-auto pr-2 pb-12">
-        <Card class="bg-bg-secondary border-border-color shadow-2xl overflow-hidden">
+        <Card class="bg-bg-secondary border-border-color shadow-2xl overflow-hidden flex flex-col">
+            <!-- Table Legend -->
+            <div class="px-6 py-3 bg-bg-tertiary/30 border-b border-border-color flex items-center justify-end gap-6">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-70">Hardware Online</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-white/10"></div>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-70">Hardware Offline</span>
+                </div>
+                <div class="h-4 w-px bg-border-color mx-2"></div>
+                <div class="flex items-center gap-2">
+                    <Star size={10} class="text-yellow-500" fill="currentColor" />
+                    <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-70">Archival Priority</span>
+                </div>
+            </div>
+
             <table class="w-full border-collapse">
                 <thead>
                     <tr class="bg-bg-tertiary/50 border-b border-border-color">
-                        <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Primary</th>
+                        <th class="px-6 py-4 w-12"></th>
+                        <th class="px-2 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary">Stat</th>
                         <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Identity</th>
                         <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Type & Tier</th>
                         <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Location</th>
                         <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Utilization</th>
-                        <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Status</th>
                         <th class="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest text-text-secondary">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-border-color/30">
+                <tbody
+                    use:dndzone={{items: mediaList, flipDurationMs: 200}}
+                    onconsider={handleDndConsider}
+                    onfinalize={handleDndFinalize}
+                    class="divide-y divide-border-color/30"
+                >
                     {#each mediaList as media (media.id)}
                         <tr class="hover:bg-bg-primary/30 transition-colors group">
-                            <td class="px-6 py-4">
-                                <button
-                                    class={cn(
-                                        "p-2 rounded-lg border transition-all",
-                                        primaryTargetId === media.id.toString()
-                                            ? "bg-yellow-500/10 border-yellow-500/50 text-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
-                                            : "bg-bg-primary border-border-color text-text-secondary opacity-20 hover:opacity-100 hover:border-yellow-500/30"
-                                    )}
-                                    onclick={() => setPrimaryTarget(media.id)}
-                                    title="Set as primary archival target"
-                                >
-                                    <Star size={16} fill={primaryTargetId === media.id.toString() ? "currentColor" : "none"} />
-                                </button>
+                            <td class="px-6 py-4 text-center">
+                                <div class="cursor-grab active:cursor-grabbing text-text-secondary opacity-20 group-hover:opacity-100 transition-opacity">
+                                    <GripVertical size={16} />
+                                </div>
+                            </td>
+                            <td class="px-2 py-4 text-center">
+                                <div class="flex justify-center">
+                                    {#if media.is_online}
+                                        <div class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)] animate-pulse" title="Online"></div>
+                                    {:else}
+                                        <div class="w-2.5 h-2.5 rounded-full bg-white/5 border border-white/10" title="Offline"></div>
+                                    {/if}
+                                </div>
                             </td>
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-3">
-                                    <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500">
+                                    <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500 shrink-0">
                                         {#if media.media_type === 'tape'}<CassetteTape size={18} />{/if}
                                         {#if media.media_type === 'hdd'}<HardDrive size={18} />{/if}
                                         {#if media.media_type === 'cloud'}<Cloud size={18} />{/if}
                                     </div>
                                     <div>
-                                        <span class="text-sm font-black text-text-primary mono tracking-tight">{media.identifier}</span>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-sm font-black text-text-primary mono tracking-tight">{media.identifier}</span>
+                                            {#if mediaList.indexOf(media) === 0}
+                                                <span class="text-[8px] font-black uppercase bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20">Next Target</span>
+                                            {/if}
+                                        </div>
                                         <div class="flex gap-2 mt-0.5">
                                             {#if media.config?.encryption_key}
                                                 <span class="text-[8px] font-black uppercase tracking-tighter text-blue-400 bg-blue-500/10 px-1 rounded flex items-center gap-1">
@@ -274,13 +310,6 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4">
-                                <span class={cn("px-2.5 py-1 rounded text-[9px] font-black uppercase tracking-widest border",
-                                    media.status === 'active' ? "bg-success-color/10 text-success-color border-success-color/20" : "bg-bg-primary text-text-secondary border-border-color"
-                                )}>
-                                    {media.status}
-                                </span>
-                            </td>
                             <td class="px-6 py-4 text-right">
                                 <div class="flex items-center justify-end gap-2">
                                     {#if media.status === 'active'}
@@ -289,6 +318,7 @@
                                             size="sm"
                                             class="h-9 px-4 font-black uppercase tracking-widest text-[9px] border-action-color/30 text-action-color hover:bg-action-color/10"
                                             onclick={() => handleInitialize(media.id, media.identifier)}
+                                            disabled={!media.is_online}
                                         >
                                             <RotateCw size={14} class="mr-1.5" /> Initialize
                                         </Button>
@@ -297,8 +327,9 @@
                                             size="sm"
                                             class="h-9 px-4 font-black uppercase tracking-widest text-[9px] border-success-color/30 text-success-color hover:bg-success-color/10"
                                             onclick={() => handleStartBackup(media.id, media.identifier)}
+                                            disabled={!media.is_online}
                                         >
-                                            <PlayCircle size={14} class="mr-1.5" /> Initiate Archival
+                                            <PlayCircle size={14} class="mr-1.5" /> Archive
                                         </Button>
                                     {/if}
                                     <Button variant="ghost" size="icon" class="h-9 w-9 hover:bg-error-color/10 hover:text-error-color" onclick={() => handleDelete(media.id)}><Trash2 size={16} /></Button>
@@ -306,7 +337,7 @@
                             </td>
                         </tr>
                     {:else}
-                        <tr><td colspan="7" class="px-8 py-24 text-center opacity-20"><Database size={48} class="mx-auto mb-3" /><p class="text-sm font-black uppercase tracking-[0.2em]">No Media Assets Registered</p></td></tr>
+                        <tr><td colspan="8" class="px-8 py-24 text-center opacity-20"><Database size={48} class="mx-auto mb-3" /><p class="text-sm font-black uppercase tracking-[0.2em]">No Media Assets Registered</p></td></tr>
                     {/each}
                 </tbody>
             </table>

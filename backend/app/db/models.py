@@ -13,7 +13,7 @@ class FilesystemState(Base):
     __tablename__ = "filesystem_state"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    file_path: Mapped[str] = mapped_column(String, index=True, unique=True)
+    file_path: Mapped[str] = mapped_column(String, unique=True)
     size: Mapped[int] = mapped_column(BigInteger)
     mtime: Mapped[float] = mapped_column(Float)
     sha256_hash: Mapped[Optional[str]] = mapped_column(
@@ -50,6 +50,7 @@ class StorageMedia(Base):
     extra_config: Mapped[Optional[str]] = mapped_column(
         String
     )  # JSON config for type-specific details
+    priority_index: Mapped[int] = mapped_column(Integer, default=0)
 
     versions: Mapped[List["FileVersion"]] = relationship(back_populates="media")
 

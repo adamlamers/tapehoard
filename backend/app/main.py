@@ -5,12 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from app.api import system, inventory, backups, restores
-from app.db.database import engine
-from app.db import models
 from app.services.scheduler import scheduler_manager
 
-# Create standard tables
-models.Base.metadata.create_all(bind=engine)
+# Note: Tables are created via Alembic migrations, not metadata.create_all
+# to ensure FTS5 virtual tables and triggers are properly initialized.
 
 
 @asynccontextmanager

@@ -31,7 +31,7 @@
         type CartItemSchema
     } from '$lib/api';
     import { toast } from 'svelte-sonner';
-    import { cn } from '$lib/utils';
+    import { cn, formatLocalDate, formatLocalDateTime } from '$lib/utils';
 
     let currentPath = $state('ROOT');
     let searchQuery = $state('');
@@ -339,7 +339,7 @@
                                 </div>
                                 <div class="space-y-1">
                                     <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 block">Last Indexed</span>
-                                    <span class="text-sm font-bold text-text-primary mono">{new Date(selectedItemMetadata.last_seen_timestamp).toLocaleDateString()}</span>
+                                    <span class="text-sm font-bold text-text-primary mono">{formatLocalDate(selectedItemMetadata.last_seen_timestamp)}</span>
                                 </div>
                                 {#if selectedItemMetadata.type === 'directory'}
                                     <div class="space-y-1 col-span-2 mt-2">
@@ -383,7 +383,7 @@
                                                     </div>
                                                     <div class="flex items-center gap-2 text-[10px] text-text-secondary">
                                                         <Clock size={12} class="opacity-50" />
-                                                        <span>Archived: {new Date(version.timestamp).toLocaleString()}</span>
+                                                        <span>Archived: {formatLocalDateTime(version.timestamp)}</span>
                                                     </div>
                                                 </div>
                                             </div>

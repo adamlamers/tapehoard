@@ -9,6 +9,19 @@ class AbstractStorageProvider(ABC):
         pass
 
     @abstractmethod
+    def check_online(self) -> bool:
+        """Checks if the media is physically present and reachable"""
+        pass
+
+    @abstractmethod
+    def check_existing_data(self) -> bool:
+        """
+        Checks if the media already contains TapeHoard data.
+        Used to warn users before re-initialization.
+        """
+        pass
+
+    @abstractmethod
     def identify_media(self) -> Optional[str]:
         """
         Attempts to read the identifier (barcode/UUID) from the currently inserted media.

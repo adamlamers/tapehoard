@@ -98,9 +98,15 @@ class MediaSchema(BaseModel):
     location: Optional[str]
     status: str
     config: Dict[str, Any]
+    is_online: bool = False
+    priority_index: int = 0
 
     class Config:
         from_attributes = True
+
+
+class ReorderMediaRequest(BaseModel):
+    media_ids: List[int]
 
 
 # --- Media Management ---
@@ -108,7 +114,13 @@ class MediaSchema(BaseModel):
 
 @router.get("/media", response_model=List[MediaSchema])
 def list_media(db: Session = Depends(get_db)):
-    media = db.query(models.StorageMedia).all()
+    from app.services.archiver import archiver_manager
+
+    media = (
+        db.query(models.StorageMedia)
+        .order_by(models.StorageMedia.priority_index.asc())
+        .all()
+    )
     results = []
     for m in media:
         config = {}
@@ -117,6 +129,13 @@ def list_media(db: Session = Depends(get_db)):
                 config = json.loads(m.extra_config)
             except Exception:
                 pass
+
+        # Perform a pulse check on the hardware
+        is_online = False
+        provider = archiver_manager._get_provider(m)
+        if provider:
+            is_online = provider.check_online()
+
         results.append(
             MediaSchema(
                 id=m.id,
@@ -128,9 +147,21 @@ def list_media(db: Session = Depends(get_db)):
                 location=m.location,
                 status=m.status,
                 config=config,
+                is_online=is_online,
+                priority_index=m.priority_index,
             )
         )
     return results
+
+
+@router.post("/media/reorder")
+def reorder_media(req: ReorderMediaRequest, db: Session = Depends(get_db)):
+    for index, media_id in enumerate(req.media_ids):
+        media = db.get(models.StorageMedia, media_id)
+        if media:
+            media.priority_index = index
+    db.commit()
+    return {"message": "Media priority updated"}
 
 
 @router.post("/media", response_model=MediaSchema)
@@ -209,15 +240,19 @@ def delete_media(media_id: int, db: Session = Depends(get_db)):
     media = db.get(models.StorageMedia, media_id)
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
+
+    # Cascade delete versions associated with this media
     if media.versions:
-        raise HTTPException(status_code=400, detail="Cannot delete media with files")
+        for version in media.versions:
+            db.delete(version)
+
     db.delete(media)
     db.commit()
-    return {"message": "Media deleted"}
+    return {"message": "Media and associated version history deleted"}
 
 
 @router.post("/media/{media_id}/initialize")
-def initialize_media(media_id: int, db: Session = Depends(get_db)):
+def initialize_media(media_id: int, force: bool = False, db: Session = Depends(get_db)):
     from app.services.archiver import archiver_manager
 
     media = db.get(models.StorageMedia, media_id)
@@ -227,6 +262,14 @@ def initialize_media(media_id: int, db: Session = Depends(get_db)):
     provider = archiver_manager._get_provider(media)
     if not provider:
         raise HTTPException(status_code=400, detail="Unsupported media type")
+
+    # Check for existing data if not forcing
+    if not force:
+        if provider.check_existing_data():
+            raise HTTPException(
+                status_code=409,
+                detail=f"Media {media.identifier} already contains TapeHoard backups. Initializing will delete them. Continue?",
+            )
 
     if provider.initialize_media(media.identifier):
         return {"message": "Media initialized successfully"}

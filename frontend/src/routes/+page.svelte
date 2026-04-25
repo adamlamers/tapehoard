@@ -18,7 +18,7 @@
     import { Card } from '$lib/components/ui/card';
     import { Button } from '$lib/components/ui/button';
     import { getDashboardStatsSystemDashboardStatsGet, triggerScanSystemScanPost, type DashboardStatsSchema } from '$lib/api';
-    import { cn } from '$lib/utils';
+    import { cn, formatLocalDate, formatLocalTime } from '$lib/utils';
     import { toast } from 'svelte-sonner';
 
     let stats = $state<DashboardStatsSchema | null>(null);
@@ -209,9 +209,9 @@
                         <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary block">Last Scan</span>
                         <span class="text-xl font-black text-text-primary tracking-tight">
                             {#if stats.last_scan_time}
-                                {new Date(stats.last_scan_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {formatLocalTime(stats.last_scan_time)}
                                 <span class="text-[9px] block text-text-secondary opacity-50 uppercase font-black tracking-widest">
-                                    {new Date(stats.last_scan_time).toLocaleDateString()}
+                                    {formatLocalDate(stats.last_scan_time)}
                                 </span>
                             {:else}
                                 Never

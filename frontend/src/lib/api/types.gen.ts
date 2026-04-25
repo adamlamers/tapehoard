@@ -376,6 +376,14 @@ export type MediaSchema = {
     config: {
         [key: string]: unknown;
     };
+    /**
+     * Is Online
+     */
+    is_online?: boolean;
+    /**
+     * Priority Index
+     */
+    priority_index?: number;
 };
 
 /**
@@ -396,6 +404,16 @@ export type MediaUpdateSchema = {
     config?: {
         [key: string]: unknown;
     } | null;
+};
+
+/**
+ * ReorderMediaRequest
+ */
+export type ReorderMediaRequest = {
+    /**
+     * Media Ids
+     */
+    media_ids: Array<number>;
 };
 
 /**
@@ -987,6 +1005,29 @@ export type RegisterMediaInventoryMediaPostResponses = {
 
 export type RegisterMediaInventoryMediaPostResponse = RegisterMediaInventoryMediaPostResponses[keyof RegisterMediaInventoryMediaPostResponses];
 
+export type ReorderMediaInventoryMediaReorderPostData = {
+    body: ReorderMediaRequest;
+    path?: never;
+    query?: never;
+    url: '/inventory/media/reorder';
+};
+
+export type ReorderMediaInventoryMediaReorderPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReorderMediaInventoryMediaReorderPostError = ReorderMediaInventoryMediaReorderPostErrors[keyof ReorderMediaInventoryMediaReorderPostErrors];
+
+export type ReorderMediaInventoryMediaReorderPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type DeleteMediaInventoryMediaMediaIdDeleteData = {
     body?: never;
     path: {
@@ -1053,7 +1094,12 @@ export type InitializeMediaInventoryMediaMediaIdInitializePostData = {
          */
         media_id: number;
     };
-    query?: never;
+    query?: {
+        /**
+         * Force
+         */
+        force?: boolean;
+    };
     url: '/inventory/media/{media_id}/initialize';
 };
 

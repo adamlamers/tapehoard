@@ -9,14 +9,14 @@ default:
 # --- Development ---
 
 # Run both the FastAPI backend and Svelte frontend in development mode
-dev:
+dev: db-upgrade
     @echo "Starting Backend (FastAPI) and Frontend (SvelteKit)..."
     @trap 'kill %1' SIGINT; \
         (cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload) & \
         (cd frontend && VITE_API_URL=http://localhost:${PORT:-8000} npm run dev)
 
 # Run just the backend
-backend:
+backend: db-upgrade
     cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload
 
 # Run just the frontend

@@ -1,4 +1,5 @@
 import subprocess
+import os
 from typing import Optional, BinaryIO, cast
 from .base import AbstractStorageProvider
 from loguru import logger
@@ -13,6 +14,53 @@ class LTOProvider(AbstractStorageProvider):
 
     def get_name(self) -> str:
         return "LTO Tape"
+
+    def check_online(self) -> bool:
+        """Checks if the tape drive is present and READY"""
+        if not os.path.exists(self.device_path):
+            return False
+        try:
+            # mt status returns 0 if drive is ready and tape is loaded
+            result = subprocess.run(
+                ["mt", "-f", self.device_path, "status"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            # Look for "ONLINE" or "READY" in output depending on driver
+            return (
+                "ONLINE" in result.stdout
+                or "READY" in result.stdout
+                or result.returncode == 0
+            )
+        except Exception:
+            return False
+
+    def check_existing_data(self) -> bool:
+        """Checks if the tape has data after the label (file mark 0)"""
+        if not self.check_online():
+            return False
+        try:
+            self._run_mt("rewind")
+            # Skip the label file (file 0)
+            self._run_mt("fsf 1")
+            # If we are not at EOT, there is probably data
+            result = subprocess.run(
+                ["mt", "-f", self.device_path, "status"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            # If file number > 0, it means we successfully skipped at least one file
+            import re
+
+            match = re.search(r"File number=(\d+)", result.stdout)
+            if match and int(match.group(1)) > 0:
+                return True
+            return False
+        except Exception:
+            # If we fail to fsf 1, it usually means we hit EOD/EOT right after file 0
+            return False
 
     def _run_mt(self, command: str):
         try:

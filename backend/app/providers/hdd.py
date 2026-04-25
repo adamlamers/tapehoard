@@ -12,6 +12,21 @@ class OfflineHDDProvider(AbstractStorageProvider):
     def get_name(self) -> str:
         return "Offline HDD"
 
+    def check_online(self) -> bool:
+        """Checks if the HDD is mounted and identified"""
+        id_path = os.path.join(self.mount_base, ".tapehoard_id")
+        return os.path.exists(id_path)
+
+    def check_existing_data(self) -> bool:
+        """Checks if the HDD already has tapehoard backups"""
+        archive_dir = os.path.join(self.mount_base, "tapehoard_backups", "archives")
+        if not os.path.exists(archive_dir):
+            return False
+        try:
+            return len(os.listdir(archive_dir)) > 0
+        except Exception:
+            return False
+
     def identify_media(self) -> Optional[str]:
         """Reads the hidden identifier file from the disk root"""
         id_file = os.path.join(self.mount_base, ".tapehoard_id")
@@ -46,14 +61,24 @@ class OfflineHDDProvider(AbstractStorageProvider):
         return None
 
     def initialize_media(self, media_id: str) -> bool:
-        """Initializes HDD by writing the .tapehoard_id file"""
+        """Initializes HDD by writing the .tapehoard_id file and clearing archives"""
         try:
             os.makedirs(self.mount_base, exist_ok=True)
+
+            # Clear existing backups if present
+            archive_dir = os.path.join(self.mount_base, "tapehoard_backups", "archives")
+            if os.path.exists(archive_dir):
+                logger.info(
+                    f"HDD Provider: Clearing existing archives at {archive_dir}"
+                )
+                shutil.rmtree(archive_dir)
+
+            os.makedirs(archive_dir, exist_ok=True)
+
             id_file = os.path.join(self.mount_base, ".tapehoard_id")
             with open(id_file, "w") as f:
                 f.write(media_id)
-            archive_dir = os.path.join(self.mount_base, "tapehoard_backups", "archives")
-            os.makedirs(archive_dir, exist_ok=True)
+
             logger.info(f"Initialized HDD media {media_id} at {self.mount_base}")
             return True
         except Exception as e:

@@ -5,7 +5,7 @@ import shutil
 import sqlite3
 import json
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Tuple
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -465,7 +465,7 @@ def export_database():
 
         return FileResponse(
             export_path,
-            filename=f"tapehoard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db",
+            filename=f"tapehoard_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.db",
             background=BackgroundTasks().add_task(
                 lambda: os.remove(export_path) if os.path.exists(export_path) else None
             ),

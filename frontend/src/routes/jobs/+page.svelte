@@ -12,7 +12,7 @@
     import { Card } from '$lib/components/ui/card';
     import { Button } from '$lib/components/ui/button';
     import { listJobsSystemJobsGet, cancelJobSystemJobsJobIdCancelPost, type JobSchema } from '$lib/api';
-    import { cn } from '$lib/utils';
+    import { cn, formatLocalTime, parseUTCDate } from '$lib/utils';
     import { toast } from 'svelte-sonner';
 
     let jobs = $state<JobSchema[]>([]);
@@ -64,10 +64,13 @@
     }
 
     function formatDuration(start?: string | null, end?: string | null) {
-        if (!start) return '--';
-        const startTime = new Date(start).getTime();
-        const endTime = end ? new Date(end).getTime() : Date.now();
-        const seconds = Math.floor((endTime - startTime) / 1000);
+        const startDate = parseUTCDate(start);
+        if (!startDate) return '--';
+
+        const endDate = end ? parseUTCDate(end) : new Date();
+        if (!endDate) return '--';
+
+        const seconds = Math.max(0, Math.floor((endDate.getTime() - startDate.getTime()) / 1000));
 
         if (seconds < 60) return `${seconds}s`;
         const minutes = Math.floor(seconds / 60);
@@ -185,7 +188,7 @@
                             <div>
                                 <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 block mb-1">Created</span>
                                 <div class="text-xs font-bold text-text-primary mono">
-                                    {new Date(job.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                    {formatLocalTime(job.created_at)}
                                 </div>
                             </div>
                         </div>
