@@ -1,15 +1,17 @@
 #!/bin/bash
 set -e
 
-# Establish global environment safety
-export HOME=/home/appuser
-export PATH="/app/backend/.venv/bin:$PATH"
-export PYTHONPATH="/app/backend"
+# Identify current user
+USER_ID=$(id -u)
 
 echo "Starting TapeHoard: Archive Command..."
 
-# Handle PUID/PGID without recursive chown
-if [ "$(id -u)" = '0' ] && [ -n "$PUID" ] && [ -n "$PGID" ]; then
+# Decide if we should drop privileges
+# We drop privileges ONLY if:
+# 1. We are currently root (USER_ID 0)
+# 2. PUID/PGID are provided and PUID is NOT 0
+# 3. RUN_AS_ROOT is NOT set to true
+if [ "$USER_ID" = '0' ] && [ -n "$PUID" ] && [ "$PUID" != "0" ] && [ "$RUN_AS_ROOT" != "true" ]; then
     echo "Syncing system user identity to PUID:PGID $PUID:$PGID..."
 
     # Configure the group
@@ -26,18 +28,31 @@ if [ "$(id -u)" = '0' ] && [ -n "$PUID" ] && [ -n "$PGID" ]; then
         usermod -u "$PUID" -g "$PGID" appuser
     fi
 
-    # Only chown the home directory (non-recursive)
+    # Ensure home directory exists and is owned correctly
+    mkdir -p /home/appuser
     chown "$PUID:$PGID" /home/appuser
 
     echo "Dropping privileges to appuser..."
+    export HOME=/home/appuser
     exec setpriv --reuid="$PUID" --regid="$PGID" --init-groups "$0" "$@"
 fi
+
+# If we are here, we are running as the current user (Root or Container-specified user)
+if [ "$(id -u)" = '0' ]; then
+    echo "Running as ROOT (Hardware Access Mode Enabled)"
+    export HOME=/root
+else
+    echo "Running as UID $(id -u)"
+    export HOME=/tmp
+fi
+
+# Establish environment
+export PATH="/app/backend/.venv/bin:$PATH"
+export PYTHONPATH="/app/backend"
 
 # Change to backend directory
 cd /app/backend
 
-# Use the pre-built virtualenv directly for maximum speed and stability.
-# This prevents UV from trying to sync or download tools at runtime.
 echo "Running database migrations..."
 alembic upgrade head
 
