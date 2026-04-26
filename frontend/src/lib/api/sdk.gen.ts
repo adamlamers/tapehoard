@@ -56,7 +56,7 @@ export const triggerScanSystemScanPost = <ThrowOnError extends boolean = false>(
 /**
  * Trigger Indexing
  *
- * Manually triggers hashing for all un-indexed files in the fleet
+ * Manually triggers hashing for all un-indexed files in the system
  */
 export const triggerIndexingSystemIndexHashPost = <ThrowOnError extends boolean = false>(options?: Options<TriggerIndexingSystemIndexHashPostData, ThrowOnError>) => (options?.client ?? client).post<TriggerIndexingSystemIndexHashPostResponses, unknown, ThrowOnError>({ url: '/system/index/hash', ...options });
 
@@ -221,7 +221,7 @@ export const initializeMediaInventoryMediaMediaIdInitializePost = <ThrowOnError 
 /**
  * Get Filesystem Insights
  *
- * Computes high-signal filesystem metrics for modular reporting
+ * Computes high-signal filesystem metrics with optimized single-pass queries
  */
 export const getFilesystemInsightsInventoryInsightsGet = <ThrowOnError extends boolean = false>(options?: Options<GetFilesystemInsightsInventoryInsightsGetData, ThrowOnError>) => (options?.client ?? client).get<GetFilesystemInsightsInventoryInsightsGetResponses, unknown, ThrowOnError>({ url: '/inventory/insights', ...options });
 

@@ -274,7 +274,7 @@
             <section class="space-y-6">
                 <div class="flex items-center gap-3 px-2">
                     <div class="p-1.5 bg-action-color/10 rounded-md text-action-color"><Cpu size={16} /></div>
-                    <h2 class="text-[11px] font-black uppercase tracking-[0.2em] text-text-primary">Discovered Unregistered Hardware</h2>
+                    <h2 class="text-[11px] font-black uppercase tracking-[0.2em] text-text-primary">Discovered Unregistered Drives</h2>
                     <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent"></div>
                 </div>
 
@@ -320,7 +320,7 @@
         <section class="space-y-6">
             <div class="flex items-center gap-3 px-2">
                 <div class="p-1.5 bg-blue-500/10 rounded-md text-blue-500"><Database size={16} /></div>
-                <h2 class="text-[11px] font-black uppercase tracking-[0.2em] text-text-primary">Fleet Inventory</h2>
+                <h2 class="text-[11px] font-black uppercase tracking-[0.2em] text-text-primary">Media Inventory</h2>
                 <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent"></div>
             </div>
 
@@ -482,8 +482,8 @@
             <Card class="w-[700px] max-h-[90vh] overflow-y-auto bg-bg-secondary border-border-color shadow-2xl p-10 flex flex-col gap-8 animate-in zoom-in-95 duration-300" onmousedown={(e) => e.stopPropagation()}>
                 <header class="flex justify-between items-start">
                     <div>
-                        <h2 class="text-2xl font-black text-text-primary uppercase tracking-tighter">Register Fleet Asset</h2>
-                        <p class="text-[11px] font-bold text-text-secondary uppercase tracking-widest mt-1 opacity-60">Provisioning physical storage for the unified index.</p>
+                        <h2 class="text-2xl font-black text-text-primary uppercase tracking-tighter">Add New Media</h2>
+                        <p class="text-[11px] font-bold text-text-secondary uppercase tracking-widest mt-1 opacity-60">Add physical storage locations for your backups.</p>
                     </div>
                     <Button variant="ghost" size="icon" class="hover:bg-white/5" onclick={() => showRegisterDialog = false}><X size={24} /></Button>
                 </header>

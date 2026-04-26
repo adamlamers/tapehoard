@@ -112,7 +112,7 @@
         const startDate = parseUTCDate(start);
         if (!startDate) return '--';
 
-        const endDate = end ? parseUTCDate(end) : new Date();
+        const endDate = (end ? parseUTCDate(end) : new Date()) || new Date();
         const seconds = Math.max(0, Math.floor((endDate.getTime() - startDate.getTime()) / 1000));
 
         if (seconds < 60) return `${seconds}s`;
@@ -204,7 +204,7 @@
                             <div class="flex-1 space-y-3">
                                 <div class="flex justify-between items-end">
                                     <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary truncate max-w-[400px]">
-                                        {job.current_task || 'Initializing buffer...'}
+                                        {job.current_task || 'Starting task...'}
                                     </span>
                                     <span class="text-xs font-bold mono text-text-primary">{job.progress.toFixed(1)}%</span>
                                 </div>

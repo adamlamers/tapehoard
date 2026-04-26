@@ -24,7 +24,7 @@
 	let { children } = $props();
 
 	// Initialize API client configuration
-	const apiUrl = import.meta.env.VITE_API_URL || '';
+	const apiUrl = (import.meta as any).env?.VITE_API_URL || '';
 	client.setConfig({ baseUrl: apiUrl });
 
 	const navItems = [
@@ -84,7 +84,7 @@
 				{#if isSidebarOpen}
 					<div class="flex flex-col animate-in fade-in slide-in-from-left-2 duration-500">
 						<span class="text-xl font-black tracking-tighter uppercase leading-none">TapeHoard</span>
-						<span class="text-[9px] font-bold text-blue-500 uppercase tracking-[0.3em] mt-1">Archive Command</span>
+						<span class="text-[9px] font-bold text-blue-500 uppercase tracking-[0.3em] mt-1">Backup Manager</span>
 					</div>
 				{/if}
 			</div>
@@ -196,7 +196,7 @@
 			</div>
 
 			<footer class="mt-16 pt-8 border-t border-white/[0.03] text-center">
-				<p class="text-[10px] font-black uppercase tracking-[0.2em] text-text-secondary opacity-40 italic">Command complexity leads to operational failure. Keep it simple.</p>
+				<p class="text-[10px] font-black uppercase tracking-[0.2em] text-text-secondary opacity-40 italic">Use keyboard shortcuts for quick navigation.</p>
 			</footer>
 		</div>
 	</div>
@@ -225,3 +225,4 @@
 		background: rgba(255, 255, 255, 0.1);
 	}
 </style>
+le>

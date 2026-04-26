@@ -111,7 +111,7 @@
                 Overview
             </h1>
             <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
-                Fleet Status & Archival Intelligence
+                System Status & Statistics
             </p>
         </div>
 
@@ -123,7 +123,7 @@
                 {#if indexing}
                     <RotateCw size={14} class="mr-2 animate-spin" /> Starting...
                 {:else}
-                    <Zap size={14} class="mr-2" /> Index Fleet
+                    <Zap size={14} class="mr-2" /> Index Data
                 {/if}
             </Button>
             <Button variant="default" class="h-10 px-6 font-black uppercase tracking-widest text-[10px]" onclick={startScan} disabled={scanning}>
@@ -178,11 +178,11 @@
                             <CassetteTape size={40} />
                         </div>
                         <div>
-                            <h3 class="text-lg font-black uppercase tracking-tight text-text-primary">3. Provision Media</h3>
+                            <h3 class="text-lg font-black uppercase tracking-tight text-text-primary">3. Add Media</h3>
                             <p class="text-xs text-text-secondary mt-2 leading-relaxed">Register your LTO tapes or backup disks to create a destination for your data.</p>
                         </div>
                         <Button variant="outline" class="w-full mt-auto h-11 font-black uppercase tracking-widest text-[10px] border-success-color/30 text-success-color hover:bg-success-color/10" href="/inventory">
-                            Manage Fleet <ArrowRight size={14} class="ml-2" />
+                            Manage Media <ArrowRight size={14} class="ml-2" />
                         </Button>
                     </Card>
                 </div>
@@ -334,7 +334,7 @@
                 <!-- Quick Actions & Media -->
                 <div class="space-y-8">
                     <Card class="p-8 bg-bg-secondary border-border-color shadow-xl h-fit">
-                        <h3 class="text-lg font-black uppercase tracking-tighter text-text-primary mb-6">Quick Directives</h3>
+                        <h3 class="text-lg font-black uppercase tracking-tighter text-text-primary mb-6">Quick Actions</h3>
                         <div class="space-y-3">
                             <Button variant="outline" class="w-full justify-between h-12 font-black uppercase tracking-widest text-[10px] border-border-color hover:border-blue-500/50 hover:bg-blue-500/5 group" href="/tracking">
                                 Review Tracking Rules <ArrowRight size={14} class="group-hover:translate-x-1 transition-transform" />

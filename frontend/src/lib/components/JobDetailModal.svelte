@@ -49,7 +49,7 @@
         {#if loading}
             <div class="flex-1 flex flex-col items-center justify-center gap-4 py-24">
                 <RotateCw size={48} class="animate-spin text-blue-500" />
-                <span class="text-xs font-black uppercase tracking-widest text-text-secondary">Retrieving Manifest...</span>
+                <span class="text-xs font-black uppercase tracking-widest text-text-secondary">Loading details...</span>
             </div>
         {:else if job}
             <!-- Header -->

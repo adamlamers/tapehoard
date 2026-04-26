@@ -207,7 +207,7 @@
     {#if loading}
         <div class="flex-1 flex flex-col items-center justify-center gap-4 opacity-50">
             <RotateCw size={48} class="animate-spin text-orange-500" />
-            <span class="text-xs font-black uppercase tracking-widest">Hydrating Config...</span>
+            <span class="text-xs font-black uppercase tracking-widest">Loading settings...</span>
         </div>
     {:else}
         <div class="flex-1 flex gap-8 min-h-0">
@@ -356,7 +356,7 @@
                                 <div class="p-3 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20"><CalendarClock size={24} /></div>
                                 <div>
                                     <h3 class="text-xl font-black text-text-primary uppercase tracking-tight">Scheduling</h3>
-                                    <p class="text-[11px] text-text-secondary font-medium uppercase tracking-wider opacity-60">Configure autonomous fleet discovery and archival.</p>
+                                    <p class="text-[11px] text-text-secondary font-medium uppercase tracking-wider opacity-60">Configure autonomous media discovery and archival.</p>
                                 </div>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -375,13 +375,13 @@
                                 <div class="space-y-6">
                                     <div class="flex items-center gap-2">
                                         <Zap size={16} class="text-success-color" />
-                                        <span class="text-xs font-black uppercase tracking-widest text-text-primary">Fleet Archival Frequency</span>
+                                        <span class="text-xs font-black uppercase tracking-widest text-text-primary">Media Archival Frequency</span>
                                     </div>
                                     <div class="flex gap-2">
                                         <Input bind:value={archivalSchedule} placeholder="0 4 * * 0" class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
                                         <Button variant="outline" class="h-12 px-4 text-[10px] uppercase font-black tracking-widest" onclick={() => archivalSchedule = "0 4 * * 0"}>Weekly</Button>
                                     </div>
-                                    <p class="text-[10px] text-text-secondary italic leading-relaxed opacity-60">Determines when the fleet will automatically begin data duplication.</p>
+                                    <p class="text-[10px] text-text-secondary italic leading-relaxed opacity-60">Determines when the system will automatically begin data duplication.</p>
                                 </div>
                             </div>
                         </Card>

@@ -203,7 +203,7 @@
                 </div>
                 <h2 class="text-2xl font-black uppercase tracking-tighter text-text-primary">Recovery Queue is Empty</h2>
                 <p class="text-[11px] font-bold uppercase tracking-[0.2em] mt-4 text-text-secondary leading-loose opacity-60">
-                    You haven't selected any files for restoration yet. Use the Index Browser to find and queue the items you need to recover from your fleet.
+                    You haven't selected any files for restoration yet. Use the Index Browser to find and queue the items you need to recover from your archives.
                 </p>
                 <Button variant="default" class="mt-10 h-12 px-10 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/20" href="/index-browser">
                     Browse Virtual Index <ArrowRight size={14} class="ml-2" />

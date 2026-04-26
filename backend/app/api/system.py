@@ -292,7 +292,7 @@ def trigger_scan(background_tasks: BackgroundTasks, db: Session = Depends(get_db
 
 @router.post("/index/hash")
 def trigger_indexing(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """Manually triggers hashing for all un-indexed files in the fleet"""
+    """Manually triggers hashing for all un-indexed files in the system"""
     if scanner_manager.is_hashing:
         raise HTTPException(status_code=400, detail="Hashing job already in progress")
 

@@ -72,7 +72,7 @@
                     <div class="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-text-secondary">
                         <span class="flex items-center gap-2">
                             <Activity size={12} class="opacity-50" />
-                            Indexing Fleet
+                            Indexing Data
                         </span>
                         <span class="mono text-text-primary">
                             {scanStatus.files_processed.toLocaleString()} / {scanStatus.total_files_found.toLocaleString()}
@@ -88,7 +88,7 @@
 
                     <div class="bg-bg-primary/80 px-4 py-2.5 rounded-lg border border-white/5 shadow-inner">
                         <p class="text-[10px] text-blue-300/80 truncate mono italic leading-relaxed">
-                            {scanStatus.current_path || 'Initializing crawler...'}
+                            {scanStatus.current_path || 'Starting scan...'}
                         </p>
                     </div>
                 </div>

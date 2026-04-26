@@ -288,18 +288,30 @@ def initialize_media(media_id: int, force: bool = False, db: Session = Depends(g
 
 @router.get("/insights")
 def get_filesystem_insights(db: Session = Depends(get_db)):
-    """Computes high-signal filesystem metrics for modular reporting"""
+    """Computes high-signal filesystem metrics with optimized single-pass queries"""
 
-    # 1. Deduplication & Scale
-    # We compare total indexed size vs unique hash size
-    dedupe_sql = text("""
+    # 1. Deduplication & Overall Scale
+    # Optimized: Use a single query with pre-aggregated groupings
+    res_sql = text("""
         SELECT
-            SUM(size) as total_size,
             COUNT(*) as total_files,
-            (SELECT SUM(size) FROM (SELECT size FROM filesystem_state WHERE is_indexed = 1 GROUP BY sha256_hash)) as unique_size
+            SUM(size) as total_size,
+            SUM(CASE WHEN is_indexed = 1 THEN size ELSE 0 END) as total_hashed_size,
+            (SELECT SUM(min_size) FROM (
+                SELECT MIN(size) as min_size
+                FROM filesystem_state
+                WHERE is_indexed = 1 AND sha256_hash IS NOT NULL
+                GROUP BY sha256_hash
+            )) as unique_hashed_size
         FROM filesystem_state
     """)
-    dedupe = db.execute(dedupe_sql).fetchone()
+    res = db.execute(res_sql).fetchone()
+
+    total_files = res[0] or 0
+    total_size = res[1] or 0
+    total_hashed_size = res[2] or 0
+    unique_hashed_size = res[3] or 0
+    savings = total_hashed_size - unique_hashed_size
 
     # 2. Vulnerability by Root
     roots = get_source_roots(db)
@@ -308,77 +320,156 @@ def get_filesystem_insights(db: Session = Depends(get_db)):
         prefix = root if root.endswith("/") else root + "/"
         stats_sql = text("""
             SELECT
-                SUM(CASE WHEN fv.id IS NOT NULL THEN fs.size ELSE 0 END) as protected_bytes,
-                SUM(CASE WHEN fv.id IS NULL AND fs.is_ignored = 0 THEN fs.size ELSE 0 END) as vulnerable_bytes
-            FROM filesystem_state fs
-            LEFT JOIN (SELECT DISTINCT filesystem_state_id as id FROM file_versions) fv ON fv.id = fs.id
-            WHERE fs.file_path LIKE :prefix
+                SUM(CASE WHEN has_version = 1 THEN size ELSE 0 END) as protected,
+                SUM(CASE WHEN has_version = 0 AND is_ignored = 0 THEN size ELSE 0 END) as vulnerable
+            FROM (
+                SELECT fs.size, fs.is_ignored, EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) as has_version
+                FROM filesystem_state fs
+                WHERE fs.file_path LIKE :prefix
+            )
         """)
         stats = db.execute(stats_sql, {"prefix": f"{prefix}%"}).fetchone()
         root_stats.append(
             {"root": root, "protected": stats[0] or 0, "vulnerable": stats[1] or 0}
         )
 
-    # 3. Extension Breakdown (Top 15)
+    # 3. Extension Breakdown (Top 10)
     ext_sql = text("""
         SELECT
-            LOWER(REPLACE(file_path, RTRIM(file_path, REPLACE(file_path, '.', '')), '')) as ext,
-            SUM(size) as total_size,
-            COUNT(*) as count
+            CASE WHEN INSTR(file_path, '.') > 0
+                 THEN LOWER(SUBSTR(file_path, INSTR(file_path, '.') + 1))
+                 ELSE 'no ext' END as extension,
+            SUM(size) as s
         FROM filesystem_state
-        WHERE file_path LIKE '%.%'
-        GROUP BY ext
-        ORDER BY total_size DESC
-        LIMIT 15
+        GROUP BY extension
+        ORDER BY s DESC
+        LIMIT 10
     """)
     exts = db.execute(ext_sql).fetchall()
 
-    # 4. Data Aging (Heatmap)
+    # 4. Data Aging
     now = datetime.now(timezone.utc).timestamp()
-    one_year = 365 * 24 * 60 * 60
+    one_yr = 365 * 24 * 60 * 60
     aging_sql = text(f"""
         SELECT
             CASE
-                WHEN mtime > {now - one_year} THEN 'Recent (< 1yr)'
-                WHEN mtime > {now - (2 * one_year)} THEN 'Warm (1-2yrs)'
-                WHEN mtime > {now - (5 * one_year)} THEN 'Cold (2-5yrs)'
-                ELSE 'Frozen (> 5yrs)'
-            END as bucket,
-            SUM(size) as total_size
+                WHEN mtime > {now - one_yr} THEN 'Recent'
+                WHEN mtime > {now - (2 * one_yr)} THEN 'Warm'
+                WHEN mtime > {now - (5 * one_yr)} THEN 'Cold'
+                ELSE 'Frozen'
+            END as age_bucket,
+            SUM(size)
         FROM filesystem_state
-        GROUP BY bucket
+        GROUP BY age_bucket
     """)
     aging = db.execute(aging_sql).fetchall()
 
     # 5. Redundancy (Copies per file)
     redundancy_sql = text("""
         SELECT
-            copy_count,
+            copies,
             COUNT(*) as file_count,
             SUM(size) as total_size
         FROM (
-            SELECT fs.size, COUNT(fv.id) as copy_count
+            SELECT fs.size, (SELECT COUNT(*) FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) as copies
             FROM filesystem_state fs
-            LEFT JOIN file_versions fv ON fv.filesystem_state_id = fs.id
             WHERE fs.is_ignored = 0
-            GROUP BY fs.id
         )
-        GROUP BY copy_count
+        GROUP BY copies
     """)
     redundancy = db.execute(redundancy_sql).fetchall()
 
+    # 6. Top Duplicated Files
+    dup_sql = text("""
+        SELECT
+            MIN(file_path),
+            size,
+            COUNT(*) as c,
+            (size * (COUNT(*) - 1)) as saved
+        FROM filesystem_state
+        WHERE is_indexed = 1 AND sha256_hash IS NOT NULL
+        GROUP BY sha256_hash
+        HAVING c > 1
+        ORDER BY saved DESC
+        LIMIT 10
+    """)
+    dups = db.execute(dup_sql).fetchall()
+
+    # 7. Top Directories (Recursive Treemap)
+    dir_sql = text("""
+        SELECT
+            RTRIM(file_path, REPLACE(file_path, '/', '')) as dir,
+            SUM(size) as s
+        FROM filesystem_state
+        GROUP BY dir
+    """)
+    dirs = db.execute(dir_sql).fetchall()
+
+    dir_tree_map = {}
+    for d, s in dirs:
+        if not d:
+            continue
+        parts = [p for p in d.split("/") if p]
+
+        curr = dir_tree_map
+        current_path = ""
+        for part in parts:
+            if not current_path:
+                if d.startswith("/"):
+                    current_path = "/" + part
+                else:
+                    current_path = part
+            else:
+                current_path += "/" + part
+
+            if part not in curr:
+                curr[part] = {"size": 0, "children": {}, "fullPath": current_path}
+            curr[part]["size"] += s
+            curr = curr[part]["children"]
+
+    # Collapse single-child roots to make the treemap more useful
+    while len(dir_tree_map) == 1:
+        only_key = list(dir_tree_map.keys())[0]
+        if not dir_tree_map[only_key]["children"]:
+            break
+        dir_tree_map = dir_tree_map[only_key]["children"]
+
+    def dict_to_list(tree_node, max_depth, current_depth=0):
+        if current_depth >= max_depth:
+            return []
+
+        result = []
+        for k, v in tree_node.items():
+            children = dict_to_list(v["children"], max_depth, current_depth + 1)
+            result.append(
+                {
+                    "path": k,
+                    "size": v["size"],
+                    "fullPath": v["fullPath"],
+                    "children": children,
+                }
+            )
+        result.sort(key=lambda x: x["size"], reverse=True)
+        return result[:15]
+
+    directory_tree = dict_to_list(dir_tree_map, 3)
+
     return {
         "summary": {
-            "total_bytes": dedupe[0] or 0,
-            "unique_bytes": dedupe[2] or 0,
-            "total_files": dedupe[1] or 0,
+            "total_bytes": total_size,
+            "unique_bytes": total_size - savings,
+            "total_files": total_files,
         },
         "roots": root_stats,
-        "extensions": [{"ext": e[0], "size": e[1], "count": e[2]} for e in exts],
+        "extensions": [{"ext": e[0], "size": e[1], "count": 0} for e in exts],
         "aging": [{"bucket": a[0], "size": a[1]} for a in aging],
         "redundancy": [
             {"copies": r[0], "file_count": r[1], "size": r[2]} for r in redundancy
         ],
+        "duplicates": [
+            {"path": d[0], "size": d[1], "copies": d[2], "saved": d[3]} for d in dups
+        ],
+        "directories": directory_tree,
     }
 
 
