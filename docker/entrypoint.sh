@@ -1,11 +1,10 @@
 #!/bin/bash
 set -e
 
-# Establish global UV safety
+# Establish global environment safety
 export HOME=/home/appuser
-export UV_CACHE_DIR=/uv-cache
-export UV_CONFIG_DIR=/uv-cache/config
-export UV_DATA_DIR=/uv-cache/data
+export PATH="/app/backend/.venv/bin:$PATH"
+export PYTHONPATH="/app/backend"
 
 echo "Starting TapeHoard: Archive Command..."
 
@@ -27,10 +26,8 @@ if [ "$(id -u)" = '0' ] && [ -n "$PUID" ] && [ -n "$PGID" ]; then
         usermod -u "$PUID" -g "$PGID" appuser
     fi
 
-    # Only chown the home directory and cache if needed (non-recursive)
-    # We rely on the user to have set correct permissions on external volumes
-    # like /database, /staging, and /source_data.
-    chown "$PUID:$PGID" /home/appuser /uv-cache
+    # Only chown the home directory (non-recursive)
+    chown "$PUID:$PGID" /home/appuser
 
     echo "Dropping privileges to appuser..."
     exec setpriv --reuid="$PUID" --regid="$PGID" --init-groups "$0" "$@"
@@ -39,11 +36,11 @@ fi
 # Change to backend directory
 cd /app/backend
 
-# Use UV for all operations
-# Note: /app/backend is kept as root-owned/read-only for security and speed.
+# Use the pre-built virtualenv directly for maximum speed and stability.
+# This prevents UV from trying to sync or download tools at runtime.
 echo "Running database migrations..."
-uv --cache-dir /uv-cache run alembic upgrade head
+alembic upgrade head
 
 # Start the application
 echo "Starting Archive Command server on port ${PORT:-8000}..."
-exec uv --cache-dir /uv-cache run uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
