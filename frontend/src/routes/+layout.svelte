@@ -19,8 +19,13 @@
 	import { cn } from '$lib/utils';
 	import { Toaster } from 'svelte-sonner';
 	import ScanStatusOverlay from '$lib/components/ScanStatusOverlay.svelte';
+	import { client } from '$lib/api/client.gen';
 
 	let { children } = $props();
+
+	// Initialize API client configuration
+	const apiUrl = import.meta.env.VITE_API_URL || '';
+	client.setConfig({ baseUrl: apiUrl });
 
 	const navItems = [
 		{ name: 'Overview', href: '/', icon: LayoutDashboard },
