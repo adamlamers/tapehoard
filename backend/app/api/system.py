@@ -148,8 +148,8 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
             SUM(size) as total_size,
             SUM(CASE WHEN is_ignored = 1 THEN 1 ELSE 0 END) as ignored_count,
             SUM(CASE WHEN is_ignored = 1 THEN size ELSE 0 END) as ignored_size,
-            SUM(CASE WHEN is_ignored = 0 AND is_indexed = 1 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN 1 ELSE 0 END) as unprotected_count,
-            SUM(CASE WHEN is_ignored = 0 AND is_indexed = 1 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN size ELSE 0 END) as unprotected_size
+            SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN 1 ELSE 0 END) as unprotected_count,
+            SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN size ELSE 0 END) as unprotected_size
         FROM filesystem_state
     """)
 
