@@ -22,6 +22,11 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA cache_size=-20000")  # 20MB cache
+    cursor.execute("PRAGMA temp_store=MEMORY")
+    cursor.execute(
+        "PRAGMA mmap_size=30000000000"
+    )  # Enable memory mapping for massive indexes
     cursor.close()
 
 
