@@ -17,6 +17,8 @@ dependencies = [
     "pathspec>=1.1.0",
     "boto3>=1.42.94",
     "python-multipart>=0.0.26",
+    "cryptography>=47.0.0",
+    "pycryptodome>=3.23.0",
 ]
 
 [build-system]

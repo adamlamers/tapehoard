@@ -99,6 +99,7 @@ class MediaSchema(BaseModel):
     status: str
     config: Dict[str, Any]
     is_online: bool = False
+    is_identified: bool = False
     priority_index: int = 0
 
     class Config:
@@ -132,9 +133,13 @@ def list_media(db: Session = Depends(get_db)):
 
         # Perform a pulse check on the hardware
         is_online = False
+        is_identified = False
         provider = archiver_manager._get_provider(m)
         if provider:
             is_online = provider.check_online()
+            if is_online:
+                current_id = provider.identify_media()
+                is_identified = current_id == m.identifier
 
         results.append(
             MediaSchema(
@@ -148,6 +153,7 @@ def list_media(db: Session = Depends(get_db)):
                 status=m.status,
                 config=config,
                 is_online=is_online,
+                is_identified=is_identified,
                 priority_index=m.priority_index,
             )
         )
@@ -278,6 +284,102 @@ def initialize_media(media_id: int, force: bool = False, db: Session = Depends(g
 
 
 # --- Browsing Endpoints (Highly Optimized) ---
+
+
+@router.get("/insights")
+def get_filesystem_insights(db: Session = Depends(get_db)):
+    """Computes high-signal filesystem metrics for modular reporting"""
+
+    # 1. Deduplication & Scale
+    # We compare total indexed size vs unique hash size
+    dedupe_sql = text("""
+        SELECT
+            SUM(size) as total_size,
+            COUNT(*) as total_files,
+            (SELECT SUM(size) FROM (SELECT size FROM filesystem_state WHERE is_indexed = 1 GROUP BY sha256_hash)) as unique_size
+        FROM filesystem_state
+    """)
+    dedupe = db.execute(dedupe_sql).fetchone()
+
+    # 2. Vulnerability by Root
+    roots = get_source_roots(db)
+    root_stats = []
+    for root in roots:
+        prefix = root if root.endswith("/") else root + "/"
+        stats_sql = text("""
+            SELECT
+                SUM(CASE WHEN fv.id IS NOT NULL THEN fs.size ELSE 0 END) as protected_bytes,
+                SUM(CASE WHEN fv.id IS NULL AND fs.is_ignored = 0 THEN fs.size ELSE 0 END) as vulnerable_bytes
+            FROM filesystem_state fs
+            LEFT JOIN (SELECT DISTINCT filesystem_state_id as id FROM file_versions) fv ON fv.id = fs.id
+            WHERE fs.file_path LIKE :prefix
+        """)
+        stats = db.execute(stats_sql, {"prefix": f"{prefix}%"}).fetchone()
+        root_stats.append(
+            {"root": root, "protected": stats[0] or 0, "vulnerable": stats[1] or 0}
+        )
+
+    # 3. Extension Breakdown (Top 15)
+    ext_sql = text("""
+        SELECT
+            LOWER(REPLACE(file_path, RTRIM(file_path, REPLACE(file_path, '.', '')), '')) as ext,
+            SUM(size) as total_size,
+            COUNT(*) as count
+        FROM filesystem_state
+        WHERE file_path LIKE '%.%'
+        GROUP BY ext
+        ORDER BY total_size DESC
+        LIMIT 15
+    """)
+    exts = db.execute(ext_sql).fetchall()
+
+    # 4. Data Aging (Heatmap)
+    now = datetime.now(timezone.utc).timestamp()
+    one_year = 365 * 24 * 60 * 60
+    aging_sql = text(f"""
+        SELECT
+            CASE
+                WHEN mtime > {now - one_year} THEN 'Recent (< 1yr)'
+                WHEN mtime > {now - (2 * one_year)} THEN 'Warm (1-2yrs)'
+                WHEN mtime > {now - (5 * one_year)} THEN 'Cold (2-5yrs)'
+                ELSE 'Frozen (> 5yrs)'
+            END as bucket,
+            SUM(size) as total_size
+        FROM filesystem_state
+        GROUP BY bucket
+    """)
+    aging = db.execute(aging_sql).fetchall()
+
+    # 5. Redundancy (Copies per file)
+    redundancy_sql = text("""
+        SELECT
+            copy_count,
+            COUNT(*) as file_count,
+            SUM(size) as total_size
+        FROM (
+            SELECT fs.size, COUNT(fv.id) as copy_count
+            FROM filesystem_state fs
+            LEFT JOIN file_versions fv ON fv.filesystem_state_id = fs.id
+            WHERE fs.is_ignored = 0
+            GROUP BY fs.id
+        )
+        GROUP BY copy_count
+    """)
+    redundancy = db.execute(redundancy_sql).fetchall()
+
+    return {
+        "summary": {
+            "total_bytes": dedupe[0] or 0,
+            "unique_bytes": dedupe[2] or 0,
+            "total_files": dedupe[1] or 0,
+        },
+        "roots": root_stats,
+        "extensions": [{"ext": e[0], "size": e[1], "count": e[2]} for e in exts],
+        "aging": [{"bucket": a[0], "size": a[1]} for a in aging],
+        "redundancy": [
+            {"copies": r[0], "file_count": r[1], "size": r[2]} for r in redundancy
+        ],
+    }
 
 
 @router.get("/browse", response_model=List[FileItemSchema])

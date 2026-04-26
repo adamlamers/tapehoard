@@ -13,9 +13,8 @@ class OfflineHDDProvider(AbstractStorageProvider):
         return "Offline HDD"
 
     def check_online(self) -> bool:
-        """Checks if the HDD is mounted and identified"""
-        id_path = os.path.join(self.mount_base, ".tapehoard_id")
-        return os.path.exists(id_path)
+        """Checks if the HDD mount point is physically accessible"""
+        return os.path.exists(self.mount_base) and os.path.isdir(self.mount_base)
 
     def check_existing_data(self) -> bool:
         """Checks if the HDD already has tapehoard backups"""

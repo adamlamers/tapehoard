@@ -1,8 +1,9 @@
 <script lang="ts">
-        // @ts-ignore
-        import '../app.css';
-        // @ts-ignore
-        import { page } from '$app/stores';	import {
+	// @ts-ignore
+	import '../app.css';
+	// @ts-ignore
+	import { page } from '$app/stores';
+	import {
 		LayoutDashboard,
 		Library,
 		FolderTree,
@@ -12,7 +13,8 @@
 		CassetteTape,
 		Activity,
 		ChevronLeft,
-		ChevronRight
+		ChevronRight,
+		PieChart
 	} from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import { Toaster } from 'svelte-sonner';
@@ -22,7 +24,8 @@
 
 	const navItems = [
 		{ name: 'Overview', href: '/', icon: LayoutDashboard },
-		{ name: 'Virtual Index', href: '/index-browser', icon: Library },
+		{ name: 'Insights', href: '/insights', icon: PieChart },
+		{ name: 'Archive Index', href: '/index-browser', icon: Library },
 		{ name: 'Live Filesystem', href: '/tracking', icon: FolderTree },
 		{ name: 'Jobs', href: '/jobs', icon: Activity },
 		{ name: 'Media Inventory', href: '/inventory', icon: CassetteTape },
@@ -43,6 +46,7 @@
 		// Navigation Shortcuts (Single keys only, no modifiers)
 		if (!['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName) && !e.ctrlKey && !e.metaKey && !e.altKey) {
 			if (e.key === 'd') window.location.href = '/';
+			if (e.key === 'g') window.location.href = '/insights';
 			if (e.key === 'i') window.location.href = '/index-browser';
 			if (e.key === 't') window.location.href = '/tracking';
 			if (e.key === 'a') window.location.href = '/jobs';
@@ -55,26 +59,125 @@
 
 <svelte:window onkeydown={handleGlobalKeyDown} />
 
-<Toaster position="top-left" richColors />
-<ScanStatusOverlay />
+<Toaster theme="dark" richColors position="top-center" closeButton />
 
-<!-- Shortcuts Overlay -->
+<div class="flex h-screen bg-background text-foreground overflow-hidden font-sans antialiased selection:bg-blue-500/30">
+	<!-- Sidebar -->
+	<aside
+		class={cn(
+			"bg-bg-secondary border-r border-border-color flex flex-col transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] relative z-[1000] shadow-2xl",
+			isSidebarOpen ? "w-72" : "w-24"
+		)}
+	>
+		<!-- Logo Section -->
+		<div class="h-24 flex items-center px-8 shrink-0 relative overflow-hidden border-b border-white/[0.03]">
+			<div class="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-transparent"></div>
+			<div class="flex items-center gap-3 relative z-10">
+				<div class="w-10 h-10 bg-blue-600 flex items-center justify-center rounded-xl shadow-lg shadow-blue-600/20 group-hover:scale-110 transition-transform duration-500">
+					<Database class="text-white" size={22} />
+				</div>
+				{#if isSidebarOpen}
+					<div class="flex flex-col animate-in fade-in slide-in-from-left-2 duration-500">
+						<span class="text-xl font-black tracking-tighter uppercase leading-none">TapeHoard</span>
+						<span class="text-[9px] font-bold text-blue-500 uppercase tracking-[0.3em] mt-1">Archive Command</span>
+					</div>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Nav Links -->
+		<nav class="flex-1 overflow-y-auto px-4 py-8 space-y-2 scrollbar-hide">
+			{#each navItems as item}
+				<a
+					href={item.href}
+					class={cn(
+						"flex items-center gap-4 px-4 py-4 rounded-xl transition-all duration-300 group relative",
+						$page.url.pathname === item.href
+							? "bg-blue-600 text-white shadow-xl shadow-blue-600/20"
+							: "text-text-secondary hover:bg-white/5 hover:text-text-primary"
+					)}
+				>
+					<item.icon size={22} class={cn("transition-transform duration-300 group-hover:scale-110", $page.url.pathname === item.href ? "text-white" : "opacity-60 group-hover:opacity-100")} />
+					{#if isSidebarOpen}
+						<span class="text-[11px] font-black uppercase tracking-widest animate-in fade-in slide-in-from-left-2 duration-300">
+							{item.name}
+						</span>
+					{/if}
+
+					{#if $page.url.pathname === item.href}
+						<div class="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-l-full"></div>
+					{/if}
+				</a>
+			{/each}
+		</nav>
+
+		<!-- Bottom Actions -->
+		<div class="p-4 space-y-2 border-t border-white/[0.03] bg-black/10">
+			<a
+				href="/settings"
+				class={cn(
+					"flex items-center gap-4 px-4 py-4 rounded-xl transition-all duration-300 group",
+					$page.url.pathname === '/settings'
+						? "bg-bg-tertiary text-text-primary border border-white/10"
+						: "text-text-secondary hover:bg-white/5 hover:text-text-primary"
+				)}
+			>
+				<Settings size={22} class="opacity-60 group-hover:opacity-100" />
+				{#if isSidebarOpen}
+					<span class="text-[11px] font-black uppercase tracking-widest">Settings</span>
+				{/if}
+			</a>
+			<button
+				class="w-full flex items-center gap-4 px-4 py-4 rounded-xl text-text-secondary hover:bg-white/5 hover:text-text-primary transition-all group"
+				onclick={() => isSidebarOpen = !isSidebarOpen}
+			>
+				{#if isSidebarOpen}
+					<ChevronLeft size={22} class="opacity-60 group-hover:opacity-100" />
+					<span class="text-[11px] font-black uppercase tracking-widest">Collapse</span>
+				{:else}
+					<ChevronRight size={22} class="opacity-60 group-hover:opacity-100" />
+				{/if}
+			</button>
+		</div>
+	</aside>
+
+	<!-- Main Content Area -->
+	<main class="flex-1 flex flex-col relative overflow-hidden">
+		<!-- Dynamic Scan Status Overlay (Global) -->
+		<ScanStatusOverlay />
+
+		<div class="flex-1 overflow-y-auto p-8 lg:p-12 relative">
+			<!-- Animated Background Glow -->
+			<div class="absolute -top-24 -right-24 w-96 h-96 bg-blue-600/5 rounded-full blur-[120px] pointer-events-none"></div>
+			<div class="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-600/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+			{@render children()}
+		</div>
+	</main>
+</div>
+
+<!-- Global Shortcut Help -->
 {#if showShortcuts}
-	<div class="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300" onclick={() => showShortcuts = false} role="presentation">
-		<div class="w-[500px] bg-bg-secondary border border-border-color shadow-2xl rounded-2xl p-10 flex flex-col gap-8" onclick={(e) => e.stopPropagation()} role="dialog">
-			<header>
-				<h2 class="text-2xl font-black text-text-primary uppercase tracking-tighter flex items-center gap-3">
-					<span class="p-2 bg-action-color/10 rounded-lg text-action-color"><Settings size={24} /></span>
-					Fleet Command Shortcuts
-				</h2>
-				<p class="text-[11px] font-bold text-text-secondary uppercase tracking-widest mt-2 opacity-60">Universal system navigation & control.</p>
-			</header>
+	<div class="fixed inset-0 z-[2000] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-500">
+		<div class="w-[600px] bg-bg-secondary border border-white/10 rounded-3xl p-12 shadow-2xl relative overflow-hidden">
+			<div class="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-transparent pointer-events-none"></div>
+
+			<div class="flex justify-between items-start mb-12">
+				<div>
+					<h2 class="text-3xl font-black uppercase tracking-tighter text-text-primary">Global Command Palette</h2>
+					<p class="text-xs font-bold text-text-secondary uppercase tracking-widest mt-2 opacity-60">Terminal-grade keyboard interfaces</p>
+				</div>
+				<button onclick={() => showShortcuts = false} class="text-text-secondary hover:text-white transition-colors">
+					<Library size={32} class="rotate-45" />
+				</button>
+			</div>
 
 			<div class="grid grid-cols-2 gap-x-12 gap-y-6">
 				<div class="space-y-4">
 					<h3 class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Navigation</h3>
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Overview</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">D</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Virtual Index</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">I</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Insights</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">G</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Archive Index</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">I</kbd></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Live Filesystem</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">T</kbd></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Jobs</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">A</kbd></div>
 				</div>
@@ -83,119 +186,37 @@
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Media Inventory</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">M</kbd></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Data Recovery</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">R</kbd></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">System Settings</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">S</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Close Menu</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">ESC</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Command Help</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">?</kbd></div>
 				</div>
 			</div>
 
-			<footer class="pt-6 border-t border-border-color flex justify-center">
-				<p class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 italic">Press '?' at any time to toggle this command set.</p>
+			<footer class="mt-16 pt-8 border-t border-white/[0.03] text-center">
+				<p class="text-[10px] font-black uppercase tracking-[0.2em] text-text-secondary opacity-40 italic">Command complexity leads to operational failure. Keep it simple.</p>
 			</footer>
 		</div>
 	</div>
 {/if}
 
-<div class="app-container flex h-screen w-full overflow-hidden bg-bg-primary text-text-primary font-sans selection:bg-action-color/30">
-	<!-- SIDEBAR -->
-	<aside
-		class={cn(
-			"sidebar flex flex-col border-r border-border-color bg-bg-secondary transition-all duration-300 relative z-50 shadow-2xl shrink-0",
-			isSidebarOpen ? "w-64" : "w-20"
-		)}
-	>
-		<!-- LOGO AREA -->
-		<div class={cn(
-			"flex h-20 items-center border-b border-border-color bg-bg-tertiary/30 shrink-0 overflow-hidden transition-all duration-300",
-			isSidebarOpen ? "px-6" : "px-0 justify-center"
-		)}>
-			<div class="flex items-center gap-3">
-				<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-action-color text-white shadow-lg shadow-action-color/20 shrink-0">
-					<Database size={22} strokeWidth={2.5} />
-				</div>
-				{#if isSidebarOpen}
-					<div class="flex flex-col animate-in fade-in slide-in-from-left-2 duration-300">
-						<span class="text-lg font-black uppercase tracking-tighter leading-none">TapeHoard</span>
-						<span class="text-[9px] font-bold uppercase tracking-[0.2em] text-text-secondary opacity-60">LTO Archival</span>
-					</div>
-				{/if}
-			</div>
-		</div>
-
-		<!-- NAVIGATION -->
-		<nav class="flex-1 py-4 overflow-y-auto overflow-x-hidden">
-			{#each navItems as item}
-				{@const isActive = $page.url.pathname === item.href || ($page.url.pathname.startsWith(item.href) && item.href !== '/')}
-				<a
-					href={item.href}
-					class={cn(
-						"group flex items-center transition-all w-full border-l-4 h-12",
-						isSidebarOpen ? "px-6 gap-4" : "px-0 justify-center gap-0",
-						isActive
-							? "bg-action-color/10 text-text-primary border-l-action-color"
-							: "text-text-secondary hover:bg-white/[0.03] hover:text-text-primary border-l-transparent"
-					)}
-					title={!isSidebarOpen ? item.name : ''}
-				>
-					<item.icon size={18} class={cn("shrink-0", isActive ? "text-action-color" : "text-text-secondary group-hover:text-action-color")} />
-					{#if isSidebarOpen}
-						<span class="truncate text-[12px] font-bold uppercase tracking-wider animate-in fade-in slide-in-from-left-2 duration-300">{item.name}</span>
-					{/if}
-				</a>
-			{/each}
-		</nav>
-
-		<!-- FOOTER ACTIONS -->
-		<div class="border-t border-border-color bg-bg-tertiary/10 shrink-0 flex flex-col">
-			<a
-				href="/settings"
-				class={cn(
-					"group flex items-center transition-all w-full border-l-4 h-14",
-					isSidebarOpen ? "px-6 gap-4" : "px-0 justify-center gap-0",
-					$page.url.pathname === '/settings'
-						? "bg-bg-tertiary text-text-primary border-l-white"
-						: "text-text-secondary hover:bg-white/[0.03] hover:text-text-primary border-l-transparent"
-				)}
-				title={!isSidebarOpen ? "Settings" : ''}
-			>
-				<Settings size={18} class="shrink-0" />
-				{#if isSidebarOpen}
-					<span class="text-[12px] font-bold uppercase tracking-wider animate-in fade-in slide-in-from-left-2 duration-300">Settings</span>
-				{/if}
-			</a>
-
-			<button
-				class="flex h-12 items-center justify-center border-t border-border-color bg-bg-secondary text-text-secondary hover:text-text-primary transition-colors shrink-0"
-				onclick={() => isSidebarOpen = !isSidebarOpen}
-			>
-				{#if isSidebarOpen}
-					<ChevronLeft size={16} />
-				{:else}
-					<ChevronRight size={16} />
-				{/if}
-			</button>
-		</div>
-	</aside>
-
-	<!-- MAIN CONTENT -->
-	<main class="flex-1 min-w-0 flex flex-col relative overflow-hidden">
-		<div class="flex-1 overflow-y-auto p-8 relative scrollbar-hide">
-			{@render children()}
-		</div>
-	</main>
-</div>
-
 <style>
-	:global(::-webkit-scrollbar) {
+	:global(body) {
+		font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+	}
+
+	::-webkit-scrollbar {
 		width: 6px;
 		height: 6px;
 	}
-	:global(::-webkit-scrollbar-track) {
-		background: #0a0a0a;
+
+	::-webkit-scrollbar-track {
+		background: transparent;
 	}
-	:global(::-webkit-scrollbar-thumb) {
-		background: #1a1a1a;
-		border-radius: 4px;
+
+	::-webkit-scrollbar-thumb {
+		background: rgba(255, 255, 255, 0.05);
+		border-radius: 10px;
 	}
-	:global(::-webkit-scrollbar-thumb:hover) {
-		background: #2a2a2a;
+
+	::-webkit-scrollbar-thumb:hover {
+		background: rgba(255, 255, 255, 0.1);
 	}
 </style>

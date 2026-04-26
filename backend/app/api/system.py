@@ -14,6 +14,7 @@ from app.db.database import get_db, SessionLocal
 from app.db import models
 from app.services.scanner import scanner_manager, JobManager
 import pathspec
+from loguru import logger
 
 router = APIRouter(prefix="/system", tags=["System"])
 
@@ -206,10 +207,28 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/jobs", response_model=List[JobSchema])
-def list_jobs(limit: int = 50, db: Session = Depends(get_db)):
+def list_jobs(limit: int = 50, offset: int = 0, db: Session = Depends(get_db)):
     return (
-        db.query(models.Job).order_by(models.Job.created_at.desc()).limit(limit).all()
+        db.query(models.Job)
+        .order_by(models.Job.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+        .all()
     )
+
+
+@router.get("/jobs/count")
+def get_jobs_count(db: Session = Depends(get_db)):
+    count = db.query(models.Job).count()
+    return {"count": count}
+
+
+@router.get("/jobs/{job_id}", response_model=JobSchema)
+def get_job_detail(job_id: int, db: Session = Depends(get_db)):
+    job = db.get(models.Job, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 @router.post("/jobs/{job_id}/cancel")
@@ -446,11 +465,198 @@ def test_notification(req: TestNotificationRequest):
         )
 
 
+@router.get("/ls")
+def list_host_directories(path: str = "/"):
+    """Lists subdirectories on the host system for path selection"""
+    if not os.path.exists(path):
+        return []
+    if not os.path.isdir(path):
+        return []
+
+    try:
+        entries = os.listdir(path)
+        dirs = []
+        for entry in entries:
+            full_path = os.path.join(path, entry)
+            try:
+                if os.path.isdir(full_path) and not entry.startswith("."):
+                    dirs.append({"name": entry, "path": full_path})
+            except OSError:
+                continue
+        dirs.sort(key=lambda x: x["name"].lower())
+        return dirs
+    except Exception as e:
+        logger.error(f"Failed to list directory {path}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/hardware/discover")
+def discover_hardware(db: Session = Depends(get_db)):
+    """
+    Scans the host system for tape drives and mounted HDDs that are NOT yet in the inventory.
+    """
+
+    discovered = []
+
+    # Load ignored hardware
+    ignored_setting = (
+        db.query(models.SystemSetting)
+        .filter(models.SystemSetting.key == "ignored_hardware")
+        .first()
+    )
+    ignored_list = json.loads(ignored_setting.value) if ignored_setting else []
+
+    # 1. Check Configured Tape Drives
+    drive_setting = (
+        db.query(models.SystemSetting)
+        .filter(models.SystemSetting.key == "tape_drives")
+        .first()
+    )
+    if drive_setting:
+        try:
+            drives = json.loads(drive_setting.value)
+            for device_path in drives:
+                from app.providers.tape import LTOProvider
+
+                provider = LTOProvider(device_path=device_path)
+                if provider.check_online():
+                    ident = provider.identify_media()
+
+                    if ident in ignored_list:
+                        continue
+
+                    # Check if this identifier is already in our DB
+                    exists = (
+                        db.query(models.StorageMedia)
+                        .filter(models.StorageMedia.identifier == ident)
+                        .first()
+                        if ident
+                        else None
+                    )
+
+                    discovered.append(
+                        {
+                            "type": "tape",
+                            "device_path": device_path,
+                            "identifier": ident or "Unknown/New Tape",
+                            "is_registered": exists is not None,
+                            "status": "ready_for_ingestion" if not exists else "active",
+                        }
+                    )
+        except Exception as e:
+            logger.error(f"Tape discovery failed: {e}")
+
+    # 2. Check for "Offline" HDDs (Potential mount points)
+    # We look at the parent directory of our source roots or standard mount points
+    potential_mounts = ["/mnt", "/media", "/Volumes"]
+    try:
+        root_dev = os.stat("/").st_dev
+    except Exception:
+        root_dev = None
+
+    # Load restore destinations to ignore them
+    restore_setting = (
+        db.query(models.SystemSetting)
+        .filter(models.SystemSetting.key == "restore_destinations")
+        .first()
+    )
+    restore_paths = json.loads(restore_setting.value) if restore_setting else []
+
+    for base in potential_mounts:
+        if not os.path.exists(base):
+            continue
+        try:
+            for entry in os.scandir(base):
+                if entry.is_dir():
+                    # Skip root filesystem or anything on the same device as /
+                    try:
+                        if (
+                            root_dev is not None
+                            and os.stat(entry.path).st_dev == root_dev
+                        ):
+                            continue
+                    except Exception:
+                        continue
+
+                    # Skip configured restore paths
+                    if entry.path in restore_paths:
+                        continue
+
+                    if entry.path in ignored_list:
+                        continue
+
+                    id_file = os.path.join(entry.path, ".tapehoard_id")
+                    ident = None
+                    if os.path.exists(id_file):
+                        with open(id_file, "r") as f:
+                            ident = f.read().strip()
+
+                    if ident and ident in ignored_list:
+                        continue
+
+                    exists = (
+                        db.query(models.StorageMedia)
+                        .filter(models.StorageMedia.identifier == ident)
+                        .first()
+                        if ident
+                        else None
+                    )
+
+                    if not exists:
+                        discovered.append(
+                            {
+                                "type": "hdd",
+                                "mount_path": entry.path,
+                                "identifier": ident or "Unrecognized Disk",
+                                "is_registered": False,
+                                "status": "uninitialized"
+                                if not ident
+                                else "foreign_tapehoard_disk",
+                            }
+                        )
+        except Exception:
+            continue
+
+    return discovered
+
+
+class IgnoreHardwareRequest(BaseModel):
+    identifier: str
+
+
+@router.post("/hardware/ignore")
+def ignore_hardware(req: IgnoreHardwareRequest, db: Session = Depends(get_db)):
+    """Adds a hardware identifier or path to the ignore list"""
+    setting = (
+        db.query(models.SystemSetting)
+        .filter(models.SystemSetting.key == "ignored_hardware")
+        .first()
+    )
+    if not setting:
+        setting = models.SystemSetting(key="ignored_hardware", value="[]")
+        db.add(setting)
+
+    ignored = json.loads(setting.value)
+    if req.identifier not in ignored:
+        ignored.append(req.identifier)
+        setting.value = json.dumps(ignored)
+        db.commit()
+
+    return {"message": f"Hardware {req.identifier} will be ignored"}
+
+
 @router.get("/database/export")
 def export_database():
-    db_path = "tapehoard.db"
+    # Resolve DB path from env or use default
+    db_url = os.getenv("DATABASE_URL", "sqlite:///tapehoard.db")
+    # Handle sqlite:/// prefix
+    db_path = db_url.replace("sqlite:///", "")
+
     if not os.path.exists(db_path):
-        raise HTTPException(status_code=404, detail="Database file not found")
+        # Fallback to local if not found (for dev)
+        db_path = "tapehoard.db"
+        if not os.path.exists(db_path):
+            raise HTTPException(status_code=404, detail="Database file not found")
 
     # We create a temporary copy to ensure we don't return a partially locked file
     export_path = "tapehoard_export.db"

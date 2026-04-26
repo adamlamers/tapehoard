@@ -163,7 +163,6 @@
                         await removeFromCartRestoresCartItemIdDelete({
                             path: { item_id: cartItem.id }
                         });
-                        toast.info(`Removed ${item.name} from recovery queue`);
                     }
                 } else {
                     // Toggling a directory off is currently not supported as a bulk op
@@ -182,15 +181,12 @@
                         await addToCartRestoresCartFileIdPost({
                             path: { file_id: metaResponse.data.id }
                         });
-                        toast.success(`Added ${item.name} to recovery queue`);
                     }
                 } else {
                     // It's a directory
-                    const response = await addDirectoryToCartRestoresCartDirectoryPost({
+                    await addDirectoryToCartRestoresCartDirectoryPost({
                         body: { path: item.path }
                     });
-                    const msg = (response.data as any)?.message || `Added folder to recovery queue`;
-                    toast.success(msg);
                 }
             }
 
@@ -211,10 +207,9 @@
 
     async function handleToggleDirectoryCart(itemPath: string) {
         try {
-            const response = await addDirectoryToCartRestoresCartDirectoryPost({
+            await addDirectoryToCartRestoresCartDirectoryPost({
                 body: { path: itemPath }
             });
-            toast.success((response.data as any)?.message || "Folder added to recovery queue");
 
             // Refresh everything
             await Promise.all([
@@ -266,10 +261,10 @@
         <div class="relative z-10">
             <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
                 <Library class="text-blue-500" size={28} />
-                Virtual Index
+                Archive Index
             </h1>
             <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
-                Unified filesystem view across all physical media
+                A view of what is stored where on archive media
             </p>
         </div>
 

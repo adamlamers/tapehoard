@@ -5,11 +5,11 @@ services:
       dockerfile: docker/Dockerfile
     container_name: tapehoard
     ports:
-      - "9000:8000"
+      - "8000:8000"
     volumes:
       - ./db:/database
       - ./staging:/staging
-      - /Users/alamers/git/ditchcord:/source_data:ro
+      - /Users/alamers/git:/source_data:ro
       - /Users/alamers/restore:/restores
     # Uncomment to enable LTO tape drive support
     # devices:

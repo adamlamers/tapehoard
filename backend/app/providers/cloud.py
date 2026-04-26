@@ -1,7 +1,14 @@
 import boto3
+import os
+import io
 from typing import Optional, BinaryIO, Dict, Any
 from .base import AbstractStorageProvider
 from loguru import logger
+
+# Modern high-performance encryption via PyCryptodome
+from Crypto.Cipher import AES
+from Crypto.Protocol.KDF import PBKDF2
+from Crypto.Hash import SHA256
 
 
 class CloudStorageProvider(AbstractStorageProvider):
@@ -9,18 +16,36 @@ class CloudStorageProvider(AbstractStorageProvider):
         self.provider_type = config.get("provider", "S3")
         self.bucket_name = config.get("bucket_name")
         self.region = config.get("region", "us-east-1")
-        self.endpoint_url = config.get("endpoint_url")  # For non-AWS S3 (B2, Wasabi)
+        self.endpoint_url = config.get("endpoint_url")
 
-        # We assume credentials are in env or handled by the host
+        # Local Encryption Settings
+        self.passphrase = config.get("encryption_passphrase")
+
+        # Credentials
+        access_key = config.get("access_key")
+        secret_key = config.get("secret_key")
+
         self.s3 = boto3.client(
-            "s3", region_name=self.region, endpoint_url=self.endpoint_url
+            "s3",
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name=self.region,
+            endpoint_url=self.endpoint_url,
+        )
+
+    def _derive_key(self, salt: bytes) -> bytes:
+        """Derives a 256-bit AES key using PBKDF2-HMAC-SHA256"""
+        if not self.passphrase:
+            raise ValueError("No encryption passphrase configured")
+
+        return PBKDF2(
+            self.passphrase, salt, dkLen=32, count=100000, hmac_hash_module=SHA256
         )
 
     def get_name(self) -> str:
         return f"Cloud ({self.provider_type})"
 
     def check_online(self) -> bool:
-        """Checks if the cloud bucket is accessible"""
         try:
             self.s3.head_bucket(Bucket=self.bucket_name)
             return True
@@ -28,7 +53,6 @@ class CloudStorageProvider(AbstractStorageProvider):
             return False
 
     def check_existing_data(self) -> bool:
-        """Checks if the bucket has any archives"""
         try:
             response = self.s3.list_objects_v2(
                 Bucket=self.bucket_name, Prefix="archives/", MaxKeys=1
@@ -38,21 +62,20 @@ class CloudStorageProvider(AbstractStorageProvider):
             return False
 
     def identify_media(self) -> Optional[str]:
-        """Checks if the bucket exists and we have access"""
         try:
-            self.s3.head_bucket(Bucket=self.bucket_name)
-            return self.bucket_name
-        except Exception as e:
-            logger.error(f"Failed to identify cloud bucket {self.bucket_name}: {e}")
-            return None
+            response = self.s3.get_object(Bucket=self.bucket_name, Key=".tapehoard_id")
+            return response["Body"].read().decode("utf-8").strip()
+        except Exception:
+            try:
+                self.s3.head_bucket(Bucket=self.bucket_name)
+                return self.bucket_name
+            except Exception as e:
+                logger.error(f"Failed to identify cloud bucket {self.bucket_name}: {e}")
+                return None
 
     def initialize_media(self, media_id: str) -> bool:
-        """Initializes cloud media by writing the .tapehoard_id and clearing archives"""
         try:
-            # Check bucket exists
             self.s3.head_bucket(Bucket=self.bucket_name)
-
-            # Delete objects in archives/
             paginator = self.s3.get_paginator("list_objects_v2")
             for page in paginator.paginate(Bucket=self.bucket_name, Prefix="archives/"):
                 if "Contents" in page:
@@ -60,15 +83,11 @@ class CloudStorageProvider(AbstractStorageProvider):
                     self.s3.delete_objects(
                         Bucket=self.bucket_name, Delete={"Objects": objects}
                     )
-
-            # Write identifier
             self.s3.put_object(
                 Bucket=self.bucket_name,
                 Key=".tapehoard_id",
                 Body=media_id.encode("utf-8"),
             )
-
-            logger.info(f"Initialized Cloud media {media_id} and cleared archives")
             return True
         except Exception as e:
             logger.error(f"Cloud Provider: Failed to initialize media: {e}")
@@ -78,24 +97,87 @@ class CloudStorageProvider(AbstractStorageProvider):
         return self.identify_media() == media_id
 
     def write_archive(self, media_id: str, stream: BinaryIO) -> str:
-        """Uploads the stream as a new object in the bucket"""
-        # Generate a unique object key (future: use job timestamp)
+        """
+        Encrypts data with AES-256-GCM before upload.
+        Format: [Salt (16)] + [Nonce (12)] + [Tag (16)] + [Ciphertext]
+        """
         import uuid
 
         object_key = f"archives/{uuid.uuid4().hex}.tar"
 
-        logger.info(f"Uploading archive to cloud: {media_id}/{object_key}")
-        try:
-            self.s3.upload_fileobj(stream, self.bucket_name, object_key)
-            return object_key
-        except Exception as e:
-            logger.error(f"Cloud upload failed: {e}")
-            raise
+        if self.passphrase:
+            logger.info(
+                f"Uploading AES-256-GCM archive to {self.bucket_name}/{object_key}"
+            )
+
+            # 1. Setup crypto artifacts
+            salt = os.urandom(16)
+            nonce = os.urandom(12)
+            key = self._derive_key(salt)
+
+            # 2. Encrypt
+            cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+            data = stream.read()
+            ciphertext, tag = cipher.encrypt_and_digest(data)
+
+            # 3. Concatenate and upload
+            # We store everything needed for decryption in the blob itself for maximum portability
+            payload = salt + nonce + tag + ciphertext
+
+            try:
+                self.s3.put_object(
+                    Bucket=self.bucket_name,
+                    Key=object_key,
+                    Body=payload,
+                    Metadata={"x-amz-meta-tapehoard-encrypted": "v2-gcm"},
+                )
+                return object_key
+            except Exception as e:
+                logger.error(f"GCM cloud upload failed: {e}")
+                raise
+        else:
+            logger.info(f"Uploading plain archive to {self.bucket_name}/{object_key}")
+            try:
+                self.s3.upload_fileobj(stream, self.bucket_name, object_key)
+                return object_key
+            except Exception as e:
+                logger.error(f"Cloud upload failed: {e}")
+                raise
+
+    def read_archive(self, media_id: str, location_id: str) -> BinaryIO:
+        """Retrieves and decrypts an AES-GCM archive"""
+        response = self.s3.get_object(Bucket=self.bucket_name, Key=location_id)
+        raw_payload = response["Body"].read()
+
+        metadata = response.get("Metadata", {})
+        is_encrypted = (
+            metadata.get("tapehoard-encrypted") == "v2-gcm"
+            or metadata.get("x-amz-meta-tapehoard-encrypted") == "v2-gcm"
+        )
+
+        if is_encrypted:
+            logger.info(f"Decrypting AES-GCM cloud archive: {location_id}")
+
+            # Extract artifacts from payload
+            salt = raw_payload[:16]
+            nonce = raw_payload[16:28]
+            tag = raw_payload[28:44]
+            ciphertext = raw_payload[44:]
+
+            # Derive key and decrypt
+            key = self._derive_key(salt)
+            cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+
+            try:
+                decrypted_data = cipher.decrypt_and_verify(ciphertext, tag)
+                return io.BytesIO(decrypted_data)
+            except ValueError as e:
+                logger.error(f"Decryption failed (MAC mismatch): {e}")
+                raise ValueError(
+                    "Cloud archive tampering detected or incorrect passphrase!"
+                )
+
+        return io.BytesIO(raw_payload)
 
     def finalize_media(self, media_id: str):
         logger.info(f"Finalized cloud media {media_id}")
-
-    def read_archive(self, media_id: str, location_id: str) -> BinaryIO:
-        """Returns a streaming body for the S3 object"""
-        response = self.s3.get_object(Bucket=self.bucket_name, Key=location_id)
-        return response["Body"]

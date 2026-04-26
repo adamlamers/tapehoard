@@ -185,6 +185,16 @@ export type HttpValidationError = {
 };
 
 /**
+ * IgnoreHardwareRequest
+ */
+export type IgnoreHardwareRequest = {
+    /**
+     * Identifier
+     */
+    identifier: string;
+};
+
+/**
  * ItemMetadataSchema
  */
 export type ItemMetadataSchema = {
@@ -380,6 +390,10 @@ export type MediaSchema = {
      * Is Online
      */
     is_online?: boolean;
+    /**
+     * Is Identified
+     */
+    is_identified?: boolean;
     /**
      * Priority Index
      */
@@ -644,6 +658,10 @@ export type ListJobsSystemJobsGetData = {
          * Limit
          */
         limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
     };
     url: '/system/jobs';
 };
@@ -667,6 +685,50 @@ export type ListJobsSystemJobsGetResponses = {
 };
 
 export type ListJobsSystemJobsGetResponse = ListJobsSystemJobsGetResponses[keyof ListJobsSystemJobsGetResponses];
+
+export type GetJobsCountSystemJobsCountGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/jobs/count';
+};
+
+export type GetJobsCountSystemJobsCountGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type GetJobDetailSystemJobsJobIdGetData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: number;
+    };
+    query?: never;
+    url: '/system/jobs/{job_id}';
+};
+
+export type GetJobDetailSystemJobsJobIdGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetJobDetailSystemJobsJobIdGetError = GetJobDetailSystemJobsJobIdGetErrors[keyof GetJobDetailSystemJobsJobIdGetErrors];
+
+export type GetJobDetailSystemJobsJobIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: JobSchema;
+};
+
+export type GetJobDetailSystemJobsJobIdGetResponse = GetJobDetailSystemJobsJobIdGetResponses[keyof GetJobDetailSystemJobsJobIdGetResponses];
 
 export type CancelJobSystemJobsJobIdCancelPostData = {
     body?: never;
@@ -897,6 +959,71 @@ export type TestNotificationSystemNotificationsTestPostResponses = {
     200: unknown;
 };
 
+export type ListHostDirectoriesSystemLsGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Path
+         */
+        path?: string;
+    };
+    url: '/system/ls';
+};
+
+export type ListHostDirectoriesSystemLsGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListHostDirectoriesSystemLsGetError = ListHostDirectoriesSystemLsGetErrors[keyof ListHostDirectoriesSystemLsGetErrors];
+
+export type ListHostDirectoriesSystemLsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type DiscoverHardwareSystemHardwareDiscoverGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/hardware/discover';
+};
+
+export type DiscoverHardwareSystemHardwareDiscoverGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type IgnoreHardwareSystemHardwareIgnorePostData = {
+    body: IgnoreHardwareRequest;
+    path?: never;
+    query?: never;
+    url: '/system/hardware/ignore';
+};
+
+export type IgnoreHardwareSystemHardwareIgnorePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type IgnoreHardwareSystemHardwareIgnorePostError = IgnoreHardwareSystemHardwareIgnorePostErrors[keyof IgnoreHardwareSystemHardwareIgnorePostErrors];
+
+export type IgnoreHardwareSystemHardwareIgnorePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type ExportDatabaseSystemDatabaseExportGetData = {
     body?: never;
     path?: never;
@@ -1113,6 +1240,20 @@ export type InitializeMediaInventoryMediaMediaIdInitializePostErrors = {
 export type InitializeMediaInventoryMediaMediaIdInitializePostError = InitializeMediaInventoryMediaMediaIdInitializePostErrors[keyof InitializeMediaInventoryMediaMediaIdInitializePostErrors];
 
 export type InitializeMediaInventoryMediaMediaIdInitializePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type GetFilesystemInsightsInventoryInsightsGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/inventory/insights';
+};
+
+export type GetFilesystemInsightsInventoryInsightsGetResponses = {
     /**
      * Successful Response
      */

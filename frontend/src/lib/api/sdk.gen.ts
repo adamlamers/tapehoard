@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddDirectoryToCartRestoresCartDirectoryPostData, AddDirectoryToCartRestoresCartDirectoryPostErrors, AddDirectoryToCartRestoresCartDirectoryPostResponses, AddToCartRestoresCartFileIdPostData, AddToCartRestoresCartFileIdPostErrors, AddToCartRestoresCartFileIdPostResponses, BrowseCartRestoresCartBrowseGetData, BrowseCartRestoresCartBrowseGetErrors, BrowseCartRestoresCartBrowseGetResponses, BrowseIndexInventoryBrowseGetData, BrowseIndexInventoryBrowseGetErrors, BrowseIndexInventoryBrowseGetResponses, BrowsePathSystemBrowseGetData, BrowsePathSystemBrowseGetErrors, BrowsePathSystemBrowseGetResponses, CancelJobSystemJobsJobIdCancelPostData, CancelJobSystemJobsJobIdCancelPostErrors, CancelJobSystemJobsJobIdCancelPostResponses, ClearCartRestoresCartClearPostData, ClearCartRestoresCartClearPostResponses, DeleteMediaInventoryMediaMediaIdDeleteData, DeleteMediaInventoryMediaMediaIdDeleteErrors, DeleteMediaInventoryMediaMediaIdDeleteResponses, ExportDatabaseSystemDatabaseExportGetData, ExportDatabaseSystemDatabaseExportGetResponses, GetCartTreeRestoresCartTreeGetData, GetCartTreeRestoresCartTreeGetErrors, GetCartTreeRestoresCartTreeGetResponses, GetDashboardStatsSystemDashboardStatsGetData, GetDashboardStatsSystemDashboardStatsGetResponses, GetIndexTreeInventoryTreeGetData, GetIndexTreeInventoryTreeGetErrors, GetIndexTreeInventoryTreeGetResponses, GetItemMetadataInventoryMetadataGetData, GetItemMetadataInventoryMetadataGetErrors, GetItemMetadataInventoryMetadataGetResponses, GetManifestRestoresManifestGetData, GetManifestRestoresManifestGetResponses, GetScanStatusSystemScanStatusGetData, GetScanStatusSystemScanStatusGetResponses, GetSettingsSystemSettingsGetData, GetSettingsSystemSettingsGetResponses, GetTreeSystemTreeGetData, GetTreeSystemTreeGetErrors, GetTreeSystemTreeGetResponses, HealthCheckHealthGetData, HealthCheckHealthGetResponses, ImportDatabaseSystemDatabaseImportPostData, ImportDatabaseSystemDatabaseImportPostErrors, ImportDatabaseSystemDatabaseImportPostResponses, InitializeMediaInventoryMediaMediaIdInitializePostData, InitializeMediaInventoryMediaMediaIdInitializePostErrors, InitializeMediaInventoryMediaMediaIdInitializePostResponses, ListBackupsBackupsGetData, ListBackupsBackupsGetResponses, ListCartRestoresCartGetData, ListCartRestoresCartGetResponses, ListInventoryInventoryGetData, ListInventoryInventoryGetResponses, ListJobsSystemJobsGetData, ListJobsSystemJobsGetErrors, ListJobsSystemJobsGetResponses, ListMediaInventoryMediaGetData, ListMediaInventoryMediaGetResponses, RegisterMediaInventoryMediaPostData, RegisterMediaInventoryMediaPostErrors, RegisterMediaInventoryMediaPostResponses, RemoveFromCartRestoresCartItemIdDeleteData, RemoveFromCartRestoresCartItemIdDeleteErrors, RemoveFromCartRestoresCartItemIdDeleteResponses, ReorderMediaInventoryMediaReorderPostData, ReorderMediaInventoryMediaReorderPostErrors, ReorderMediaInventoryMediaReorderPostResponses, SearchIndexInventorySearchGetData, SearchIndexInventorySearchGetErrors, SearchIndexInventorySearchGetResponses, SearchSystemSystemSearchGetData, SearchSystemSystemSearchGetErrors, SearchSystemSystemSearchGetResponses, StreamJobsSystemJobsStreamGetData, StreamJobsSystemJobsStreamGetResponses, TestNotificationSystemNotificationsTestPostData, TestNotificationSystemNotificationsTestPostErrors, TestNotificationSystemNotificationsTestPostResponses, TrackBatchSystemTrackBatchPostData, TrackBatchSystemTrackBatchPostErrors, TrackBatchSystemTrackBatchPostResponses, TriggerBackupBackupsTriggerMediaIdPostData, TriggerBackupBackupsTriggerMediaIdPostErrors, TriggerBackupBackupsTriggerMediaIdPostResponses, TriggerRestoreRestoresTriggerPostData, TriggerRestoreRestoresTriggerPostErrors, TriggerRestoreRestoresTriggerPostResponses, TriggerScanSystemScanPostData, TriggerScanSystemScanPostResponses, UpdateMediaInventoryMediaMediaIdPatchData, UpdateMediaInventoryMediaMediaIdPatchErrors, UpdateMediaInventoryMediaMediaIdPatchResponses, UpdateSettingSystemSettingsPostData, UpdateSettingSystemSettingsPostErrors, UpdateSettingSystemSettingsPostResponses } from './types.gen';
+import type { AddDirectoryToCartRestoresCartDirectoryPostData, AddDirectoryToCartRestoresCartDirectoryPostErrors, AddDirectoryToCartRestoresCartDirectoryPostResponses, AddToCartRestoresCartFileIdPostData, AddToCartRestoresCartFileIdPostErrors, AddToCartRestoresCartFileIdPostResponses, BrowseCartRestoresCartBrowseGetData, BrowseCartRestoresCartBrowseGetErrors, BrowseCartRestoresCartBrowseGetResponses, BrowseIndexInventoryBrowseGetData, BrowseIndexInventoryBrowseGetErrors, BrowseIndexInventoryBrowseGetResponses, BrowsePathSystemBrowseGetData, BrowsePathSystemBrowseGetErrors, BrowsePathSystemBrowseGetResponses, CancelJobSystemJobsJobIdCancelPostData, CancelJobSystemJobsJobIdCancelPostErrors, CancelJobSystemJobsJobIdCancelPostResponses, ClearCartRestoresCartClearPostData, ClearCartRestoresCartClearPostResponses, DeleteMediaInventoryMediaMediaIdDeleteData, DeleteMediaInventoryMediaMediaIdDeleteErrors, DeleteMediaInventoryMediaMediaIdDeleteResponses, DiscoverHardwareSystemHardwareDiscoverGetData, DiscoverHardwareSystemHardwareDiscoverGetResponses, ExportDatabaseSystemDatabaseExportGetData, ExportDatabaseSystemDatabaseExportGetResponses, GetCartTreeRestoresCartTreeGetData, GetCartTreeRestoresCartTreeGetErrors, GetCartTreeRestoresCartTreeGetResponses, GetDashboardStatsSystemDashboardStatsGetData, GetDashboardStatsSystemDashboardStatsGetResponses, GetFilesystemInsightsInventoryInsightsGetData, GetFilesystemInsightsInventoryInsightsGetResponses, GetIndexTreeInventoryTreeGetData, GetIndexTreeInventoryTreeGetErrors, GetIndexTreeInventoryTreeGetResponses, GetItemMetadataInventoryMetadataGetData, GetItemMetadataInventoryMetadataGetErrors, GetItemMetadataInventoryMetadataGetResponses, GetJobDetailSystemJobsJobIdGetData, GetJobDetailSystemJobsJobIdGetErrors, GetJobDetailSystemJobsJobIdGetResponses, GetJobsCountSystemJobsCountGetData, GetJobsCountSystemJobsCountGetResponses, GetManifestRestoresManifestGetData, GetManifestRestoresManifestGetResponses, GetScanStatusSystemScanStatusGetData, GetScanStatusSystemScanStatusGetResponses, GetSettingsSystemSettingsGetData, GetSettingsSystemSettingsGetResponses, GetTreeSystemTreeGetData, GetTreeSystemTreeGetErrors, GetTreeSystemTreeGetResponses, HealthCheckHealthGetData, HealthCheckHealthGetResponses, IgnoreHardwareSystemHardwareIgnorePostData, IgnoreHardwareSystemHardwareIgnorePostErrors, IgnoreHardwareSystemHardwareIgnorePostResponses, ImportDatabaseSystemDatabaseImportPostData, ImportDatabaseSystemDatabaseImportPostErrors, ImportDatabaseSystemDatabaseImportPostResponses, InitializeMediaInventoryMediaMediaIdInitializePostData, InitializeMediaInventoryMediaMediaIdInitializePostErrors, InitializeMediaInventoryMediaMediaIdInitializePostResponses, ListBackupsBackupsGetData, ListBackupsBackupsGetResponses, ListCartRestoresCartGetData, ListCartRestoresCartGetResponses, ListHostDirectoriesSystemLsGetData, ListHostDirectoriesSystemLsGetErrors, ListHostDirectoriesSystemLsGetResponses, ListInventoryInventoryGetData, ListInventoryInventoryGetResponses, ListJobsSystemJobsGetData, ListJobsSystemJobsGetErrors, ListJobsSystemJobsGetResponses, ListMediaInventoryMediaGetData, ListMediaInventoryMediaGetResponses, RegisterMediaInventoryMediaPostData, RegisterMediaInventoryMediaPostErrors, RegisterMediaInventoryMediaPostResponses, RemoveFromCartRestoresCartItemIdDeleteData, RemoveFromCartRestoresCartItemIdDeleteErrors, RemoveFromCartRestoresCartItemIdDeleteResponses, ReorderMediaInventoryMediaReorderPostData, ReorderMediaInventoryMediaReorderPostErrors, ReorderMediaInventoryMediaReorderPostResponses, SearchIndexInventorySearchGetData, SearchIndexInventorySearchGetErrors, SearchIndexInventorySearchGetResponses, SearchSystemSystemSearchGetData, SearchSystemSystemSearchGetErrors, SearchSystemSystemSearchGetResponses, StreamJobsSystemJobsStreamGetData, StreamJobsSystemJobsStreamGetResponses, TestNotificationSystemNotificationsTestPostData, TestNotificationSystemNotificationsTestPostErrors, TestNotificationSystemNotificationsTestPostResponses, TrackBatchSystemTrackBatchPostData, TrackBatchSystemTrackBatchPostErrors, TrackBatchSystemTrackBatchPostResponses, TriggerBackupBackupsTriggerMediaIdPostData, TriggerBackupBackupsTriggerMediaIdPostErrors, TriggerBackupBackupsTriggerMediaIdPostResponses, TriggerRestoreRestoresTriggerPostData, TriggerRestoreRestoresTriggerPostErrors, TriggerRestoreRestoresTriggerPostResponses, TriggerScanSystemScanPostData, TriggerScanSystemScanPostResponses, UpdateMediaInventoryMediaMediaIdPatchData, UpdateMediaInventoryMediaMediaIdPatchErrors, UpdateMediaInventoryMediaMediaIdPatchResponses, UpdateSettingSystemSettingsPostData, UpdateSettingSystemSettingsPostErrors, UpdateSettingSystemSettingsPostResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -27,6 +27,16 @@ export const getDashboardStatsSystemDashboardStatsGet = <ThrowOnError extends bo
  * List Jobs
  */
 export const listJobsSystemJobsGet = <ThrowOnError extends boolean = false>(options?: Options<ListJobsSystemJobsGetData, ThrowOnError>) => (options?.client ?? client).get<ListJobsSystemJobsGetResponses, ListJobsSystemJobsGetErrors, ThrowOnError>({ url: '/system/jobs', ...options });
+
+/**
+ * Get Jobs Count
+ */
+export const getJobsCountSystemJobsCountGet = <ThrowOnError extends boolean = false>(options?: Options<GetJobsCountSystemJobsCountGetData, ThrowOnError>) => (options?.client ?? client).get<GetJobsCountSystemJobsCountGetResponses, unknown, ThrowOnError>({ url: '/system/jobs/count', ...options });
+
+/**
+ * Get Job Detail
+ */
+export const getJobDetailSystemJobsJobIdGet = <ThrowOnError extends boolean = false>(options: Options<GetJobDetailSystemJobsJobIdGetData, ThrowOnError>) => (options.client ?? client).get<GetJobDetailSystemJobsJobIdGetResponses, GetJobDetailSystemJobsJobIdGetErrors, ThrowOnError>({ url: '/system/jobs/{job_id}', ...options });
 
 /**
  * Cancel Job
@@ -92,6 +102,34 @@ export const updateSettingSystemSettingsPost = <ThrowOnError extends boolean = f
  */
 export const testNotificationSystemNotificationsTestPost = <ThrowOnError extends boolean = false>(options: Options<TestNotificationSystemNotificationsTestPostData, ThrowOnError>) => (options.client ?? client).post<TestNotificationSystemNotificationsTestPostResponses, TestNotificationSystemNotificationsTestPostErrors, ThrowOnError>({
     url: '/system/notifications/test',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Host Directories
+ *
+ * Lists subdirectories on the host system for path selection
+ */
+export const listHostDirectoriesSystemLsGet = <ThrowOnError extends boolean = false>(options?: Options<ListHostDirectoriesSystemLsGetData, ThrowOnError>) => (options?.client ?? client).get<ListHostDirectoriesSystemLsGetResponses, ListHostDirectoriesSystemLsGetErrors, ThrowOnError>({ url: '/system/ls', ...options });
+
+/**
+ * Discover Hardware
+ *
+ * Scans the host system for tape drives and mounted HDDs that are NOT yet in the inventory.
+ */
+export const discoverHardwareSystemHardwareDiscoverGet = <ThrowOnError extends boolean = false>(options?: Options<DiscoverHardwareSystemHardwareDiscoverGetData, ThrowOnError>) => (options?.client ?? client).get<DiscoverHardwareSystemHardwareDiscoverGetResponses, unknown, ThrowOnError>({ url: '/system/hardware/discover', ...options });
+
+/**
+ * Ignore Hardware
+ *
+ * Adds a hardware identifier or path to the ignore list
+ */
+export const ignoreHardwareSystemHardwareIgnorePost = <ThrowOnError extends boolean = false>(options: Options<IgnoreHardwareSystemHardwareIgnorePostData, ThrowOnError>) => (options.client ?? client).post<IgnoreHardwareSystemHardwareIgnorePostResponses, IgnoreHardwareSystemHardwareIgnorePostErrors, ThrowOnError>({
+    url: '/system/hardware/ignore',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -172,6 +210,13 @@ export const updateMediaInventoryMediaMediaIdPatch = <ThrowOnError extends boole
  * Initialize Media
  */
 export const initializeMediaInventoryMediaMediaIdInitializePost = <ThrowOnError extends boolean = false>(options: Options<InitializeMediaInventoryMediaMediaIdInitializePostData, ThrowOnError>) => (options.client ?? client).post<InitializeMediaInventoryMediaMediaIdInitializePostResponses, InitializeMediaInventoryMediaMediaIdInitializePostErrors, ThrowOnError>({ url: '/inventory/media/{media_id}/initialize', ...options });
+
+/**
+ * Get Filesystem Insights
+ *
+ * Computes high-signal filesystem metrics for modular reporting
+ */
+export const getFilesystemInsightsInventoryInsightsGet = <ThrowOnError extends boolean = false>(options?: Options<GetFilesystemInsightsInventoryInsightsGetData, ThrowOnError>) => (options?.client ?? client).get<GetFilesystemInsightsInventoryInsightsGetResponses, unknown, ThrowOnError>({ url: '/inventory/insights', ...options });
 
 /**
  * Browse Index

@@ -98,7 +98,7 @@
         });
 
         const virtualIndexRoot = $derived({
-                name: "Index Browser",
+                name: "Archive Index",
                 path: "ROOT",
                 expanded: true,
                 children: [],
@@ -106,7 +106,7 @@
         });
 
         const recoveryQueueRoot = $derived({
-                name: "Recovery Queue",
+                name: "Data Recovery",
                 path: "ROOT",
                 expanded: true,
                 children: [],
@@ -124,8 +124,8 @@
         const breadcrumbs = $derived.by(() => {
                 if (currentPath === "ROOT") {
                     let name = "All Sources";
-                    if (mode === "index") name = "Index Browser";
-                    if (mode === "cart") name = "Recovery Queue";
+                    if (mode === "index") name = "Archive Index";
+                    if (mode === "cart") name = "Data Recovery";
                     return [{ name, path: "ROOT" }];
                 }
 
@@ -133,8 +133,8 @@
                 const crumbs: Breadcrumb[] = [];
 
                 let rootName = "All Sources";
-                if (mode === "index") rootName = "Index Browser";
-                if (mode === "cart") rootName = "Recovery Queue";
+                if (mode === "index") rootName = "Archive Index";
+                if (mode === "cart") rootName = "Data Recovery";
                 crumbs.push({ name: rootName, path: "ROOT" });
 
                 let current = "";
