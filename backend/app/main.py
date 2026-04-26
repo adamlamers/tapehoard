@@ -52,8 +52,11 @@ app.include_router(backups.router)
 app.include_router(restores.router)
 
 # Mount frontend static files
-# We expect the 'build' directory to exist at the root level of the app
-static_path = "static"
+# In Docker, static is in /app/backend/static
+# In Dev, it might be in ./static (if run from backend/)
+base_dir = os.path.dirname(os.path.abspath(__file__))
+static_path = os.path.join(os.path.dirname(base_dir), "static")
+
 if os.path.exists(static_path):
     app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
 

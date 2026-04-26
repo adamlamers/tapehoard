@@ -475,6 +475,14 @@ export type ScanStatusSchema = {
      */
     files_hashed: number;
     /**
+     * Files New
+     */
+    files_new: number;
+    /**
+     * Files Modified
+     */
+    files_modified: number;
+    /**
      * Total Files Found
      */
     total_files_found: number;
@@ -482,6 +490,14 @@ export type ScanStatusSchema = {
      * Current Path
      */
     current_path: string;
+    /**
+     * Is Throttled
+     */
+    is_throttled: boolean;
+    /**
+     * Hashing Speed
+     */
+    hashing_speed: string;
     /**
      * Last Run Time
      */
@@ -780,6 +796,20 @@ export type TriggerScanSystemScanPostData = {
 };
 
 export type TriggerScanSystemScanPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type TriggerIndexingSystemIndexHashPostData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/index/hash';
+};
+
+export type TriggerIndexingSystemIndexHashPostResponses = {
     /**
      * Successful Response
      */

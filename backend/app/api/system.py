@@ -72,8 +72,12 @@ class ScanStatusSchema(BaseModel):
     is_running: bool
     files_processed: int
     files_hashed: int
+    files_new: int
+    files_modified: int
     total_files_found: int
     current_path: str
+    is_throttled: bool
+    hashing_speed: str
     last_run_time: Optional[datetime] = None
 
 
@@ -286,14 +290,28 @@ def trigger_scan(background_tasks: BackgroundTasks, db: Session = Depends(get_db
     return {"message": "Scan started", "job_id": job.id}
 
 
+@router.post("/index/hash")
+def trigger_indexing(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Manually triggers hashing for all un-indexed files in the fleet"""
+    if scanner_manager.is_hashing:
+        raise HTTPException(status_code=400, detail="Hashing job already in progress")
+
+    background_tasks.add_task(scanner_manager.run_hashing)
+    return {"message": "Background hashing task initiated"}
+
+
 @router.get("/scan/status", response_model=ScanStatusSchema)
 def get_scan_status():
     return ScanStatusSchema(
         is_running=scanner_manager.is_running,
         files_processed=scanner_manager.files_processed,
         files_hashed=scanner_manager.files_hashed,
+        files_new=scanner_manager.files_new,
+        files_modified=scanner_manager.files_modified,
         total_files_found=scanner_manager.total_files_found,
         current_path=scanner_manager.current_path,
+        is_throttled=scanner_manager.is_throttled,
+        hashing_speed=scanner_manager._format_speed(),
         last_run_time=scanner_manager.last_run_time,
     )
 

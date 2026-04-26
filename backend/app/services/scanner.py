@@ -2,16 +2,14 @@ import os
 import hashlib
 import time
 import psutil
+import threading
+import concurrent.futures
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple, Any, cast
+from typing import Dict, List, Optional, Tuple, Any
 from loguru import logger
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from app.db import models
 from app.db.database import SessionLocal
-import concurrent.futures
-import pathspec
-import json
 
 
 class JobManager:
@@ -91,13 +89,11 @@ class JobManager:
         db = SessionLocal()
         try:
             job = db.get(models.Job, job_id)
-            if (
+            return bool(
                 job
                 and job.status == "FAILED"
                 and job.error_message == "Cancelled by user"
-            ):
-                return True
-            return False
+            )
         finally:
             db.close()
 
@@ -105,208 +101,199 @@ class JobManager:
 class ScannerService:
     def __init__(self):
         self.is_running = False
+        self.is_hashing = False
         self.last_run_time: Optional[datetime] = None
+
+        # Metrics
         self.files_processed = 0
         self.files_hashed = 0
+        self.files_new = 0
+        self.files_modified = 0
         self.total_files_found = 0
+        self.bytes_hashed = 0
+        self.start_time = 0.0
+        self.is_throttled = False
         self.current_path = ""
+        self._lock = threading.Lock()
+        self._current_iowait = 0.0
 
-    def _set_low_priority(self):
-        """Sets the current process to a background/low-I/O priority"""
+        # Stalling Tracker
+        self._last_block_time = time.time()
+        self._active_hashes: Dict[int, str] = {}  # thread_id -> current_file
+
+        # Throttle Monitor
+        self._throttle_thread = threading.Thread(
+            target=self._monitor_iowait, daemon=True
+        )
+        self._throttle_thread.start()
+
+    def _monitor_iowait(self):
+        """Background thread to poll system pressure once per second (Efficient)"""
+        while True:
+            try:
+                cpu_times = psutil.cpu_times_percent(interval=1)
+                iowait = getattr(cpu_times, "iowait", 0.0)
+                with self._lock:
+                    self.is_throttled = iowait > 5.0
+                    self._current_iowait = iowait
+            except Exception:
+                time.sleep(1)
+
+    def _set_priority(self, level: str = "normal"):
+        """Sets the current process priority. 'normal' or 'background'"""
         try:
-            # CPU Niceness
-            os.nice(19)
-
-            # I/O Niceness (Linux only)
-            if hasattr(psutil.Process(), "ionice"):
-                p = psutil.Process()
-                # IOPRIO_CLASS_IDLE is 3. It only gets I/O when nothing else wants it.
-                # If that's too slow, we can use IOPRIO_CLASS_BE (2) with priority 7.
-                p.ionice(psutil.IOPRIO_CLASS_IDLE)
-                logger.info("Scanner process set to IDLE I/O priority")
-        except Exception as e:
-            logger.debug(f"Priority adjustment restricted: {e}")
-
-    def _check_iowait_throttle(self):
-        """Dynamic sleep if system iowait is high"""
-        try:
-            # Check system-wide CPU times
-            # iowait is index 4 on Linux, 0 elsewhere
-            cpu_times = psutil.cpu_times_percent(interval=None)
-            iowait = getattr(cpu_times, "iowait", 0.0)
-
-            if iowait > 15.0:
-                # Heavy contention detected! Back off.
-                time.sleep(0.5)
-            elif iowait > 5.0:
-                # Moderate contention. Micro-sleep.
-                time.sleep(0.05)
+            if level == "background":
+                os.nice(19)
+                if hasattr(psutil.Process(), "ionice"):
+                    psutil.Process().ionice(psutil.IOPRIO_CLASS_IDLE)
+            else:
+                os.nice(0)
+                if hasattr(psutil.Process(), "ionice"):
+                    psutil.Process().ionice(psutil.IOPRIO_CLASS_BE, value=4)
         except Exception:
             pass
 
     def compute_sha256(self, file_path: str, job_id: Optional[int] = None) -> str:
         sha256_hash = hashlib.sha256()
+        thread_id = threading.get_ident()
+
         try:
             with open(file_path, "rb") as f:
+                with self._lock:
+                    self._active_hashes[thread_id] = file_path
+
                 for byte_block in iter(lambda: f.read(1048576), b""):
                     if job_id is not None and JobManager.is_cancelled(job_id):
                         return ""
 
-                    # Apply dynamic throttling based on system pressure
-                    self._check_iowait_throttle()
+                    # Efficient throttle check
+                    if self.is_throttled:
+                        delay = 0.05 if self._current_iowait < 15.0 else 0.2
+                        time.sleep(delay)
 
                     sha256_hash.update(byte_block)
+
+                    with self._lock:
+                        self.bytes_hashed += len(byte_block)
+                        self._last_block_time = time.time()  # Pulse!
+
             return sha256_hash.hexdigest()
         except Exception as e:
             logger.error(f"Failed to hash {file_path}: {e}")
             return ""
+        finally:
+            with self._lock:
+                if thread_id in self._active_hashes:
+                    del self._active_hashes[thread_id]
 
-    def _get_exclusion_spec(self, db: Session) -> Optional[pathspec.PathSpec]:
-        setting = (
-            db.query(models.SystemSetting)
-            .filter(models.SystemSetting.key == "global_exclusions")
-            .first()
-        )
-        if not setting or not setting.value.strip():
-            return None
-        patterns = [p.strip() for p in setting.value.splitlines() if p.strip()]
-        return pathspec.PathSpec.from_lines("gitwildmatch", patterns)
-
-    def _get_source_roots(self, db: Session) -> List[str]:
-        setting = (
-            db.query(models.SystemSetting)
-            .filter(models.SystemSetting.key == "source_roots")
-            .first()
-        )
-        if setting:
-            try:
-                val = json.loads(setting.value)
-                if isinstance(val, list):
-                    return [str(v) for v in val]
-                return [str(val)]
-            except Exception:
-                return [str(setting.value)]
-        return ["/source_data"]
+    def _format_speed(self) -> str:
+        elapsed = time.time() - self.start_time
+        if elapsed <= 0:
+            return "0 B/s"
+        speed = self.bytes_hashed / elapsed
+        for unit in ["B/s", "KB/s", "MB/s", "GB/s"]:
+            if speed < 1024:
+                return f"{speed:.1f} {unit}"
+            speed /= 1024
+        return f"{speed:.1f} TB/s"
 
     def scan_sources(self, db: Session, job_id: Optional[int] = None):
+        """Metadata Discovery - Runs at Normal Priority"""
         if self.is_running:
-            logger.warning("Scan already in progress")
             return
-
         self.is_running = True
         self.files_processed = 0
-        self.files_hashed = 0
+        self.files_new = 0
+        self.files_modified = 0
         self.total_files_found = 0
-
-        # Be a polite citizen
-        self._set_low_priority()
+        self.current_path = ""
+        self._set_priority("normal")
 
         if job_id is not None:
             JobManager.start_job(job_id)
 
         try:
-            spec = self._get_exclusion_spec(db)
-            roots = self._get_source_roots(db)
+            from app.api.system import get_exclusion_spec, get_source_roots
+
+            spec = get_exclusion_spec(db)
+            roots = get_source_roots(db)
             tracking_rules = db.query(models.TrackedSource).all()
+            tracking_map = {s.path: s.action for s in tracking_rules}
 
-            raw_include: List[str] = [
-                r.path for r in tracking_rules if r.action == "include"
-            ]
-            raw_exclude: List[str] = [
-                r.path for r in tracking_rules if r.action == "exclude"
-            ]
-            include_rules = cast(List[str], sorted(raw_include, key=len, reverse=True))
-            exclude_rules = cast(List[str], sorted(raw_exclude, key=len, reverse=True))
-
-            def get_tracking_status(path: str) -> Tuple[bool, bool]:
+            def get_status(path: str) -> Tuple[bool, bool]:
                 is_ignored = False
                 if spec and spec.match_file(path):
                     is_ignored = True
-                for ex in exclude_rules:
-                    if path == ex or path.startswith(ex + "/"):
-                        for inc in include_rules:
-                            if len(inc) > len(ex) and (
-                                path == inc or path.startswith(inc + "/")
-                            ):
-                                return True, is_ignored
-                        return False, is_ignored
-                for inc in include_rules:
-                    if path == inc or path.startswith(inc + "/"):
-                        return True, is_ignored
-                return not is_ignored, is_ignored
+                applicable = []
+                for r_path, action in tracking_map.items():
+                    if path == r_path or path.startswith(r_path + "/"):
+                        applicable.append((len(r_path), action))
+                if not applicable:
+                    return not is_ignored, is_ignored
+                applicable.sort(key=lambda x: x[0], reverse=True)
+                return applicable[0][1] == "include", is_ignored
 
-            # --- Discovery Pass ---
-            BATCH_SIZE = 1000
-            pending_batch: List[Dict[str, Any]] = []
             now = datetime.now(timezone.utc)
+            BATCH_SIZE = 1000
+            pending: List[Dict[str, Any]] = []
 
-            # Maximize thread pool for local SSD hashing
-            workers = os.cpu_count() or 4
-            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-                for root_path in roots:
+            # Wake up hashing engine immediately
+            threading.Thread(target=self.run_hashing).start()
+
+            for root_path in roots:
+                if job_id is not None and JobManager.is_cancelled(job_id):
+                    break
+                if not os.path.exists(root_path):
+                    continue
+
+                for root_dir, dirs, files in os.walk(root_path):
                     if job_id is not None and JobManager.is_cancelled(job_id):
                         break
-                    if not os.path.exists(root_path):
-                        continue
+                    if spec:
+                        for d in list(dirs):
+                            if spec.match_file(os.path.join(root_dir, d) + "/"):
+                                dirs.remove(d)
 
-                    for root_dir, dirs, files in os.walk(root_path):
-                        if job_id is not None and JobManager.is_cancelled(job_id):
-                            break
-
-                        if spec:
-                            original_dirs = list(dirs)
-                            for d in original_dirs:
-                                if spec.match_file(os.path.join(root_dir, d) + "/"):
-                                    dirs.remove(d)
-
-                        for file in files:
-                            if job_id is not None and JobManager.is_cancelled(job_id):
-                                break
-                            full_path = os.path.join(root_dir, file)
+                    for file in files:
+                        full_path = os.path.join(root_dir, file)
+                        with self._lock:
                             self.total_files_found += 1
+                            self.current_path = root_dir
 
-                            try:
-                                stats = os.stat(full_path)
-                                tracked, ignored = get_tracking_status(full_path)
-                                pending_batch.append(
-                                    {
-                                        "path": full_path,
-                                        "size": stats.st_size,
-                                        "mtime": stats.st_mtime,
-                                        "tracked": tracked,
-                                        "ignored": ignored,
-                                    }
+                        try:
+                            st = os.stat(full_path)
+                            tracked, ignored = get_status(full_path)
+                            pending.append(
+                                {
+                                    "path": full_path,
+                                    "size": st.st_size,
+                                    "mtime": st.st_mtime,
+                                    "tracked": tracked,
+                                    "ignored": ignored,
+                                }
+                            )
+                        except Exception:
+                            continue
+
+                        if len(pending) >= BATCH_SIZE:
+                            self._sync_metadata_batch(db, pending, now)
+                            db.commit()
+                            pending = []
+                            if job_id is not None:
+                                JobManager.update_job(
+                                    job_id,
+                                    10.0,
+                                    f"Discovered {self.total_files_found} items...",
                                 )
-                            except Exception:
-                                continue
 
-                            if len(pending_batch) >= BATCH_SIZE:
-                                self._process_and_sync_batch(
-                                    db, pending_batch, executor, now, job_id
-                                )
-                                pending_batch = []
-                                if job_id is not None:
-                                    JobManager.update_job(
-                                        job_id,
-                                        5.0,
-                                        f"Indexing: {self.total_files_found} items discovered...",
-                                    )
-
-                if pending_batch:
-                    self._process_and_sync_batch(
-                        db, pending_batch, executor, now, job_id
-                    )
+            if pending:
+                self._sync_metadata_batch(db, pending, now)
+                db.commit()
+            db.commit()
 
             if job_id is not None and not JobManager.is_cancelled(job_id):
-                db.commit()
                 JobManager.complete_job(job_id)
-                from app.services.notifications import notification_manager
-
-                notification_manager.notify(
-                    "Scan Completed",
-                    f"Archive Command finished. {self.files_processed} items processed.",
-                    "success",
-                )
+                self.last_run_time = now
 
         except Exception as e:
             logger.exception(f"Scan failed: {e}")
@@ -316,10 +303,7 @@ class ScannerService:
         finally:
             self.is_running = False
 
-    def _process_and_sync_batch(
-        self, db: Session, batch: List[Dict[str, Any]], executor, now, job_id
-    ):
-        """Processes a batch: Consolidates all DB writes into the main thread's session"""
+    def _sync_metadata_batch(self, db: Session, batch: List[Dict[str, Any]], now):
         paths = [f["path"] for f in batch]
         existing = {
             r.file_path: r
@@ -327,92 +311,120 @@ class ScannerService:
             .filter(models.FilesystemState.file_path.in_(paths))
             .all()
         }
-
-        hashing_tasks = []
-
         for f in batch:
             ext = existing.get(f["path"])
-            is_new = ext is None
-            changed = (
-                not ext
-                or ext.size != f["size"]
-                or ext.mtime != f["mtime"]
-                or ext.is_ignored != f["ignored"]
-            )
-
-            # If it's a new file or changed, and we are tracking it, hash it!
-            if (
-                f["tracked"]
-                and not f["ignored"]
-                and (is_new or changed or not ext.sha256_hash)
-            ):
-                hashing_tasks.append(
-                    executor.submit(self._hash_worker, f, is_new, job_id)
-                )
-            elif changed or is_new:
-                # Metadata only sync
-                if is_new:
-                    db.add(
-                        models.FilesystemState(
-                            file_path=f["path"],
-                            size=f["size"],
-                            mtime=f["mtime"],
-                            is_ignored=f["ignored"],
-                            last_seen_timestamp=now,
-                            is_indexed=False,
-                        )
+            if not ext:
+                with self._lock:
+                    self.files_new += 1
+                db.add(
+                    models.FilesystemState(
+                        file_path=f["path"],
+                        size=f["size"],
+                        mtime=f["mtime"],
+                        is_ignored=f["ignored"],
+                        last_seen_timestamp=now,
+                        is_indexed=False,
                     )
-                else:
-                    ext.size = f["size"]
-                    ext.mtime = f["mtime"]
-                    ext.is_ignored = f["ignored"]
-                    ext.last_seen_timestamp = now
+                )
+            else:
+                if ext.size != f["size"] or ext.mtime != f["mtime"]:
+                    ext.is_indexed = False
+                if ext.size != f["size"] or ext.mtime != f["mtime"]:
+                    with self._lock:
+                        self.files_modified += 1
+                ext.size = f["size"]
+                ext.mtime = f["mtime"]
+                ext.is_ignored = f["ignored"]
+                ext.last_seen_timestamp = now
 
-            self.files_processed += 1
+            with self._lock:
+                self.files_processed += 1
 
-        db.flush()  # Send changes to SQLite buffer without final commit yet
+    def run_hashing(self):
+        """Content Hashing Engine - Low Priority Background Worker"""
+        if self.is_hashing:
+            return
+        with self._lock:
+            self.is_hashing = True
 
-        # Drain hashing results and write to DB using the main thread's session
-        if hashing_tasks:
-            for future in concurrent.futures.as_completed(hashing_tasks):
-                res = future.result()
-                if res:
-                    f_path, f_hash, f_meta, f_is_new = res
-                    if f_is_new:
-                        db.add(
-                            models.FilesystemState(
-                                file_path=f_path,
-                                size=f_meta["size"],
-                                mtime=f_meta["mtime"],
-                                sha256_hash=f_hash,
-                                is_indexed=True,
-                                is_ignored=f_meta["ignored"],
-                                last_seen_timestamp=now,
-                            )
-                        )
-                    else:
-                        # Find object in the session cache if possible, or update by path
-                        obj = existing.get(f_path)
-                        if obj:
-                            obj.sha256_hash = f_hash
-                            obj.is_indexed = True
-                            obj.last_seen_timestamp = now
-                        else:
-                            db.execute(
-                                text(
-                                    "UPDATE filesystem_state SET sha256_hash = :h, is_indexed = 1, last_seen_timestamp = :t WHERE file_path = :p"
-                                ),
-                                {"h": f_hash, "t": now, "p": f_path},
-                            )
+        self._set_priority("background")
+        db = SessionLocal()
+        job = JobManager.create_job(db, "HASH")
+        JobManager.start_job(job.id)
 
-        db.commit()  # Single atomic commit per batch
+        self.start_time = time.time()
+        self.bytes_hashed = 0
+        self.files_hashed = 0
 
-    def _hash_worker(self, f_meta, is_new, job_id):
-        """Pure worker: No database access here, just heavy CPU hashing"""
-        h = self.compute_sha256(f_meta["path"], job_id)
-        if not h:
-            return None
-        return f_meta["path"], h, f_meta, is_new
+        try:
+            while True:
+                targets = (
+                    db.query(models.FilesystemState)
+                    .filter(
+                        models.FilesystemState.is_indexed.is_(False),
+                        models.FilesystemState.is_ignored.is_(False),
+                    )
+                    .limit(100)
+                    .all()
+                )
+
+                if not targets:
+                    # If discovery is still running, wait for more metadata to hit the DB
+                    if self.is_running:
+                        time.sleep(2)
+                        continue
+                    break
+
+                if JobManager.is_cancelled(job.id):
+                    break
+
+                workers = os.cpu_count() or 4
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=workers
+                ) as executor:
+                    futures = {
+                        executor.submit(self.compute_sha256, t.file_path, job.id): t
+                        for t in targets
+                    }
+                    for future in concurrent.futures.as_completed(futures):
+                        t = futures[future]
+                        h = future.result()
+                        if h:
+                            t.sha256_hash = h
+                            t.is_indexed = True
+                            self.files_hashed += 1
+
+                        if self.files_hashed % 5 == 0:
+                            # RICH HEARTBEAT STATUS
+                            with self._lock:
+                                stall_time = time.time() - self._last_block_time
+                                is_stalled = stall_time > 60.0
+
+                                active_files = list(self._active_hashes.values())
+                                first_active = (
+                                    active_files[0].split("/")[-1]
+                                    if active_files
+                                    else "Waiting..."
+                                )
+
+                                status = f"Hashing: {self.files_hashed} objs [{self._format_speed()}] | Active: {first_active}"
+                                if is_stalled:
+                                    status = (
+                                        f"⚠️ STALLED ({int(stall_time)}s) | {status}"
+                                    )
+                                elif self.is_throttled:
+                                    status += " (THROTTLED)"
+
+                            JobManager.update_job(job.id, 50.0, status)
+                db.commit()
+
+            JobManager.complete_job(job.id)
+        except Exception as e:
+            logger.error(f"Hashing job failed: {e}")
+            JobManager.fail_job(job.id, str(e))
+        finally:
+            self.is_hashing = False
+            db.close()
 
 
 scanner_manager = ScannerService()

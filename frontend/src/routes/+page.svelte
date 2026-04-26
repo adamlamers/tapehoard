@@ -18,13 +18,15 @@
     } from 'lucide-svelte';
     import { Card } from '$lib/components/ui/card';
     import { Button } from '$lib/components/ui/button';
-    import { getDashboardStatsSystemDashboardStatsGet, triggerScanSystemScanPost, type DashboardStatsSchema } from '$lib/api';
+    import { getDashboardStatsSystemDashboardStatsGet, triggerScanSystemScanPost, triggerIndexingSystemIndexHashPost, type DashboardStatsSchema } from '$lib/api';
     import { cn, formatLocalDate, formatLocalTime } from '$lib/utils';
     import { toast } from 'svelte-sonner';
+    import { Zap } from 'lucide-svelte';
 
     let stats = $state<DashboardStatsSchema | null>(null);
     let loading = $state(true);
     let scanning = $state(false);
+    let indexing = $state(false);
 
     async function loadStats() {
         loading = true;
@@ -37,6 +39,18 @@
             console.error("Failed to load dashboard stats:", error);
         } finally {
             loading = false;
+        }
+    }
+
+    async function startIndexing() {
+        indexing = true;
+        try {
+            await triggerIndexingSystemIndexHashPost();
+            toast.success("Background indexing job initiated");
+        } catch (error: any) {
+            toast.error(error.body?.detail || "Failed to start indexing");
+        } finally {
+            indexing = false;
         }
     }
 
@@ -104,6 +118,13 @@
         <div class="flex gap-3 z-10">
             <Button variant="outline" class="h-10 px-6 font-black uppercase tracking-widest text-[10px] border-border-color" onclick={loadStats}>
                 <RotateCw size={14} class={cn("mr-2", loading && "animate-spin")} /> Refresh
+            </Button>
+            <Button variant="outline" class="h-10 px-6 font-black uppercase tracking-widest text-[10px] border-action-color/30 text-action-color hover:bg-action-color/5" onclick={startIndexing} disabled={indexing}>
+                {#if indexing}
+                    <RotateCw size={14} class="mr-2 animate-spin" /> Starting...
+                {:else}
+                    <Zap size={14} class="mr-2" /> Index Fleet
+                {/if}
             </Button>
             <Button variant="default" class="h-10 px-6 font-black uppercase tracking-widest text-[10px]" onclick={startScan} disabled={scanning}>
                 {#if scanning}

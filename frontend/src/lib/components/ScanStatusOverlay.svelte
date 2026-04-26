@@ -51,25 +51,39 @@
                 <div class="flex-1">
                     <div class="flex justify-between items-center mb-1">
                         <span class="text-xs font-black uppercase tracking-widest text-text-primary">System Scanner Active</span>
-                        <span class="text-sm font-black mono text-blue-400">INDEXING</span>
+                        <div class="flex items-center gap-2">
+                            {#if scanStatus.is_throttled}
+                                <span class="text-[9px] font-black bg-orange-500/10 text-orange-500 px-2 py-0.5 rounded border border-orange-500/20 animate-pulse">THROTTLED</span>
+                            {/if}
+                            <span class="text-sm font-black mono text-blue-400">{scanStatus.hashing_speed}</span>
+                        </div>
                     </div>
                     <div class="flex items-center gap-2">
                         <div class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-                        <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-text-secondary opacity-60">Optimizing Unified Index</p>
+                        <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-text-secondary opacity-60">
+                            New: {scanStatus.files_new} &bull; Mod: {scanStatus.files_modified}
+                        </p>
                     </div>
                 </div>
             </div>
 
             <div class="space-y-4">
-                <div class="flex flex-col gap-2">
+                <div class="flex flex-col gap-3">
                     <div class="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-text-secondary">
                         <span class="flex items-center gap-2">
                             <Activity size={12} class="opacity-50" />
-                            Progress
+                            Indexing Fleet
                         </span>
                         <span class="mono text-text-primary">
-                            {scanStatus.files_processed.toLocaleString()} ITEMS SCANNED
+                            {scanStatus.files_processed.toLocaleString()} / {scanStatus.total_files_found.toLocaleString()}
                         </span>
+                    </div>
+
+                    <div class="w-full bg-bg-primary h-1.5 rounded-full border border-white/5 overflow-hidden">
+                        <div
+                            class="bg-blue-500 h-full transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.4)]"
+                            style="width: {scanProgress}%"
+                        ></div>
                     </div>
 
                     <div class="bg-bg-primary/80 px-4 py-2.5 rounded-lg border border-white/5 shadow-inner">
