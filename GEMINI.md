@@ -30,6 +30,8 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
     *   `just format`: Auto-formats code with Ruff.
 
 ## 2. Code Quality & Pre-commit
+*   **PEP 8 Compliance:** All Python code must strictly adhere to PEP 8 standards. Use explicit, idiomatic language features.
+*   **Descriptive Naming:** Always use very descriptive variable and function names. Avoid abbreviations whenever possible to maintain high readability.
 *   All code must pass `pre-commit` hooks. If you generate a new file or modify an existing one, ensure it complies with `ruff` and `ruff-format`.
 *   You can manually format your changes by running `just format`.
 

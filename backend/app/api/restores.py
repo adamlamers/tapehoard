@@ -1,30 +1,52 @@
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import List, Optional
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
 from app.db.database import get_db, SessionLocal
 from app.db import models
-from datetime import datetime, timezone
 from app.services.archiver import archiver_manager
 from app.services.scanner import JobManager
+from loguru import logger
 
 router = APIRouter(prefix="/restores", tags=["Restores"])
 
-# --- Schemas ---
+
+# --- Request/Response Schemas ---
 
 
 class CartItemSchema(BaseModel):
     id: int
     file_path: str
     size: int
-    media_identifiers: List[str]
+    type: str
 
     class Config:
         from_attributes = True
 
 
-class ManifestMediaRequirement(BaseModel):
+class RestoreTriggerRequest(BaseModel):
+    destination_path: str
+
+
+class CartFileItemSchema(BaseModel):
+    name: str
+    path: str
+    type: str
+    size: Optional[int] = None
+    mtime: Optional[float] = None
+    vulnerable: bool = False
+    selected: bool = False
+    indeterminate: bool = False
+
+
+class CartTreeNodeSchema(BaseModel):
+    name: str
+    path: str
+    has_children: bool = False
+
+
+class ManifestMediaSchema(BaseModel):
     identifier: str
     media_type: str
     file_count: int
@@ -34,292 +56,111 @@ class ManifestMediaRequirement(BaseModel):
 class RestoreManifestSchema(BaseModel):
     total_files: int
     total_size: int
-    media_required: List[ManifestMediaRequirement]
-
-
-class RestoreRequest(BaseModel):
-    destination: str
+    media_required: List[ManifestMediaSchema]
 
 
 class DirectoryCartRequest(BaseModel):
     path: str
 
 
-class CartFileItemSchema(BaseModel):
-    name: str
-    path: str
-    type: str
-    size: Optional[int] = None
-    media: List[str] = []
-
-
-class CartTreeNodeSchema(BaseModel):
-    name: str
-    path: str
-    has_children: bool = False
-
-
 # --- Endpoints ---
 
 
-@router.post("/trigger")
-def trigger_restore(
-    req: RestoreRequest,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-):
-    cart_items = db.query(models.RestoreCart).all()
-    if not cart_items:
-        raise HTTPException(status_code=400, detail="Recovery queue is empty")
-
-    job = JobManager.create_job(db, "RESTORE")
-
-    def run_restore_task():
-        db_inner = SessionLocal()
-        try:
-            archiver_manager.run_restore(
-                db_inner, destination=req.destination, job_id=job.id
-            )
-        finally:
-            db_inner.close()
-
-    background_tasks.add_task(run_restore_task)
-    return {"message": "Restore job initiated", "job_id": job.id}
-
-
-@router.get("/cart/browse", response_model=List[CartFileItemSchema])
-def browse_cart(path: Optional[str] = None, db: Session = Depends(get_db)):
-    from app.api.inventory import get_source_roots
-
-    roots = get_source_roots(db)
-
-    if path is None or path == "ROOT":
-        results = []
-        for root in roots:
-            # Check if any file in the cart is under this root
-            prefix = root if root.endswith("/") else root + "/"
-            sql = text("""
-                SELECT EXISTS (
-                    SELECT 1 FROM filesystem_state fs
-                    JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
-                    WHERE fs.file_path LIKE :prefix
-                )
-            """)
-            if db.execute(sql, {"prefix": f"{prefix}%"}).scalar():
-                results.append(
-                    CartFileItemSchema(name=root, path=root, type="directory")
-                )
-        return results
-
-    prefix = path if path.endswith("/") else path + "/"
-    results = []
-
-    # Subdirectories in cart
-    subdir_sql = text("""
-        SELECT DISTINCT SUBSTR(fs.file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(fs.file_path, LENGTH(:prefix) + 1), '/') - 1) as dirname
-        FROM filesystem_state fs
-        JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
-        WHERE fs.file_path LIKE :search_prefix
-        AND SUBSTR(fs.file_path, LENGTH(:prefix) + 1) LIKE '%/%'
-    """)
-    subdirs = db.execute(
-        subdir_sql, {"prefix": prefix, "search_prefix": f"{prefix}%"}
-    ).fetchall()
-    for sd in subdirs:
-        if sd[0]:
-            results.append(
-                CartFileItemSchema(name=sd[0], path=prefix + sd[0], type="directory")
-            )
-
-    # Files in cart
-    file_sql = text("""
-        SELECT fs.file_path, fs.size, fs.id, GROUP_CONCAT(sm.identifier) as media_list
-        FROM filesystem_state fs
-        JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
-        JOIN file_versions fv ON fv.filesystem_state_id = fs.id
-        JOIN storage_media sm ON sm.id = fv.media_id
-        WHERE fs.file_path LIKE :search_prefix
-        AND SUBSTR(fs.file_path, LENGTH(:prefix) + 1) NOT LIKE '%/%'
-        GROUP BY fs.id
-    """)
-    files = db.execute(
-        file_sql, {"prefix": prefix, "search_prefix": f"{prefix}%"}
-    ).fetchall()
-    for f in files:
-        results.append(
-            CartFileItemSchema(
-                name=f[0].split("/")[-1],
-                path=f[0],
-                type="file",
-                size=f[1],
-                media=f[3].split(",") if f[3] else [],
-            )
-        )
-
-    results.sort(key=lambda x: (x.type != "directory", x.name.lower()))
-    return results
-
-
-@router.get("/cart/tree", response_model=List[CartTreeNodeSchema])
-def get_cart_tree(path: Optional[str] = None, db: Session = Depends(get_db)):
-    from app.api.inventory import get_source_roots
-
-    roots = get_source_roots(db)
-
-    if path is None or path == "ROOT":
-        results = []
-        for root in roots:
-            prefix = root if root.endswith("/") else root + "/"
-            sql = text("""
-                SELECT EXISTS (
-                    SELECT 1 FROM filesystem_state fs
-                    JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
-                    WHERE fs.file_path LIKE :prefix
-                )
-            """)
-            if db.execute(sql, {"prefix": f"{prefix}%"}).scalar():
-                results.append(
-                    CartTreeNodeSchema(name=root, path=root, has_children=True)
-                )
-        return results
-
-    prefix = path if path.endswith("/") else path + "/"
-    subdir_sql = text("""
-        SELECT DISTINCT SUBSTR(fs.file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(fs.file_path, LENGTH(:prefix) + 1), '/') - 1) as dirname
-        FROM filesystem_state fs
-        JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
-        WHERE fs.file_path LIKE :search_prefix
-        AND SUBSTR(fs.file_path, LENGTH(:prefix) + 1) LIKE '%/%'
-    """)
-    subdirs = db.execute(
-        subdir_sql, {"prefix": prefix, "search_prefix": f"{prefix}%"}
-    ).fetchall()
-    results = [
-        CartTreeNodeSchema(name=sd[0], path=prefix + sd[0], has_children=True)
-        for sd in subdirs
-        if sd[0]
-    ]
-    results.sort(key=lambda x: x.name.lower())
-    return results
-
-
 @router.get("/cart", response_model=List[CartItemSchema])
-def list_cart(db: Session = Depends(get_db)):
-    # OPTIMIZED: Use joinedload to fetch all versions in a single query
-    items = (
-        db.query(models.RestoreCart)
-        .options(
-            joinedload(models.RestoreCart.file_state)
-            .joinedload(models.FilesystemState.versions)
-            .joinedload(models.FileVersion.media)
-        )
+def list_recovery_queue(db_session: Session = Depends(get_db)):
+    """Returns all items currently queued for data recovery."""
+    queue_items = (
+        db_session.query(models.RestoreCart)
+        .options(joinedload(models.RestoreCart.file_state))
         .all()
     )
-
-    results = []
-    for item in items:
-        media_ids = [v.media.identifier for v in item.file_state.versions]
-        results.append(
-            CartItemSchema(
-                id=item.id,
-                file_path=item.file_state.file_path,
-                size=item.file_state.size,
-                media_identifiers=media_ids,
-            )
+    return [
+        CartItemSchema(
+            id=item.id,
+            file_path=item.file_state.file_path,
+            size=item.file_state.size,
+            type="file",
         )
-    return results
-
-
-# NOTE: Static routes MUST come before parameterized ones like /cart/{file_id}
+        for item in queue_items
+    ]
 
 
 @router.post("/cart/clear")
-def clear_cart(db: Session = Depends(get_db)):
-    db.query(models.RestoreCart).delete(synchronize_session=False)
-    db.commit()
-    return {"message": "Recovery queue cleared"}
-
-
-@router.post("/cart/directory")
-def add_directory_to_cart(req: DirectoryCartRequest, db: Session = Depends(get_db)):
-    from loguru import logger
-
-    path = req.path
-    if path == "ROOT":
-        prefix_query = "%"
-        exact_path = "ROOT"
-    else:
-        prefix = path if path.endswith("/") else path + "/"
-        prefix_query = f"{prefix}%"
-        exact_path = path
-
-    logger.info(f"Adding directory to queue: {path} (prefix: {prefix_query})")
-
-    # Optimized SQL for lightning-fast bulk insert
-    # 1. Matches path prefix (using the new index)
-    # 2. Joins file_versions to ensure it's restorable
-    # 3. Left Joins restore_cart to skip already-queued items
-    insert_sql = text("""
-        INSERT INTO restore_cart (filesystem_state_id, created_at)
-        SELECT DISTINCT fs.id, :now
-        FROM filesystem_state fs
-        JOIN file_versions fv ON fv.filesystem_state_id = fs.id
-        LEFT JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
-        WHERE (fs.file_path = :path OR fs.file_path LIKE :prefix)
-        AND rc.id IS NULL
-    """)
-
-    db.execute(
-        insert_sql,
-        {
-            "path": exact_path,
-            "prefix": prefix_query,
-            "now": datetime.now(timezone.utc).isoformat(),
-        },
-    )
-
-    db.commit()
-
-    total_in_cart = db.query(models.RestoreCart).count()
-    logger.info(f"Directory add complete. Total in cart: {total_in_cart}")
-
-    return {"message": f"Added restorable items from {path} to recovery queue"}
+def clear_recovery_queue(db_session: Session = Depends(get_db)):
+    """Removes all items from the data recovery queue."""
+    db_session.query(models.RestoreCart).delete()
+    db_session.commit()
+    return {"message": "Recovery queue cleared."}
 
 
 @router.post("/cart/{file_id}")
-def add_to_cart(file_id: int, db: Session = Depends(get_db)):
-    existing = (
-        db.query(models.RestoreCart)
+def add_file_to_recovery_queue(file_id: int, db_session: Session = Depends(get_db)):
+    """Adds a specific file to the recovery queue if it has valid backups."""
+    existing_item = (
+        db_session.query(models.RestoreCart)
         .filter(models.RestoreCart.filesystem_state_id == file_id)
         .first()
     )
-    if existing:
-        return {"message": "Already in recovery queue"}
+    if existing_item:
+        return {"message": "Item already in queue."}
 
-    file_state = db.get(models.FilesystemState, file_id)
-    if not file_state or not file_state.versions:
-        raise HTTPException(status_code=400, detail="File has no backed up versions")
+    file_record = db_session.get(models.FilesystemState, file_id)
+    if not file_record or not file_record.versions:
+        raise HTTPException(
+            status_code=400,
+            detail="File has no backed up versions and cannot be recovered.",
+        )
 
-    new_item = models.RestoreCart(filesystem_state_id=file_id)
-    db.add(new_item)
-    db.commit()
-    return {"message": "Added to recovery queue"}
+    new_queue_item = models.RestoreCart(filesystem_state_id=file_id)
+    db_session.add(new_queue_item)
+    db_session.commit()
+    return {"message": "Added to recovery queue."}
 
 
 @router.delete("/cart/{item_id}")
-def remove_from_cart(item_id: int, db: Session = Depends(get_db)):
-    item = db.get(models.RestoreCart, item_id)
-    if item:
-        db.delete(item)
-        db.commit()
-    return {"message": "Removed from recovery queue"}
+def remove_from_recovery_queue(item_id: int, db_session: Session = Depends(get_db)):
+    """Removes a specific item from the data recovery queue."""
+    queue_item = db_session.get(models.RestoreCart, item_id)
+    if queue_item:
+        db_session.delete(queue_item)
+        db_session.commit()
+    return {"message": "Removed from recovery queue."}
+
+
+@router.post("/cart/directory")
+def add_directory_to_recovery_queue(
+    request_data: DirectoryCartRequest, db_session: Session = Depends(get_db)
+):
+    """Recursively adds all restorable files within a directory to the recovery queue."""
+    target_directory = request_data.path
+    if not target_directory.endswith("/"):
+        target_directory += "/"
+
+    # Efficient bulk insert: Find all indexed files under this path that have AT LEAST ONE version
+    # and ARE NOT already in the cart.
+    discovery_sql = text("""
+        INSERT INTO restore_cart (filesystem_state_id)
+        SELECT DISTINCT fs.id
+        FROM filesystem_state fs
+        JOIN file_versions fv ON fv.filesystem_state_id = fs.id
+        LEFT JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
+        WHERE fs.file_path LIKE :prefix
+        AND rc.id IS NULL
+    """)
+
+    db_session.execute(discovery_sql, {"prefix": f"{target_directory}%"})
+    db_session.commit()
+
+    total_in_queue = db_session.query(models.RestoreCart).count()
+    logger.info(f"Directory recovery queued. Total items: {total_in_queue}")
+
+    return {"message": f"Added restorable items from {target_directory} to queue."}
 
 
 @router.get("/manifest", response_model=RestoreManifestSchema)
-def get_manifest(db: Session = Depends(get_db)):
-    # OPTIMIZED: Use a single raw SQL query to calculate the entire manifest
-    # This completely avoids loading thousands of ORM objects into memory
-    sql = text("""
+def calculate_recovery_manifest(db_session: Session = Depends(get_db)):
+    """Generates an optimized physical media manifest for the current recovery queue."""
+    manifest_sql = text("""
         SELECT
             sm.identifier,
             sm.media_type,
@@ -329,32 +170,177 @@ def get_manifest(db: Session = Depends(get_db)):
         JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
         JOIN file_versions fv ON fv.filesystem_state_id = fs.id
         JOIN storage_media sm ON sm.id = fv.media_id
-        GROUP BY sm.id
+        WHERE fv.id = (
+            SELECT id FROM file_versions
+            WHERE filesystem_state_id = fs.id
+            ORDER BY created_at DESC LIMIT 1
+        )
+        GROUP BY sm.identifier, sm.media_type
     """)
 
-    rows = db.execute(sql).fetchall()
-
-    requirements = []
-    total_size = 0
-
-    # We also need the total unique files in the cart (a file might be on multiple media)
-    total_unique_files = db.query(models.RestoreCart).count()
-
-    for row in rows:
-        requirements.append(
-            ManifestMediaRequirement(
-                identifier=row[0],
-                media_type=row[1],
-                file_count=row[2],
-                total_size=row[3],
-            )
+    manifest_rows = db_session.execute(manifest_sql).fetchall()
+    media_requirements = [
+        ManifestMediaSchema(
+            identifier=row[0], media_type=row[1], file_count=row[2], total_size=row[3]
         )
-        total_size += row[3]
+        for row in manifest_rows
+    ]
 
-    requirements.sort(key=lambda x: x.identifier)
+    total_count = sum(media.file_count for media in media_requirements)
+    total_bytes = sum(media.total_size for media in media_requirements)
 
     return RestoreManifestSchema(
-        total_files=total_unique_files,
-        total_size=total_size,
-        media_required=requirements,
+        total_files=total_count,
+        total_size=total_bytes,
+        media_required=media_requirements,
     )
+
+
+@router.post("/trigger")
+def trigger_recovery_job(
+    request_data: RestoreTriggerRequest,
+    background_tasks: BackgroundTasks,
+    db_session: Session = Depends(get_db),
+):
+    """Initiates the background physical recovery process to the specified destination."""
+    destination_root = request_data.destination_path
+
+    # Pre-validation of queue
+    queue_count = db_session.query(models.RestoreCart).count()
+    if queue_count == 0:
+        raise HTTPException(status_code=400, detail="Recovery queue is empty.")
+
+    job_record = JobManager.create_job(db_session, "RESTORE")
+
+    def run_recovery_task():
+        with SessionLocal() as db_inner:
+            archiver_manager.run_restore(db_inner, destination_root, job_record.id)
+
+    background_tasks.add_task(run_recovery_task)
+    return {"message": "Recovery job initiated.", "job_id": job_record.id}
+
+
+@router.get("/cart/browse", response_model=List[CartFileItemSchema])
+def browse_recovery_queue_virtual_fs(
+    path: Optional[str] = None, db_session: Session = Depends(get_db)
+):
+    """Provides a virtual browsable view of the recovery queue."""
+    from app.api.system import get_source_roots
+
+    source_roots = get_source_roots(db_session)
+
+    if path is None or path == "ROOT":
+        results = []
+        for root_path in source_roots:
+            stats_sql = text("""
+                SELECT COUNT(*) FROM filesystem_state fs
+                JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
+                WHERE fs.file_path LIKE :prefix
+            """)
+            count = (
+                db_session.execute(stats_sql, {"prefix": f"{root_path}%"}).scalar() or 0
+            )
+            if count > 0:
+                results.append(
+                    CartFileItemSchema(
+                        name=root_path, path=root_path, type="directory", selected=True
+                    )
+                )
+        return results
+
+    path_prefix = path if path.endswith("/") else path + "/"
+    results = []
+
+    # Virtual directory aggregation
+    dir_agg_sql = text("""
+        SELECT DISTINCT SUBSTR(fs.file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(fs.file_path, LENGTH(:prefix) + 1), '/') - 1) as dirname
+        FROM filesystem_state fs
+        JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
+        WHERE fs.file_path LIKE :search_prefix
+        AND SUBSTR(fs.file_path, LENGTH(:prefix) + 1) LIKE '%/%'
+    """)
+    virtual_dirs = db_session.execute(
+        dir_agg_sql, {"prefix": path_prefix, "search_prefix": f"{path_prefix}%"}
+    ).fetchall()
+    for dir_row in virtual_dirs:
+        if dir_row[0]:
+            results.append(
+                CartFileItemSchema(
+                    name=dir_row[0],
+                    path=path_prefix + dir_row[0],
+                    type="directory",
+                    selected=True,
+                )
+            )
+
+    # Actual files in the cart
+    file_agg_sql = text("""
+        SELECT fs.file_path, fs.size, fs.mtime
+        FROM filesystem_state fs
+        JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
+        WHERE fs.file_path LIKE :search_prefix
+        AND SUBSTR(fs.file_path, LENGTH(:prefix) + 1) NOT LIKE '%/%'
+    """)
+    cart_files = db_session.execute(
+        file_agg_sql, {"prefix": path_prefix, "search_prefix": f"{path_prefix}%"}
+    ).fetchall()
+    for file_row in cart_files:
+        results.append(
+            CartFileItemSchema(
+                name=file_row[0].split("/")[-1],
+                path=file_row[0],
+                type="file",
+                size=file_row[1],
+                mtime=file_row[2],
+                selected=True,
+            )
+        )
+
+    results.sort(key=lambda x: (x.type != "directory", x.name.lower()))
+    return results
+
+
+@router.get("/cart/tree", response_model=List[CartTreeNodeSchema])
+def get_recovery_queue_tree(
+    path: Optional[str] = None, db_session: Session = Depends(get_db)
+):
+    """Returns a recursive tree view of the recovery queue's virtual filesystem."""
+    from app.api.system import get_source_roots
+
+    source_roots = get_source_roots(db_session)
+
+    if path is None or path == "ROOT":
+        results = []
+        for root_path in source_roots:
+            stats_sql = text("""
+                SELECT 1 FROM filesystem_state fs
+                JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
+                WHERE fs.file_path LIKE :prefix LIMIT 1
+            """)
+            if db_session.execute(stats_sql, {"prefix": f"{root_path}%"}).scalar():
+                results.append(
+                    CartTreeNodeSchema(
+                        name=root_path, path=root_path, has_children=True
+                    )
+                )
+        return results
+
+    path_prefix = path if path.endswith("/") else path + "/"
+    subdir_sql = text("""
+        SELECT DISTINCT SUBSTR(fs.file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(fs.file_path, LENGTH(:prefix) + 1), '/') - 1) as dirname
+        FROM filesystem_state fs
+        JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
+        WHERE fs.file_path LIKE :search_prefix
+        AND SUBSTR(fs.file_path, LENGTH(:prefix) + 1) LIKE '%/%'
+    """)
+    subdirs = db_session.execute(
+        subdir_sql, {"prefix": path_prefix, "search_prefix": f"{path_prefix}%"}
+    ).fetchall()
+
+    results = [
+        CartTreeNodeSchema(name=row[0], path=path_prefix + row[0], has_children=True)
+        for row in subdirs
+        if row[0]
+    ]
+    results.sort(key=lambda x: x.name.lower())
+    return results
