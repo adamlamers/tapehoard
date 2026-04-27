@@ -22,7 +22,10 @@
         AlertCircle,
         ShieldAlert,
         Library,
-        Minus
+        Minus,
+        ArrowUp,
+        ArrowDown,
+        ArrowRight
     } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import { Card } from '$lib/components/ui/card';
@@ -106,8 +109,38 @@
                 listStorageFleetInventoryMediaGet(),
                 discoverHardwareNodesSystemHardwareDiscoverGet()
             ]);
-            if (mediaRes.data) mediaList = mediaRes.data;
-            if (hardwareRes.data) discoveredAssets = hardwareRes.data as any[];
+            if (mediaRes.data) {
+                // Implement client-side Last Known Good (LKG) caching for hardware status
+                mediaList = mediaRes.data.map(newMedia => {
+                    const oldMedia = mediaList.find(m => m.id === newMedia.id);
+                    if (oldMedia && oldMedia.live_info && newMedia.live_info) {
+                        const newInfo = newMedia.live_info as any;
+                        const oldInfo = oldMedia.live_info as any;
+                        // If new info is empty (due to a busy drive), preserve the old info
+                        if (Object.keys(newInfo.tape || {}).length === 0 && Object.keys(oldInfo.tape || {}).length > 0) {
+                            newInfo.tape = oldInfo.tape;
+                        }
+                        if (Object.keys(newInfo.drive || {}).length === 0 && Object.keys(oldInfo.drive || {}).length > 0) {
+                            newInfo.drive = oldInfo.drive;
+                        }
+                    }
+                    return newMedia;
+                });
+            }
+            if (hardwareRes.data) {
+                discoveredAssets = (hardwareRes.data as any[]).map(newAsset => {
+                    const oldAsset = discoveredAssets.find(a => a.device_path === newAsset.device_path);
+                    if (oldAsset && oldAsset.hardware_info && newAsset.hardware_info) {
+                         if (Object.keys(newAsset.hardware_info.tape || {}).length === 0 && Object.keys(oldAsset.hardware_info.tape || {}).length > 0) {
+                            newAsset.hardware_info.tape = oldAsset.hardware_info.tape;
+                        }
+                        if (Object.keys(newAsset.hardware_info.drive || {}).length === 0 && Object.keys(oldAsset.hardware_info.drive || {}).length > 0) {
+                            newAsset.hardware_info.drive = oldAsset.hardware_info.drive;
+                        }
+                    }
+                    return newAsset;
+                });
+            }
         } catch (error) {
             if (!silent) toast.error("Failed to load inventory details");
         } finally {

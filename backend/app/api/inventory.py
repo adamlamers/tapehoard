@@ -1,9 +1,10 @@
 import json
+import psutil
 import os
+from loguru import logger
 from datetime import datetime, timezone
 from typing import List, Optional
 
-import psutil
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -66,30 +67,32 @@ def list_storage_fleet(db_session: Session = Depends(get_db)):
 
         if provider:
             is_online = provider.check_online()
-            if is_online:
-                try:
-                    detected_id = provider.identify_media(allow_intrusive=False)
-                    hardware_identified = detected_id == media.identifier
+            try:
+                # Attempt to identify the tape non-intrusively
+                detected_id = provider.identify_media(allow_intrusive=False)
+                hardware_identified = detected_id == media.identifier
 
-                    if media.media_type == "tape":
-                        from app.providers.tape import LTOProvider
+                # Always populate live_info for tape drives if the provider exists
+                # LTOProvider now returns LKG (Last Known Good) state if direct read fails
+                if media.media_type == "tape":
+                    from app.providers.tape import LTOProvider
 
-                        if isinstance(provider, LTOProvider):
-                            live_info = {
-                                "drive": provider.get_drive_info(),
-                                "tape": provider.get_mam_info(),
-                            }
+                    if isinstance(provider, LTOProvider):
+                        live_info = {
+                            "drive": provider.get_drive_info(),
+                            "tape": provider.get_mam_info(),
+                        }
 
-                    # For HDD providers, also grab host-level capacity if possible
-                    if media.media_type == "hdd":
-                        from app.providers.hdd import OfflineHDDProvider
+                # For HDD providers, also grab host-level capacity if possible
+                if is_online and media.media_type == "hdd":
+                    from app.providers.hdd import OfflineHDDProvider
 
-                        if isinstance(provider, OfflineHDDProvider):
-                            usage = psutil.disk_usage(provider.mount_base)
-                            host_free_bytes = usage.free
-                            host_total_bytes = usage.total
-                except Exception:
-                    pass
+                    if isinstance(provider, OfflineHDDProvider):
+                        usage = psutil.disk_usage(provider.mount_base)
+                        host_free_bytes = usage.free
+                        host_total_bytes = usage.total
+            except Exception as e:
+                logger.debug(f"Error populating live info for {media.identifier}: {e}")
 
         # Parse config
         final_config = {}
