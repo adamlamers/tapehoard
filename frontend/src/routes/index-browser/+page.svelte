@@ -33,6 +33,8 @@
     import { toast } from 'svelte-sonner';
     import { cn, formatLocalDate, formatLocalDateTime } from '$lib/utils';
 
+    import { page } from '$app/state';
+
     let currentPath = $state('ROOT');
     let searchQuery = $state('');
     let indexedFiles = $state<FileItem[]>([]);
@@ -56,6 +58,18 @@
             console.error("Failed to load cart:", error);
         }
     }
+
+    onMount(async () => {
+        await loadCart();
+
+        // Handle deep-linked path from query params (e.g., from insights treemap)
+        const targetPath = page.url.searchParams.get('path');
+        if (targetPath) {
+            currentPath = targetPath;
+        }
+
+        await loadIndexedFiles(currentPath);
+    });
 
     async function loadIndexedFiles(path: string) {
         if (searchQuery.trim().length >= 3) return;

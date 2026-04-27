@@ -27,7 +27,8 @@
                 onToggleTrack = (item: FileItem) => {},
                 onSelect = (item: FileItem) => {},
                 mode = "host",
-                isSearching = false
+                isSearching = false,
+                pendingChanges = new Map<string, boolean>()
         } = $props<{
                 currentPath?: string;
                 searchQuery?: string;
@@ -35,8 +36,9 @@
                 onNavigate?: (path: string) => void;
                 onToggleTrack?: (item: FileItem) => void;
                 onSelect?: (item: FileItem) => void;
-                mode?: "host" | "index" | "cart";
+                mode?: "host" | "index" | "cart" | "live";
                 isSearching?: boolean;
+                pendingChanges?: Map<string, boolean>;
         }>();
 
         let selectedPaths = $state<Set<string>>(new Set());
@@ -47,24 +49,39 @@
         // --- Navigation History ---
         let navigationHistory = $state<string[]>([currentPath]);
         let historyIndex = $state(0);
+        let isInternalNavigation = false;
 
+        // Effect to catch external path changes (Deep-Linking)
         $effect(() => {
-                // Keep track of visited paths for internal back/forward buttons
                 if (currentPath !== navigationHistory[historyIndex]) {
-                        // If we are at the end of history, push new path
-                        // Otherwise, we might be navigating via back/forward buttons already
-                        // or a user might have clicked a breadcrumb/folder while in the middle of history
-                        if (currentPath !== navigationHistory[historyIndex]) {
-                                const newHistory = navigationHistory.slice(0, historyIndex + 1);
-                                newHistory.push(currentPath);
-                                navigationHistory = newHistory;
-                                historyIndex = navigationHistory.length - 1;
+                        if (isInternalNavigation) {
+                                // Handled by navigateTo helper
+                                isInternalNavigation = false;
+                        } else {
+                                // External source updated currentPath (e.g. Query Param from Treemap)
+                                // Jump directly and reset history to this point
+                                navigationHistory = [currentPath];
+                                historyIndex = 0;
                         }
                 }
         });
 
+        function navigateTo(path: string) {
+                if (path === currentPath) return;
+
+                isInternalNavigation = true;
+                const newHistory = navigationHistory.slice(0, historyIndex + 1);
+                newHistory.push(path);
+                navigationHistory = newHistory;
+                historyIndex = navigationHistory.length - 1;
+
+                currentPath = path;
+                onNavigate(path);
+        }
+
         function goBack() {
                 if (historyIndex > 0) {
+                        isInternalNavigation = true;
                         historyIndex--;
                         currentPath = navigationHistory[historyIndex];
                         onNavigate(currentPath);
@@ -73,10 +90,19 @@
 
         function goForward() {
                 if (historyIndex < navigationHistory.length - 1) {
+                        isInternalNavigation = true;
                         historyIndex++;
                         currentPath = navigationHistory[historyIndex];
                         onNavigate(currentPath);
                 }
+        }
+
+        function goUp() {
+                if (currentPath === "ROOT") return;
+                const parts = currentPath.split("/");
+                parts.pop();
+                const parent = parts.join("/") || "ROOT";
+                navigateTo(parent);
         }
 
         // --- Column Resizing Logic ---

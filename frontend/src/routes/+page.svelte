@@ -209,7 +209,7 @@
                     <Card class="p-8 bg-bg-secondary border-border-color shadow-xl h-fit">
                         <h3 class="text-lg font-black uppercase tracking-tighter text-text-primary mb-6">Quick Actions</h3>
                         <div class="space-y-3">
-                            <Button variant="outline" class="w-full justify-between h-12 font-black uppercase tracking-widest text-[10px] border-border-color hover:border-blue-500/50 hover:bg-blue-500/5 group" href="/tracking">
+                            <Button variant="outline" class="w-full justify-between h-12 font-black uppercase tracking-widest text-[10px] border-border-color hover:border-blue-500/50 hover:bg-blue-500/5 group" href="/filesystem">
                                 Review Tracking Rules <ArrowRight size={14} class="group-hover:translate-x-1 transition-transform" />
                             </Button>
                             <Button variant="outline" class="w-full justify-between h-12 font-black uppercase tracking-widest text-[10px] border-border-color hover:border-success-color/50 hover:bg-success-color/5 group" href="/index-browser">

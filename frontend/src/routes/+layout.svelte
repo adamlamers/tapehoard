@@ -31,7 +31,7 @@
 		{ name: 'Overview', href: '/', icon: LayoutDashboard },
 		{ name: 'Insights', href: '/insights', icon: PieChart },
 		{ name: 'Archive Index', href: '/index-browser', icon: Library },
-		{ name: 'Filesystem', href: '/tracking', icon: FolderTree },
+		{ name: 'Filesystem', href: '/filesystem', icon: FolderTree },
 		{ name: 'Jobs', href: '/jobs', icon: Activity },
 		{ name: 'Media Inventory', href: '/inventory', icon: CassetteTape },
 		{ name: 'Data Recovery', href: '/restores', icon: History }
@@ -53,7 +53,7 @@
 			if (e.key === 'd') window.location.href = '/';
 			if (e.key === 'g') window.location.href = '/insights';
 			if (e.key === 'i') window.location.href = '/index-browser';
-			if (e.key === 't') window.location.href = '/tracking';
+			if (e.key === 't') window.location.href = '/filesystem';
 			if (e.key === 'a') window.location.href = '/jobs';
 			if (e.key === 'm') window.location.href = '/inventory';
 			if (e.key === 'r') window.location.href = '/restores';

@@ -146,28 +146,44 @@ class ScannerService:
             logger.debug(f"Priority adjustment restricted: {priority_error}")
 
     def compute_sha256(self, file_path: str, job_id: Optional[int] = None) -> str:
-        """Computes the SHA-256 hash of a file with block-level throttling."""
+        """Computes the SHA-256 hash of a file with high-velocity block processing."""
         hash_engine = hashlib.sha256()
+
+        # Increase block size to 8MB for high-speed NVMe saturation
+        # and use local counter to minimize lock contention
+        BLOCK_SIZE = 8 * 1024 * 1024
+        local_processed_bytes = 0
+        SYNC_THRESHOLD = 128 * 1024 * 1024  # Sync metrics every 128MB
 
         try:
             with open(file_path, "rb") as file_handle:
-                with self._metrics_lock:
-                    # Not used currently but could be for debugging
-                    pass
-
-                for byte_block in iter(lambda: file_handle.read(1048576), b""):
+                while True:
                     if job_id is not None and JobManager.is_cancelled(job_id):
                         return ""
 
-                    # Dynamic throttling
+                    # Dynamic throttling - only check periodically to save cycles
                     if self.is_throttled:
                         throttle_delay = 0.05 if self._current_iowait < 15.0 else 0.2
                         time.sleep(throttle_delay)
 
-                    hash_engine.update(byte_block)
+                    byte_block = file_handle.read(BLOCK_SIZE)
+                    if not byte_block:
+                        break
 
+                    hash_engine.update(byte_block)
+                    local_processed_bytes += len(byte_block)
+
+                    # Batch sync metrics to global counter
+                    if local_processed_bytes >= SYNC_THRESHOLD:
+                        with self._metrics_lock:
+                            self.bytes_hashed += local_processed_bytes
+                        local_processed_bytes = 0
+
+                # Final remaining sync
+                if local_processed_bytes > 0:
                     with self._metrics_lock:
-                        self.bytes_hashed += len(byte_block)
+                        self.bytes_hashed += local_processed_bytes
+
             return hash_engine.hexdigest()
         except OSError as io_error:
             logger.error(f"IO Error during hashing {file_path}: {io_error}")

@@ -138,7 +138,7 @@
                             <p class="text-[10px] text-text-secondary opacity-70">The database index has been synchronized with the results of this job.</p>
                         </div>
                     </div>
-                    <Button variant="outline" size="sm" class="h-9 px-4 text-[10px] font-black uppercase tracking-widest border-blue-500/30 text-blue-400 group-hover:bg-blue-500/10 transition-all" href={job.job_type === 'SCAN' ? '/tracking' : '/inventory'}>
+                    <Button variant="outline" size="sm" class="h-9 px-4 text-[10px] font-black uppercase tracking-widest border-blue-500/30 text-blue-400 group-hover:bg-blue-500/10 transition-all" href={job.job_type === 'SCAN' ? '/filesystem' : '/inventory'}>
                         View Changes <ArrowRight size={14} class="ml-2" />
                     </Button>
                 </div>
