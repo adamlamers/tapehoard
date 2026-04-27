@@ -44,6 +44,41 @@
         let sortColumn = $state<"name" | "size" | "mtime" | "type">("name");
         let sortDirection = $state<"asc" | "desc">("asc");
 
+        // --- Navigation History ---
+        let navigationHistory = $state<string[]>([currentPath]);
+        let historyIndex = $state(0);
+
+        $effect(() => {
+                // Keep track of visited paths for internal back/forward buttons
+                if (currentPath !== navigationHistory[historyIndex]) {
+                        // If we are at the end of history, push new path
+                        // Otherwise, we might be navigating via back/forward buttons already
+                        // or a user might have clicked a breadcrumb/folder while in the middle of history
+                        if (currentPath !== navigationHistory[historyIndex]) {
+                                const newHistory = navigationHistory.slice(0, historyIndex + 1);
+                                newHistory.push(currentPath);
+                                navigationHistory = newHistory;
+                                historyIndex = navigationHistory.length - 1;
+                        }
+                }
+        });
+
+        function goBack() {
+                if (historyIndex > 0) {
+                        historyIndex--;
+                        currentPath = navigationHistory[historyIndex];
+                        onNavigate(currentPath);
+                }
+        }
+
+        function goForward() {
+                if (historyIndex < navigationHistory.length - 1) {
+                        historyIndex++;
+                        currentPath = navigationHistory[historyIndex];
+                        onNavigate(currentPath);
+                }
+        }
+
         // --- Column Resizing Logic ---
         let mtimeWidth = $state(200);
         let typeWidth = $state(150);
@@ -273,10 +308,22 @@
                 <div class="flex items-center gap-4 flex-1 min-w-0">
                         <!-- Navigation Buttons -->
                         <div class="flex items-center gap-1 shrink-0">
-                                <Button variant="ghost" size="icon" class="h-8 w-8 text-text-secondary hover:text-text-primary hover:bg-white/5" onclick={() => window.history.back()}>
+                                <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        class="h-8 w-8 text-text-secondary hover:text-text-primary hover:bg-white/5"
+                                        onclick={goBack}
+                                        disabled={historyIndex <= 0}
+                                >
                                         <ChevronLeft size={18}></ChevronLeft>
                                 </Button>
-                                <Button variant="ghost" size="icon" class="h-8 w-8 text-text-secondary hover:text-text-primary hover:bg-white/5" onclick={() => window.history.forward()}>
+                                <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        class="h-8 w-8 text-text-secondary hover:text-text-primary hover:bg-white/5"
+                                        onclick={goForward}
+                                        disabled={historyIndex >= navigationHistory.length - 1}
+                                >
                                         <ChevronRight size={18}></ChevronRight>
                                 </Button>
                                 <Button
