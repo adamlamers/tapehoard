@@ -85,9 +85,9 @@
     <title>Overview - TapeHoard</title>
 </svelte:head>
 
-<div class="flex flex-col h-full gap-8 overflow-hidden animate-in fade-in duration-700">
+<div class="flex flex-col gap-8 animate-in fade-in duration-700">
     <!-- Header -->
-    <header class="flex justify-between items-center bg-bg-secondary px-8 py-5 rounded-xl border border-border-color shadow-2xl relative overflow-hidden shrink-0">
+    <header class="flex justify-between items-center bg-bg-secondary px-8 py-5 rounded-xl border border-border-color shadow-2xl relative overflow-hidden">
         <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent pointer-events-none"></div>
         <div class="relative z-10">
             <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
@@ -120,7 +120,7 @@
         </div>
     </header>
 
-    <div class="flex-1 overflow-y-auto pr-2 pb-12 space-y-8">
+    <div class="space-y-8">
         {#if loading && !stats}
             <div class="h-96 bg-bg-secondary animate-pulse rounded-xl border border-border-color/50"></div>
         {:else if stats}
