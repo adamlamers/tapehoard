@@ -53,4 +53,5 @@ jobs:
     - name: Svelte Check & Lint
       run: |
         cd frontend
+        npx svelte-kit sync
         npm run check
