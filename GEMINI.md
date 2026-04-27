@@ -31,41 +31,41 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
 
 ## 2. Code Quality & Pre-commit
 *   **PEP 8 Compliance:** All Python code must strictly adhere to PEP 8 standards. Use explicit, idiomatic language features.
-*   **Descriptive Naming:** Always use very descriptive variable and function names. Avoid abbreviations whenever possible to maintain high readability.
-*   All code must pass `pre-commit` hooks. If you generate a new file or modify an existing one, ensure it complies with `ruff` and `ruff-format`.
-*   You can manually format your changes by running `just format`.
+*   **Descriptive Naming:** Always use very descriptive variable and function names. Avoid abbreviations (e.g., use `file_state` instead of `fs`) to maintain high readability.
+*   **Pre-commit:** All code must pass `pre-commit` hooks (ruff, ruff-format, etc.).
+*   **Validation:** Fulfill the user's request thoroughly, including adding tests when adding features or fixing bugs. You must empirically reproduce failures with new test cases before applying fixes.
 
 ## 3. Core Architectural Rules
 
 ### Hardware & Media Lifecycle
-*   **Hardware Decoupling:** Hardware configuration (like tape drive paths or general mount configurations) is global, not bound to individual media. Media represents only identity and capacity.
-*   **Abstract Storage Providers:** The core archiver must never directly call `mt` or write `tar` streams. It must use the interfaces in `backend/app/providers/base.py` (Tapes, HDDs, Cloud).
-*   **Pulse Checks:** Every media asset must support `check_online()` (hardware detection) and `check_existing_data()` (pre-initialization warning).
-*   **Sanitization:** Initializing a drive must perform a full purge of existing TapeHoard data if the `force` flag is set.
-*   **Cloud Encryption:** Cloud backups use `pycryptodome` AES-256-GCM with PBKDF2 for verifiable, authenticated client-side encryption. Credentials and passphrases are not stored in plaintext.
+*   **Hardware Decoupling:** Hardware configuration (tape drive paths, mount roots) is global. Media objects represent only identity and capacity.
+*   **Identification:** Tapes use barcodes/IDs via `mtx`/SCSI. HDDs use **Filesystem UUIDs** as a hardware fingerprint to remain path-agnostic if mount points change.
+*   **S3-Compatible targets:** Standardized on `s3` media type using `boto3`. Collects Endpoint URL, Bucket, and HMAC credentials during ingestion.
+*   **Sanitization:** Initializing media performs a full purge of existing TapeHoard data if the `force` flag is set.
+*   **Hardware Failure:** Marking media as "Failed" triggers an automatic atomic purge of all associated `file_versions` to surface those files as "Pending" on the dashboard.
 
 ### Database & Performance
-*   **High Concurrency:** SQLite must always run in **WAL (Write-Ahead Logging)** mode with a 30s busy timeout, memory-mapped I/O, and larger page cache to support concurrent scans and UI operations.
-*   **Aggregate Intelligence:** Avoid N+1 query patterns. Use Raw SQL Aggregates for directory protection statuses, manifest generation, and dashboard statistics.
-*   **Indexing:** All path-based operations must be backed by the `ix_filesystem_state_file_path` index. All foreign keys must be indexed.
-*   **Search Engine:** The FTS5 index is a standalone table synchronized via triggers. Triggers must be optimized to only fire on `file_path` changes to minimize overhead during routine scans.
+*   **High Concurrency:** SQLite must always run in **WAL (Write-Ahead Logging)** mode with a 30s busy timeout and larger page cache.
+*   **Aggregate Intelligence:** Use Raw SQL Aggregates for dashboard stats and directory protection status to avoid N+1 query patterns.
+*   **FTS5 Search:** Full-text search is managed via triggers. Ensure searches filter for `has_version = 1` when browsing the Archive Index.
 
 ### Scanning & Hashing Architecture
-*   **Concurrent Phasing:** Scanning is strictly decoupled into two phases: a fast Metadata Discovery (`SCAN`) running at normal priority, and a concurrent Content Hashing (`HASH`) running at idle background priority (with dynamic `iowait` throttling) to prevent host I/O starvation.
-*   **Thread-Safe Metrics:** All metrics (files found, hashed, processed, byte throughput) must be explicitly protected by a `threading.Lock` to avoid race conditions.
+*   **Concurrent Phasing:** Decoupled into `SCAN` (Metadata, Normal priority) and `HASH` (Content, Idle priority with dynamic `iowait` throttling).
+*   **Thread-Safe Metrics:** All counters (files processed, bytes hashed) must be protected by a `threading.Lock`.
 
 ### Archival & Recovery
-*   **Multi-Part Archiving:** Files larger than media capacity must be split using `RangeFile` and archived with `.part_OFFSET_SIZE` suffixes in the tar stream.
-*   **Deduplication:** Always check for existing hashes on the target media before writing to the tar stream. If a hash exists, record the new version pointing to the existing location.
-*   **Recovery Manifests:** Calculations must be sequential and media-aware. The system should group all files needed from a specific tape to minimize physical hardware swaps.
-*   **Local Staging:** Use the `/staging` directory for temporary file reassembly. Never perform complex I/O directly in the production data paths.
+*   **Bitstream Integrity:** `RangeFile` must guarantee exact byte counts. If a file is truncated on disk during backup, it must be padded with null bytes to prevent corrupting the tar alignment.
+*   **Metadata Fidelity:** The restorer must preserve original **permissions (chmod)**, **timestamps (utime)**, and **ownership (chown)** when recovering files.
+*   **Seekable Restoration:** Non-tape media (HDD/S3) must use `mode="r:*"` (Seekable) for robust partial restores, while Tapes use `mode="r|*"` (Pipe).
+*   **Path Normalization:** Aggressively strip leading slashes and `./` prefixes from both DB keys and tar members to ensure matches across different environments.
+*   **Independence:** Force all archive members to be **Regular Files** to break fragile hard-link dependencies. Symlinks are preserved as `SYMTYPE` with relative targets.
 
-### Deployment & Environment
-*   **Temporal Standard:** The backend strictly uses **UTC**. The frontend must use `parseUTCDate` from `lib/utils.ts` to convert timestamps to the browser's **Local Time** for display.
-*   **Docker Portability:** Native support for `PUID`, `PGID`, `RUN_AS_ROOT` and `PORT` environment variables. The frontend uses **relative API paths** (`baseUrl: ''`) in production to remain host/port-agnostic.
-*   **Job Management:** The `JobManager` must be database-driven. Never use in-memory sets for job states (like cancellation), as they will not sync across multi-worker environments.
+### Deployment & Testing
+*   **Temporal Standard:** Backend uses **UTC**. Frontend uses `parseUTCDate` to convert to browser **Local Time**.
+*   **Unsaved Changes Guard:** UI must use `beforeNavigate` and `beforeunload` listeners to warn users if they leave the Settings or Media registration forms with uncommitted changes.
+*   **Testing Protocol:** Use **Alembic-driven file-based SQLite** for tests to ensure 100% schema fidelity (including FTS5 and triggers) and reliable cross-thread data visibility. Atomic truncation must occur between tests.
 
 ### UI & UX Philosophy
-*   **Direct Terminology:** Use simple, direct, non-dramatic language. Avoid terms like "Fleet", "Archive Command", "Telemetry", etc. Use standard technical terms like "Backup Manager", "System Status", "Manage Media".
-*   **Dynamic Layout:** Use natural page scrolling (`overflow-y-auto` on the main wrapper) rather than fixed/sticky headers for a clean, professional dashboard flow.
-*   **Actionable Analytics:** Space analysis relies on hierarchical/recursive treemaps with root-collapsing to present actionable insights without irrelevant root-level noise.
+*   **Direct Terminology:** Use technical terms like "Backup Manager", "System Status", "Archive Index". Avoid marketing fluff.
+*   **Layout:** Natural page scrolling only. No sticky headers.
+*   **Navigation:** The FileBrowser must maintain internal back/forward history separate from browser page navigation.
