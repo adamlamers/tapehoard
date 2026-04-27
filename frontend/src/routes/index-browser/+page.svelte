@@ -103,7 +103,7 @@
         searchLoading = true;
         try {
             const response = await searchArchiveIndexInventorySearchGet({
-                query: { q: query }
+                query: { q: query, path: currentPath }
             });
             if (response.data) {
                 indexedFiles = (response.data as any[]).map(f => ({
@@ -127,6 +127,7 @@
     }
 
     $effect(() => {
+        const path = currentPath;
         const query = searchQuery.trim();
         if (searchTimeout) clearTimeout(searchTimeout);
 
@@ -134,9 +135,10 @@
             searchTimeout = setTimeout(() => {
                 searchFiles(query);
             }, 300);
-        } else if (query.length === 0) {
+        } else {
+            // If query is empty or too short, load the current directory
             searchTimeout = setTimeout(() => {
-                loadIndexedFiles(currentPath);
+                loadIndexedFiles(path);
             }, 50);
         }
     });
@@ -179,8 +181,6 @@
                         });
                     }
                 } else {
-                    // Toggling a directory off is currently not supported as a bulk op
-                    // The user should manage this in the Recovery Queue page
                     toast.warning("To remove a folder, please manage items in the Data Recovery page.");
                     return;
                 }
@@ -211,7 +211,7 @@
             ]);
 
             // Refresh metadata if it's the selected item
-            if (selectedItemMetadata && selectedItemMetadata.file_path === item.path) {
+            if (selectedItemMetadata && selectedItemMetadata.path === item.path) {
                 fetchMetadata(item);
             }
         } catch (error: any) {
@@ -231,7 +231,7 @@
                 searchQuery.length >= 3 ? searchFiles(searchQuery) : loadIndexedFiles(currentPath)
             ]);
 
-            if (selectedItemMetadata && selectedItemMetadata.file_path === itemPath) {
+            if (selectedItemMetadata && selectedItemMetadata.path === itemPath) {
                 const dummyItem = { path: itemPath, name: '', type: 'directory' } as FileItem;
                 fetchMetadata(dummyItem);
             }
@@ -239,17 +239,6 @@
             toast.error(error.body?.detail || "Action failed");
         }
     }
-
-    onMount(() => {
-        loadCart();
-        loadIndexedFiles(currentPath);
-    });
-
-    $effect(() => {
-        if (currentPath) {
-            loadIndexedFiles(currentPath);
-        }
-    });
 
     function formatSize(bytes: number) {
         if (bytes === 0) return "0 B";
@@ -330,10 +319,10 @@
                                 <X size={20} />
                             </button>
                         </div>
-                        <h3 class="text-lg font-black text-text-primary leading-tight truncate" title={selectedItemMetadata.file_path}>
-                            {selectedItemMetadata.file_path.split('/').pop()}
+                        <h3 class="text-lg font-black text-text-primary leading-tight truncate" title={selectedItemMetadata.path}>
+                            {selectedItemMetadata.path.split('/').pop()}
                         </h3>
-                        <p class="text-[10px] mono text-text-secondary mt-1 opacity-60 truncate italic">{selectedItemMetadata.file_path}</p>
+                        <p class="text-[10px] mono text-text-secondary mt-1 opacity-60 truncate italic">{selectedItemMetadata.path}</p>
                     </div>
 
                     <ScrollArea class="flex-1">
@@ -379,20 +368,20 @@
                                             <div class="bg-bg-primary/50 border border-border-color rounded-lg p-3 group hover:border-blue-500/30 transition-all">
                                                 <div class="flex justify-between items-center mb-2">
                                                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-blue-500/10 text-blue-400 text-[10px] font-black border border-blue-500/20">
-                                                        {version.media_identifier}
+                                                        {(version as any).media_id || (version as any).media_identifier}
                                                     </span>
                                                     <span class="text-[9px] font-bold text-text-secondary opacity-40 uppercase tracking-tighter">
-                                                        {version.media_type}
+                                                        {(version as any).media_type}
                                                     </span>
                                                 </div>
                                                 <div class="flex flex-col gap-1">
                                                     <div class="flex items-center gap-2 text-[10px] text-text-secondary">
                                                         <FolderTree size={12} class="opacity-50" />
-                                                        <span class="mono">POS: {version.file_number}</span>
+                                                        <span class="mono">POS: {(version as any).archive_id || (version as any).file_number}</span>
                                                     </div>
-                                                    <div class="flex items-center gap-2 text-[10px] text-text-secondary">
+                                                    <div class="flex items-center gap-1.5 opacity-60">
                                                         <Clock size={12} class="opacity-50" />
-                                                        <span>Archived: {formatLocalDateTime(version.timestamp)}</span>
+                                                        <span>Archived: {formatLocalDateTime((version as any).timestamp || (version as any).created_at)}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -409,16 +398,16 @@
 
                     {#if selectedItemMetadata.type === 'file' && (selectedItemMetadata.versions?.length ?? 0) > 0}
                         <div class="p-6 bg-bg-tertiary/30 border-t border-border-color mt-auto">
-                            <Button class="w-full h-11 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/10" onclick={() => handleToggleCart({path: selectedItemMetadata?.file_path || '', type: 'file', name: '', media: (selectedItemMetadata?.versions || []).map(v => v.media_identifier), selected: (selectedItemMetadata as any).selected} as FileItem)}>
+                            <Button class="w-full h-11 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/10" onclick={() => handleToggleCart({path: selectedItemMetadata?.path || '', type: 'file', name: '', media: (selectedItemMetadata?.versions || []).map((v: any) => v.media_id || v.media_identifier), selected: selectedItemMetadata?.selected} as FileItem)}>
                                 <ShieldCheck size={16} class="mr-2" />
-                                {(selectedItemMetadata as any).selected ? 'Remove from Queue' : 'Add to Recovery Queue'}
+                                {selectedItemMetadata.selected ? 'Remove from Queue' : 'Add to Recovery Queue'}
                             </Button>
                         </div>
                     {:else if selectedItemMetadata.type === 'directory' && (selectedItemMetadata.child_count || 0) > 0}
                         <div class="p-6 bg-bg-tertiary/30 border-t border-border-color mt-auto">
-                            <Button variant="outline" class={cn("w-full h-11 font-black uppercase tracking-widest text-[11px]", "border-success-color/30 text-success-color hover:bg-success-color/10")} onclick={() => handleToggleDirectoryCart(selectedItemMetadata?.file_path || '')} disabled={(selectedItemMetadata as any).selected}>
+                            <Button variant="outline" class={cn("w-full h-11 font-black uppercase tracking-widest text-[11px]", "border-success-color/30 text-success-color hover:bg-success-color/10")} onclick={() => handleToggleDirectoryCart(selectedItemMetadata?.path || '')} disabled={selectedItemMetadata.selected}>
                                 <ListPlus size={16} class="mr-2" />
-                                {#if (selectedItemMetadata as any).selected}
+                                {#if selectedItemMetadata.selected}
                                     Folder Fully Queued
                                 {:else}
                                     Add Folder to Recovery Queue

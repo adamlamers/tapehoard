@@ -23,6 +23,7 @@
         let {
                 item,
                 isSelected = false,
+                isStaged = false,
                 onClick = (e: MouseEvent) => {},
                 onDoubleClick = () => {},
                 onToggleTrack = () => {},
@@ -31,10 +32,11 @@
         } = $props<{
                 item: FileItem;
                 isSelected?: boolean;
+                isStaged?: boolean;
                 onClick?: (e: MouseEvent) => void;
                 onDoubleClick?: () => void;
                 onToggleTrack?: () => void;
-                mode?: "host" | "index";
+                mode?: "host" | "index" | "live" | "cart";
                 colWidths?: { mtime: number; type: number; size: number };
         }>();
 
@@ -115,7 +117,7 @@
         role="button"
         tabindex="0"
         onclick={onClick}
-        ondblclick={onDoubleClick}
+        ondblclick={(e) => { e.stopPropagation(); onDoubleClick(); }}
         onkeydown={(e) => e.key === "Enter" && onDoubleClick()}
 >
         <!-- TRACKING STATUS / SELECTION -->
@@ -133,8 +135,16 @@
                         <div class="text-text-secondary/40">
                                 <EyeOff size={16} />
                         </div>
-                {:else if mode === 'host'}
-                        {#if item.tracked}
+                {:else if mode === 'host' || mode === 'live'}
+                        {#if isStaged}
+                                <div class="text-blue-500 bg-blue-500/10 p-1 rounded-md animate-pulse border border-blue-500/30">
+                                        {#if item.tracked}
+                                                <Square size={16} />
+                                        {:else}
+                                                <ShieldCheck size={16} />
+                                        {/if}
+                                </div>
+                        {:else if item.tracked}
                                 <div class="text-success-color bg-success-color/10 p-1 rounded-md">
                                         <ShieldCheck size={16} />
                                 </div>

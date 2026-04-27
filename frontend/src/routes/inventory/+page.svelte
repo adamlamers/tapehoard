@@ -29,13 +29,13 @@
     import { Input } from '$lib/components/ui/input';
     import { cn } from '$lib/utils';
     import {
-        listStorageMediaInventoryMediaGet,
+        listStorageFleetInventoryMediaGet,
         registerNewMediaInventoryMediaPost,
         deleteMediaAssetInventoryMediaMediaIdDelete,
         triggerBackupJobBackupsTriggerMediaIdPost,
         initializeStorageHardwareInventoryMediaMediaIdInitializePost,
         reorderArchivalPriorityInventoryMediaReorderPost,
-        updateMediaRecordInventoryMediaMediaIdPatch,
+        updateMediaAssetInventoryMediaMediaIdPatch,
         discoverHardwareNodesSystemHardwareDiscoverGet,
         ignoreHardwareNodeSystemHardwareIgnorePost,
         type MediaSchema
@@ -101,7 +101,7 @@
         loading = true;
         try {
             const [mediaRes, hardwareRes] = await Promise.all([
-                listStorageMediaInventoryMediaGet(),
+                listStorageFleetInventoryMediaGet(),
                 discoverHardwareNodesSystemHardwareDiscoverGet()
             ]);
             if (mediaRes.data) mediaList = mediaRes.data;
@@ -231,7 +231,7 @@
     async function handleUpdate() {
         if (!editingMedia) return;
         try {
-            await updateMediaRecordInventoryMediaMediaIdPatch({
+            await updateMediaAssetInventoryMediaMediaIdPatch({
                 path: { media_id: editingMedia.id },
                 body: {
                     location: editingMedia.location,
@@ -333,7 +333,7 @@
                         <span class="text-[8px] font-black uppercase bg-bg-tertiary text-text-secondary px-1.5 py-0.5 rounded border border-border-color">RETIRED</span>
                     {/if}
                 </div>
-                <div class="mt-1 flex flex-col gap-0.5">
+                <div class="mt-1 flex flex-col gap-1">
                     {#if media.media_type === 'hdd' && media.config?.mount_path}
                         <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
                             <Monitor size={10} /> {media.config.mount_path}
@@ -342,6 +342,21 @@
                         <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
                             <Globe size={10} /> {media.config.bucket_name}
                         </div>
+                    {:else if media.media_type === 'tape' && media.live_info}
+                        {@const info = media.live_info as any}
+                        {#if info.drive}
+                            <div class="flex items-center gap-2 text-[8px] font-bold text-blue-400/80 uppercase tracking-tight">
+                                <Cpu size={10} /> {info.drive.vendor} {info.drive.model} (FW: {info.drive.firmware})
+                            </div>
+                        {/if}
+                        {#if info.tape}
+                            <div class="flex flex-wrap gap-x-2 gap-y-1 mt-0.5">
+                                <span class="text-[7px] font-black bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary uppercase">MFR: {info.tape.manufacturer}</span>
+                                <span class="text-[7px] font-black bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary uppercase">S/N: {info.tape.serial}</span>
+                                <span class="text-[7px] font-black bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 text-blue-400 uppercase">{info.tape.generation_label || info.tape.generation}</span>
+                                <span class="text-[7px] font-black bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary uppercase">BORN: {info.tape.manufacture_date}</span>
+                            </div>
+                        {/if}
                     {/if}
                     <div class="flex gap-2 mt-0.5">
                         {#if media.config?.encryption_key || media.config?.encryption_passphrase}
@@ -487,6 +502,23 @@
                                                 {/if}
                                             </span>
                                         </div>
+
+                                        {#if asset.type === 'tape' && asset.hardware_info}
+                                            <div class="mt-3 space-y-2 border-t border-border-color/30 pt-3">
+                                                {#if asset.hardware_info.drive}
+                                                    <div class="text-[8px] font-bold text-blue-400/80 uppercase">
+                                                        Drive: {asset.hardware_info.drive.vendor} {asset.hardware_info.drive.model} ({asset.hardware_info.drive.firmware})
+                                                    </div>
+                                                {/if}
+                                                {#if asset.hardware_info.tape}
+                                                    <div class="flex flex-wrap gap-1">
+                                                        <span class="text-[7px] font-black bg-white/5 px-1 rounded border border-white/10 text-text-secondary uppercase">MFR: {asset.hardware_info.tape.manufacturer}</span>
+                                                        <span class="text-[7px] font-black bg-blue-500/10 px-1 rounded border border-blue-500/20 text-blue-400 uppercase">{asset.hardware_info.tape.generation_label || asset.hardware_info.tape.generation}</span>
+                                                    </div>
+                                                {/if}
+                                            </div>
+                                        {/if}
+
                                         <div class="mt-4 flex gap-2">
                                             <Button variant="default" size="sm" class="h-8 text-[9px] font-black uppercase tracking-widest flex-1" onclick={() => {
                                                 newMedia.media_type = asset.type;

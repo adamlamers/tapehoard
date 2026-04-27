@@ -67,15 +67,14 @@
         });
 
         function navigateTo(path: string) {
-                if (path === currentPath) return;
-
-                isInternalNavigation = true;
-                const newHistory = navigationHistory.slice(0, historyIndex + 1);
-                newHistory.push(path);
-                navigationHistory = newHistory;
-                historyIndex = navigationHistory.length - 1;
-
-                currentPath = path;
+                if (path !== currentPath) {
+                        isInternalNavigation = true;
+                        const newHistory = navigationHistory.slice(0, historyIndex + 1);
+                        newHistory.push(path);
+                        navigationHistory = newHistory;
+                        historyIndex = navigationHistory.length - 1;
+                        currentPath = path;
+                }
                 onNavigate(path);
         }
 
@@ -265,7 +264,7 @@
 
         function handleRowDoubleClick(item: FileItem) {
                 if (item.type === "directory") {
-                        onNavigate(item.path);
+                        navigateTo(item.path);
                         selectedPaths = new Set();
                         lastSelectedPath = null;
                 }
@@ -288,7 +287,7 @@
         }
 
         function handlePathSubmit() {
-                onNavigate(pathInputValue);
+                navigateTo(pathInputValue);
                 isEditingPath = false;
         }
 
@@ -306,6 +305,11 @@
                         }
                 }
                 if (e.key === "Backspace") {
+                        // Don't navigate back if user is typing in an input
+                        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                                return;
+                        }
+
                         if (currentPath === "ROOT") return;
                         const parts = currentPath.split("/").filter(Boolean);
                         if (parts.length === 1) {
@@ -398,7 +402,7 @@
                                                                         "px-2 py-0.5 rounded-md text-[13px] transition-colors hover:bg-white/5 whitespace-nowrap cursor-pointer",
                                                                         i === breadcrumbs.length - 1 ? "text-text-primary font-bold" : "text-text-secondary hover:text-text-primary"
                                                                 )}
-                                                                onclick={(e) => { e.stopPropagation(); onNavigate(crumb.path); }}
+                                                                onclick={(e) => { e.stopPropagation(); navigateTo(crumb.path); }}
                                                         >
                                                                 {crumb.name}
                                                         </button>
@@ -406,7 +410,7 @@
                                         </div>
                                 {/if}
 
-                                <button class="ml-2 text-text-secondary hover:text-text-primary p-1 transition-colors cursor-pointer shrink-0" onclick={(e) => { e.stopPropagation(); onNavigate(currentPath); }}>
+                                <button class="ml-2 text-text-secondary hover:text-text-primary p-1 transition-colors cursor-pointer shrink-0" onclick={(e) => { e.stopPropagation(); navigateTo(currentPath); }}>
                                         <RotateCw size={14}></RotateCw>
                                 </button>
                         </div>
@@ -438,10 +442,10 @@
                 <!-- ZONE B: NAVIGATION PANE -->
                 <aside class="flex w-72 shrink-0 flex-col border-r border-border-color bg-bg-secondary/50">
                         <ScrollArea class="flex-1 p-2">
-                                <div class="px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-text-secondary/60 mb-2">
+                                <div class="px-3 py-1 text-[11px] font-bold uppercase text-text-secondary/60 mb-2">
                                         Navigation
                                 </div>
-                                <FileBrowserTreeItem node={activeRoot} selectedPath={currentPath} onSelect={onNavigate} isSpecial={true} {mode} />
+                                <FileBrowserTreeItem node={activeRoot} selectedPath={currentPath} onSelect={navigateTo} isSpecial={true} {mode} />
                         </ScrollArea>
                 </aside>
 
@@ -546,6 +550,7 @@
                                                                         {mode}
                                                                         {colWidths}
                                                                         isSelected={selectedPaths.has(item.path)}
+                                                                        isStaged={pendingChanges.has(item.path)}
                                                                         onClick={(e) => handleRowClick(e, item)}
                                                                         onDoubleClick={() => handleRowDoubleClick(item)}
                                                                         onToggleTrack={() => onToggleTrack(item)}
@@ -572,18 +577,6 @@
                         {/if}
                 </div>
                 <div class="flex items-center gap-3">
-                        <div class="flex items-center gap-1.5 rounded-full bg-action-color/10 px-2 py-0.5 text-action-color border border-action-color/20 shadow-sm">
-                                <CheckSquare size={10}></CheckSquare>
-                                <span class="font-bold uppercase tracking-wider">
-                                        {#if mode === 'host'}
-                                                {files.filter((f: FileItem) => f.tracked).length} Tracked
-                                        {:else if mode === 'index'}
-                                                {files.filter((f: FileItem) => f.selected).length} Selected
-                                        {:else}
-                                                {files.length} Queued
-                                        {/if}
-                                </span>
-                        </div>
                 </div>
         </div>
 </div>

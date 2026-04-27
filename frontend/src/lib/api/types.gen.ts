@@ -181,25 +181,41 @@ export type DirectoryCartRequest = {
 };
 
 /**
- * FileVersionSchema
+ * FileItemSchema
  */
-export type FileVersionSchema = {
+export type FileItemSchema = {
     /**
-     * Media Identifier
+     * Name
      */
-    media_identifier: string;
+    name: string;
     /**
-     * Media Type
+     * Path
      */
-    media_type: string;
+    path: string;
     /**
-     * File Number
+     * Type
      */
-    file_number: string;
+    type: string;
     /**
-     * Timestamp
+     * Size
      */
-    timestamp: string;
+    size?: number | null;
+    /**
+     * Mtime
+     */
+    mtime?: number | null;
+    /**
+     * Tracked
+     */
+    tracked?: boolean;
+    /**
+     * Ignored
+     */
+    ignored?: boolean;
+    /**
+     * Sha256 Hash
+     */
+    sha256_hash?: string | null;
 };
 
 /**
@@ -229,15 +245,15 @@ export type ItemMetadataSchema = {
     /**
      * Id
      */
-    id?: number | null;
+    id: number;
     /**
-     * File Path
+     * Path
      */
-    file_path: string;
+    path: string;
     /**
      * Type
      */
-    type: string;
+    type?: string;
     /**
      * Size
      */
@@ -245,35 +261,37 @@ export type ItemMetadataSchema = {
     /**
      * Mtime
      */
-    mtime: number;
+    mtime: string;
     /**
      * Last Seen Timestamp
      */
-    last_seen_timestamp: string;
+    last_seen_timestamp?: string | null;
     /**
      * Sha256 Hash
      */
     sha256_hash?: string | null;
     /**
-     * Versions
+     * Is Indexed
      */
-    versions?: Array<FileVersionSchema>;
+    is_indexed?: boolean;
+    /**
+     * Is Ignored
+     */
+    is_ignored?: boolean;
     /**
      * Child Count
      */
     child_count?: number | null;
     /**
-     * Vulnerable
-     */
-    vulnerable?: boolean;
-    /**
      * Selected
      */
     selected?: boolean;
     /**
-     * Indeterminate
+     * Versions
      */
-    indeterminate?: boolean;
+    versions?: Array<{
+        [key: string]: unknown;
+    }>;
 };
 
 /**
@@ -345,13 +363,13 @@ export type ManifestMediaSchema = {
  */
 export type MediaCreateSchema = {
     /**
-     * Media Type
-     */
-    media_type: string;
-    /**
      * Identifier
      */
     identifier: string;
+    /**
+     * Media Type
+     */
+    media_type: string;
     /**
      * Generation Tier
      */
@@ -381,17 +399,17 @@ export type MediaSchema = {
      */
     id: number;
     /**
-     * Media Type
-     */
-    media_type: string;
-    /**
      * Identifier
      */
     identifier: string;
     /**
+     * Media Type
+     */
+    media_type: string;
+    /**
      * Generation Tier
      */
-    generation_tier: string | null;
+    generation_tier?: string | null;
     /**
      * Capacity
      */
@@ -401,13 +419,21 @@ export type MediaSchema = {
      */
     bytes_used: number;
     /**
-     * Location
-     */
-    location: string | null;
-    /**
      * Status
      */
     status: string;
+    /**
+     * Location
+     */
+    location?: string | null;
+    /**
+     * Last Seen
+     */
+    last_seen?: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
     /**
      * Config
      */
@@ -434,6 +460,12 @@ export type MediaSchema = {
      * Host Total Bytes
      */
     host_total_bytes?: number | null;
+    /**
+     * Live Info
+     */
+    live_info?: {
+        [key: string]: unknown;
+    } | null;
 };
 
 /**
@@ -448,6 +480,10 @@ export type MediaUpdateSchema = {
      * Location
      */
     location?: string | null;
+    /**
+     * Capacity
+     */
+    capacity?: number | null;
     /**
      * Config
      */
@@ -608,82 +644,6 @@ export type ValidationError = {
     ctx?: {
         [key: string]: unknown;
     };
-};
-
-/**
- * FileItemSchema
- */
-export type AppApiInventoryFileItemSchema = {
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Path
-     */
-    path: string;
-    /**
-     * Type
-     */
-    type: string;
-    /**
-     * Size
-     */
-    size?: number | null;
-    /**
-     * Mtime
-     */
-    mtime?: number | null;
-    /**
-     * Media
-     */
-    media?: Array<string>;
-    /**
-     * Vulnerable
-     */
-    vulnerable?: boolean;
-    /**
-     * Selected
-     */
-    selected?: boolean;
-    /**
-     * Indeterminate
-     */
-    indeterminate?: boolean;
-};
-
-/**
- * FileItemSchema
- */
-export type AppApiSystemFileItemSchema = {
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Path
-     */
-    path: string;
-    /**
-     * Type
-     */
-    type: string;
-    /**
-     * Size
-     */
-    size?: number | null;
-    /**
-     * Mtime
-     */
-    mtime?: number | null;
-    /**
-     * Tracked
-     */
-    tracked?: boolean;
-    /**
-     * Ignored
-     */
-    ignored?: boolean;
 };
 
 export type GetDashboardStatsSystemDashboardStatsGetData = {
@@ -895,7 +855,7 @@ export type BrowseSystemPathSystemBrowseGetResponses = {
      *
      * Successful Response
      */
-    200: Array<AppApiSystemFileItemSchema>;
+    200: Array<FileItemSchema>;
 };
 
 export type BrowseSystemPathSystemBrowseGetResponse = BrowseSystemPathSystemBrowseGetResponses[keyof BrowseSystemPathSystemBrowseGetResponses];
@@ -908,6 +868,10 @@ export type SearchSystemIndexSystemSearchGetData = {
          * Q
          */
         q: string;
+        /**
+         * Path
+         */
+        path?: string | null;
         /**
          * Include Ignored
          */
@@ -931,7 +895,7 @@ export type SearchSystemIndexSystemSearchGetResponses = {
      *
      * Successful Response
      */
-    200: Array<AppApiSystemFileItemSchema>;
+    200: Array<FileItemSchema>;
 };
 
 export type SearchSystemIndexSystemSearchGetResponse = SearchSystemIndexSystemSearchGetResponses[keyof SearchSystemIndexSystemSearchGetResponses];
@@ -1155,28 +1119,32 @@ export type GetSystemTreeSystemTreeGetError = GetSystemTreeSystemTreeGetErrors[k
 
 export type GetSystemTreeSystemTreeGetResponses = {
     /**
+     * Response Get System Tree System Tree Get
+     *
      * Successful Response
      */
-    200: unknown;
+    200: Array<TreeNodeSchema>;
 };
 
-export type ListStorageMediaInventoryMediaGetData = {
+export type GetSystemTreeSystemTreeGetResponse = GetSystemTreeSystemTreeGetResponses[keyof GetSystemTreeSystemTreeGetResponses];
+
+export type ListStorageFleetInventoryMediaGetData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/inventory/media';
 };
 
-export type ListStorageMediaInventoryMediaGetResponses = {
+export type ListStorageFleetInventoryMediaGetResponses = {
     /**
-     * Response List Storage Media Inventory Media Get
+     * Response List Storage Fleet Inventory Media Get
      *
      * Successful Response
      */
     200: Array<MediaSchema>;
 };
 
-export type ListStorageMediaInventoryMediaGetResponse = ListStorageMediaInventoryMediaGetResponses[keyof ListStorageMediaInventoryMediaGetResponses];
+export type ListStorageFleetInventoryMediaGetResponse = ListStorageFleetInventoryMediaGetResponses[keyof ListStorageFleetInventoryMediaGetResponses];
 
 export type RegisterNewMediaInventoryMediaPostData = {
     body: MediaCreateSchema;
@@ -1254,7 +1222,7 @@ export type DeleteMediaAssetInventoryMediaMediaIdDeleteResponses = {
     200: unknown;
 };
 
-export type UpdateMediaRecordInventoryMediaMediaIdPatchData = {
+export type UpdateMediaAssetInventoryMediaMediaIdPatchData = {
     body: MediaUpdateSchema;
     path: {
         /**
@@ -1266,23 +1234,23 @@ export type UpdateMediaRecordInventoryMediaMediaIdPatchData = {
     url: '/inventory/media/{media_id}';
 };
 
-export type UpdateMediaRecordInventoryMediaMediaIdPatchErrors = {
+export type UpdateMediaAssetInventoryMediaMediaIdPatchErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UpdateMediaRecordInventoryMediaMediaIdPatchError = UpdateMediaRecordInventoryMediaMediaIdPatchErrors[keyof UpdateMediaRecordInventoryMediaMediaIdPatchErrors];
+export type UpdateMediaAssetInventoryMediaMediaIdPatchError = UpdateMediaAssetInventoryMediaMediaIdPatchErrors[keyof UpdateMediaAssetInventoryMediaMediaIdPatchErrors];
 
-export type UpdateMediaRecordInventoryMediaMediaIdPatchResponses = {
+export type UpdateMediaAssetInventoryMediaMediaIdPatchResponses = {
     /**
      * Successful Response
      */
     200: MediaSchema;
 };
 
-export type UpdateMediaRecordInventoryMediaMediaIdPatchResponse = UpdateMediaRecordInventoryMediaMediaIdPatchResponses[keyof UpdateMediaRecordInventoryMediaMediaIdPatchResponses];
+export type UpdateMediaAssetInventoryMediaMediaIdPatchResponse = UpdateMediaAssetInventoryMediaMediaIdPatchResponses[keyof UpdateMediaAssetInventoryMediaMediaIdPatchResponses];
 
 export type InitializeStorageHardwareInventoryMediaMediaIdInitializePostData = {
     body?: never;
@@ -1338,11 +1306,7 @@ export type BrowseArchiveIndexInventoryBrowseGetData = {
         /**
          * Path
          */
-        path?: string | null;
-        /**
-         * Include Ignored
-         */
-        include_ignored?: boolean;
+        path?: string;
     };
     url: '/inventory/browse';
 };
@@ -1358,14 +1322,10 @@ export type BrowseArchiveIndexInventoryBrowseGetError = BrowseArchiveIndexInvent
 
 export type BrowseArchiveIndexInventoryBrowseGetResponses = {
     /**
-     * Response Browse Archive Index Inventory Browse Get
-     *
      * Successful Response
      */
-    200: Array<AppApiInventoryFileItemSchema>;
+    200: unknown;
 };
-
-export type BrowseArchiveIndexInventoryBrowseGetResponse = BrowseArchiveIndexInventoryBrowseGetResponses[keyof BrowseArchiveIndexInventoryBrowseGetResponses];
 
 export type SearchArchiveIndexInventorySearchGetData = {
     body?: never;
@@ -1376,9 +1336,9 @@ export type SearchArchiveIndexInventorySearchGetData = {
          */
         q: string;
         /**
-         * Include Ignored
+         * Path
          */
-        include_ignored?: boolean;
+        path?: string | null;
     };
     url: '/inventory/search';
 };
@@ -1394,14 +1354,10 @@ export type SearchArchiveIndexInventorySearchGetError = SearchArchiveIndexInvent
 
 export type SearchArchiveIndexInventorySearchGetResponses = {
     /**
-     * Response Search Archive Index Inventory Search Get
-     *
      * Successful Response
      */
-    200: Array<AppApiInventoryFileItemSchema>;
+    200: unknown;
 };
-
-export type SearchArchiveIndexInventorySearchGetResponse = SearchArchiveIndexInventorySearchGetResponses[keyof SearchArchiveIndexInventorySearchGetResponses];
 
 export type GetArchiveTreeInventoryTreeGetData = {
     body?: never;
@@ -1411,10 +1367,6 @@ export type GetArchiveTreeInventoryTreeGetData = {
          * Path
          */
         path?: string | null;
-        /**
-         * Include Ignored
-         */
-        include_ignored?: boolean;
     };
     url: '/inventory/tree';
 };
@@ -1468,20 +1420,6 @@ export type GetArchiveItemMetadataInventoryMetadataGetResponses = {
 };
 
 export type GetArchiveItemMetadataInventoryMetadataGetResponse = GetArchiveItemMetadataInventoryMetadataGetResponses[keyof GetArchiveItemMetadataInventoryMetadataGetResponses];
-
-export type GetInventoryStatusInventoryGetData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/inventory/';
-};
-
-export type GetInventoryStatusInventoryGetResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
 
 export type TriggerBackupJobBackupsTriggerMediaIdPostData = {
     body?: never;

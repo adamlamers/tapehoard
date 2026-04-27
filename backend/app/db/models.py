@@ -51,6 +51,10 @@ class StorageMedia(Base):
         String
     )  # JSON config for type-specific details
     priority_index: Mapped[int] = mapped_column(Integer, default=0)
+    last_seen: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     versions: Mapped[List["FileVersion"]] = relationship(back_populates="media")
 

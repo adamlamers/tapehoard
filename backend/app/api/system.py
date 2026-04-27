@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.db import models
 from app.db.database import SessionLocal, get_db
 from app.services.scanner import JobManager, scanner_manager
+from app.api.schemas import TreeNodeSchema
 
 router = APIRouter(prefix="/system", tags=["System"])
 
@@ -57,6 +58,7 @@ class FileItemSchema(BaseModel):
     mtime: Optional[float] = None
     tracked: bool = False
     ignored: bool = False
+    sha256_hash: Optional[str] = None
 
 
 class TrackToggleRequest(BaseModel):
@@ -373,6 +375,14 @@ def browse_system_path(
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Path not found")
 
+    # Fetch existing indexed files for this path to check for hashes
+    indexed_files = {
+        f.file_path: f.sha256_hash
+        for f in db_session.query(models.FilesystemState)
+        .filter(models.FilesystemState.file_path.like(f"{path}/%"))
+        .all()
+    }
+
     results = []
     try:
         with os.scandir(path) as directory_iterator:
@@ -383,6 +393,16 @@ def browse_system_path(
                     is_tracked, is_ignored = get_tracking_status(
                         entry.path, tracking_map, exclusion_spec
                     )
+
+                    # Only show files that have a hash (archivable)
+                    # Directories are always shown
+                    if not entry.is_dir():
+                        if (
+                            entry.path not in indexed_files
+                            or not indexed_files[entry.path]
+                        ):
+                            continue
+
                     results.append(
                         FileItemSchema(
                             name=entry.name,
@@ -392,6 +412,7 @@ def browse_system_path(
                             mtime=file_stats.st_mtime,
                             tracked=is_tracked,
                             ignored=is_ignored,
+                            sha256_hash=indexed_files.get(entry.path),
                         )
                     )
                 except (OSError, FileNotFoundError):
@@ -405,24 +426,35 @@ def browse_system_path(
 
 @router.get("/search", response_model=List[FileItemSchema])
 def search_system_index(
-    q: str, include_ignored: bool = False, db_session: Session = Depends(get_db)
+    q: str,
+    path: Optional[str] = None,
+    include_ignored: bool = False,
+    db_session: Session = Depends(get_db),
 ):
-    """Instantaneous full-text search across the entire indexed filesystem."""
+    """Instantaneous full-text search across the entire indexed filesystem, optionally scoped by path."""
     if not q or len(q) < 3:
         return []
 
     ignore_filter = " AND fs.is_ignored = 0" if not include_ignored else ""
+    path_filter = ""
+    query_params = {"query": f'"{q}"'}
+
+    if path and path != "ROOT":
+        path_filter = " AND fs.file_path LIKE :path_prefix"
+        query_params["path_prefix"] = f"{path}%"
+
     search_sql = text(
         f"""
-        SELECT fs.file_path, fs.size, fs.mtime, fs.id, fs.is_ignored
+        SELECT fs.file_path, fs.size, fs.mtime, fs.id, fs.is_ignored, fs.sha256_hash
         FROM filesystem_fts
         JOIN filesystem_state fs ON fs.id = filesystem_fts.rowid
-        WHERE filesystem_fts MATCH :query {ignore_filter}
+        WHERE filesystem_fts MATCH :query {ignore_filter} {path_filter}
+        AND fs.sha256_hash IS NOT NULL
         LIMIT 200
     """
     )
 
-    files = db_session.execute(search_sql, {"query": f'"{q}"'}).fetchall()
+    files = db_session.execute(search_sql, query_params).fetchall()
     tracking_rules = db_session.query(models.TrackedSource).all()
     tracking_map = {rule.path: rule.action for rule in tracking_rules}
     exclusion_spec = get_exclusion_spec(db_session)
@@ -440,6 +472,7 @@ def search_system_index(
                 mtime=file_record[2],
                 tracked=is_tracked,
                 ignored=bool(file_record[4]),
+                sha256_hash=file_record[5],
             )
         )
 
@@ -573,6 +606,9 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
                 tape_provider = LTOProvider(device_path=dev_path)
                 if tape_provider.check_online():
                     barcode = tape_provider.identify_media()
+                    mam_info = tape_provider.get_mam_info()
+                    drive_info = tape_provider.get_drive_info()
+
                     if barcode in ignore_list:
                         continue
 
@@ -589,6 +625,7 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
                             "identifier": barcode or "NEW TAPE",
                             "is_registered": is_known,
                             "status": "ready" if not is_known else "active",
+                            "hardware_info": {"drive": drive_info, "tape": mam_info},
                         }
                     )
         except Exception as tape_error:
@@ -745,7 +782,7 @@ async def import_database_index(file: Any, db_session: Session = Depends(get_db)
     return {"message": "Import logic restricted for safety."}
 
 
-@router.get("/tree")
+@router.get("/tree", response_model=List[TreeNodeSchema])
 def get_system_tree(path: Optional[str] = None, db_session: Session = Depends(get_db)):
     """Returns a recursive tree view of the system for configuration."""
     from app.api.inventory import TreeNodeSchema

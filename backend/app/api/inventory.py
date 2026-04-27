@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import psutil
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,59 +12,21 @@ from sqlalchemy.orm import Session
 from app.db import models
 from app.db.database import get_db
 
+from app.api.schemas import (
+    MediaSchema,
+    MediaCreateSchema,
+    MediaUpdateSchema,
+    TreeNodeSchema,
+    ItemMetadataSchema,
+)
+
 router = APIRouter(prefix="/inventory", tags=["Inventory & Search"])
 
 # --- Schemas ---
 
 
-class MediaSchema(BaseModel):
-    id: int
-    identifier: str
-    media_type: str
-    capacity: int
-    bytes_used: int
-    status: str
-    location: Optional[str]
-    last_seen: Optional[datetime]
-    created_at: datetime
-    config: Dict[str, Any]
-    is_online: bool = False
-    is_identified: bool = False
-    priority_index: int = 0
-    host_free_bytes: Optional[int] = None
-    host_total_bytes: Optional[int] = None
-
-    class Config:
-        from_attributes = True
-
-
-class MediaCreateSchema(BaseModel):
-    identifier: str
-    media_type: str
-    capacity: int
-    location: Optional[str] = None
-    config: Dict[str, Any] = {}
-
-
-class MediaUpdateSchema(BaseModel):
-    status: Optional[str] = None
-    location: Optional[str] = None
-    capacity: Optional[int] = None
-    config: Optional[Dict[str, Any]] = None
-
-
 class ReorderMediaRequest(BaseModel):
     media_ids: List[int]
-
-
-class ItemMetadataSchema(BaseModel):
-    path: str
-    size: int
-    mtime: datetime
-    sha256_hash: Optional[str]
-    is_indexed: bool
-    is_ignored: bool
-    versions: List[Dict[str, Any]]
 
 
 # --- Core Logic ---
@@ -100,6 +62,7 @@ def list_storage_fleet(db_session: Session = Depends(get_db)):
         hardware_identified = False
         host_free_bytes = None
         host_total_bytes = None
+        live_info = None
 
         if provider:
             is_online = provider.check_online()
@@ -107,6 +70,15 @@ def list_storage_fleet(db_session: Session = Depends(get_db)):
                 try:
                     detected_id = provider.identify_media()
                     hardware_identified = detected_id == media.identifier
+
+                    if media.media_type == "tape":
+                        from app.providers.tape import LTOProvider
+
+                        if isinstance(provider, LTOProvider):
+                            live_info = {
+                                "drive": provider.get_drive_info(),
+                                "tape": provider.get_mam_info(),
+                            }
 
                     # For HDD providers, also grab host-level capacity if possible
                     if media.media_type == "hdd":
@@ -132,6 +104,7 @@ def list_storage_fleet(db_session: Session = Depends(get_db)):
                 id=media.id,
                 identifier=media.identifier,
                 media_type=media.media_type,
+                generation_tier=media.generation_tier,
                 capacity=media.capacity,
                 bytes_used=media.bytes_used,
                 status=media.status,
@@ -144,6 +117,7 @@ def list_storage_fleet(db_session: Session = Depends(get_db)):
                 priority_index=media.priority_index,
                 host_free_bytes=host_free_bytes,
                 host_total_bytes=host_total_bytes,
+                live_info=live_info,
             )
         )
     return results
@@ -179,6 +153,7 @@ def register_new_media(
     new_media = models.StorageMedia(
         identifier=request_data.identifier,
         media_type=request_data.media_type,
+        generation_tier=request_data.generation_tier,
         capacity=request_data.capacity,
         location=request_data.location,
         extra_config=json.dumps(request_data.config),
@@ -191,6 +166,7 @@ def register_new_media(
         id=new_media.id,
         identifier=new_media.identifier,
         media_type=new_media.media_type,
+        generation_tier=new_media.generation_tier,
         capacity=new_media.capacity,
         bytes_used=new_media.bytes_used,
         created_at=new_media.created_at,
@@ -566,6 +542,8 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
     results = []
 
     for d in dirs:
+        if not d[0] or d[0] == "/":
+            continue
         full_dir_path = query_path + d[0]
         # Calculate protection for this directory
         prot_sql = text("""
@@ -613,12 +591,22 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
 
 
 @router.get("/search")
-def search_archive_index(q: str, db_session: Session = Depends(get_db)):
-    """Performs FTS5 search across the indexed file paths."""
+def search_archive_index(
+    q: str, path: Optional[str] = None, db_session: Session = Depends(get_db)
+):
+    """Performs FTS5 search across the indexed file paths, optionally scoped by path."""
     if len(q) < 2:
         return []
 
-    search_sql = text("""
+    path_filter = ""
+    query_params = {"query": q}
+
+    if path and path != "ROOT":
+        path_filter = " AND fs.file_path LIKE :path_prefix"
+        query_params["path_prefix"] = f"{path}%"
+
+    search_sql = text(
+        f"""
         SELECT
             fs.id, fs.file_path, fs.size, fs.mtime,
             EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) as has_version
@@ -626,11 +614,13 @@ def search_archive_index(q: str, db_session: Session = Depends(get_db)):
         JOIN filesystem_state fs ON fs.id = fts.rowid
         WHERE filesystem_state_fts MATCH :query
         AND fs.is_ignored = 0
+        {path_filter}
         ORDER BY rank
         LIMIT 100
-    """)
+    """
+    )
 
-    rows = db_session.execute(search_sql, {"query": q}).fetchall()
+    rows = db_session.execute(search_sql, query_params).fetchall()
     return [
         {
             "name": os.path.basename(r[1]),
@@ -645,7 +635,41 @@ def search_archive_index(q: str, db_session: Session = Depends(get_db)):
     ]
 
 
-@router.get("/metadata")
+@router.get("/tree", response_model=List[TreeNodeSchema])
+def get_archive_tree(path: Optional[str] = None, db_session: Session = Depends(get_db)):
+    """Returns a recursive tree view of the virtual archive index."""
+    if path is None or path == "ROOT":
+        query_path = ""
+    else:
+        query_path = path if path.endswith("/") else path + "/"
+
+    # Find directories (immediate children)
+    dir_sql = text("""
+        SELECT DISTINCT
+            SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) as dir_name
+        FROM filesystem_state
+        WHERE file_path LIKE :prefix_wildcard
+        AND file_path != :prefix
+        AND INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') > 0
+        AND is_ignored = 0
+    """)
+    dirs = db_session.execute(
+        dir_sql, {"prefix": query_path, "prefix_wildcard": f"{query_path}%"}
+    ).fetchall()
+
+    results = []
+    for d in dirs:
+        if not d[0] or d[0] == "/":
+            continue
+        results.append(
+            TreeNodeSchema(name=d[0], path=query_path + d[0], has_children=True)
+        )
+
+    results.sort(key=lambda x: x.name.lower())
+    return results
+
+
+@router.get("/metadata", response_model=ItemMetadataSchema)
 def get_archive_item_metadata(path: str, db_session: Session = Depends(get_db)):
     """Retrieves full version history and location details for an indexed file."""
     item = (
@@ -670,9 +694,12 @@ def get_archive_item_metadata(path: str, db_session: Session = Depends(get_db)):
         )
 
     return ItemMetadataSchema(
+        id=item.id,
         path=item.file_path,
+        type="file",
         size=item.size,
         mtime=datetime.fromtimestamp(item.mtime, tz=timezone.utc),
+        last_seen_timestamp=item.last_seen_timestamp,
         sha256_hash=item.sha256_hash,
         is_indexed=item.is_indexed,
         is_ignored=item.is_ignored,

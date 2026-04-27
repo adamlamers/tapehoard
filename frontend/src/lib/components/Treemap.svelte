@@ -2,14 +2,7 @@
     import { onMount } from 'svelte';
     import ContextMenu from './ui/ContextMenu.svelte';
     import { FolderSearch, ExternalLink, ChevronLeft } from 'lucide-svelte';
-
-    interface TreemapItem {
-        label: string;
-        value: number;
-        color?: string;
-        fullPath?: string;
-        children?: TreemapItem[];
-    }
+    import type { TreemapItem } from '$lib/types';
 
     let { items = [], onSelect = null } = $props<{
         items: TreemapItem[];

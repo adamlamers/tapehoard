@@ -25,3 +25,11 @@ export interface Breadcrumb {
     name: string;
     path: string;
 }
+
+export interface TreemapItem {
+    label: string;
+    value: number;
+    color?: string;
+    fullPath?: string;
+    children?: TreemapItem[];
+}

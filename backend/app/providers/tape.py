@@ -12,6 +12,105 @@ class LTOProvider(AbstractStorageProvider):
         self.device_path = device_path
         self.encryption_key = encryption_key
 
+    def get_drive_info(self) -> dict:
+        """Retrieves vendor, model, and firmware version of the tape drive using sg_inq."""
+        try:
+            # Use sg_inq for reliable SCSI inquiry
+            result = subprocess.run(
+                ["sg_inq", self.device_path], capture_output=True, text=True, timeout=5
+            )
+            if result.returncode != 0:
+                return {}
+
+            info = {}
+            for line in result.stdout.splitlines():
+                if "Vendor identification:" in line:
+                    info["vendor"] = line.split(":", 1)[1].strip()
+                elif "Product identification:" in line:
+                    info["model"] = line.split(":", 1)[1].strip()
+                elif "Product revision level:" in line:
+                    info["firmware"] = line.split(":", 1)[1].strip()
+                elif "Standard Inquiry response:" in line:
+                    # Fallback parser for some versions of sg_inq
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        info["vendor"] = parts[1]
+                        info["model"] = parts[2]
+                        info["firmware"] = parts[3]
+
+            return info
+        except Exception as e:
+            logger.debug(f"Failed to get drive info for {self.device_path}: {e}")
+            return {}
+
+    def get_mam_info(self) -> dict:
+        """Reads Media Auxiliary Memory (MAM) attributes using sg_read_attr."""
+        if not self.check_online():
+            return {}
+
+        try:
+            # Attribute IDs (Standardized in SPC/SSC)
+            # 0x0000: Library Serial Number (Barcode)
+            # 0x0400: Medium Manufacturer
+            # 0x0401: Medium Serial Number
+            # 0x0800: Medium Type (LTO Gen)
+            # 0x0801: Medium Type Information
+            # 0x0806: Medium Manufacture Date
+
+            mam = {}
+
+            # Use sg_read_attr to get all attributes in text format
+            # This is more robust than trying to parse binary raw attributes
+            result = subprocess.run(
+                ["sg_read_attr", "-f", "0", self.device_path],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            if result.returncode == 0:
+                output = result.stdout
+
+                # Helper to extract values from sg_read_attr output
+                def extract(attr_id_hex: str):
+                    import re
+
+                    # Look for the hex ID and then the value after it
+                    match = re.search(
+                        f"{attr_id_hex}\\s+(?:.+?)\\s+(.+)$", output, re.MULTILINE
+                    )
+                    if match:
+                        return match.group(1).strip()
+                    return None
+
+                # Common MAM Attributes
+                mam["manufacturer"] = extract("0x0400")
+                mam["serial"] = extract("0x0401")
+                mam["barcode"] = extract("0x0000")
+                mam["generation"] = extract("0x0800")
+                mam["manufacture_date"] = extract("0x0806")
+
+                # Clean up generation string (e.g., "0x01" -> "LTO-1")
+                if mam.get("generation"):
+                    gen_map = {
+                        "0x01": "LTO-1",
+                        "0x02": "LTO-2",
+                        "0x03": "LTO-3",
+                        "0x04": "LTO-4",
+                        "0x05": "LTO-5",
+                        "0x06": "LTO-6",
+                        "0x07": "LTO-7",
+                        "0x08": "LTO-8",
+                        "0x09": "LTO-9",
+                    }
+                    val = mam["generation"].split()[0].lower()
+                    mam["generation_label"] = gen_map.get(val, mam["generation"])
+
+            return {k: v for k, v in mam.items() if v}
+        except Exception as e:
+            logger.debug(f"Failed to read MAM for {self.device_path}: {e}")
+            return {}
+
     def get_name(self) -> str:
         return "LTO Tape"
 

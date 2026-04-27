@@ -64,7 +64,7 @@
         searchLoading = true;
         try {
             const response = await searchSystemIndexSystemSearchGet({
-                query: { q: query }
+                query: { q: query, path: currentPath }
             });
             if (response.data) {
                 files = response.data.map((f: any) => ({
@@ -87,6 +87,7 @@
     }
 
     $effect(() => {
+        const path = currentPath;
         const query = searchQuery.trim();
         if (searchTimeout) clearTimeout(searchTimeout);
 
@@ -94,9 +95,11 @@
             searchTimeout = setTimeout(() => {
                 searchFiles(query);
             }, 300);
-        } else if (query.length === 0) {
+        } else {
+            // If query is empty or too short, load the current directory
+            // We use a small timeout to debounce rapid navigation or clearing
             searchTimeout = setTimeout(() => {
-                loadFiles(currentPath);
+                loadFiles(path);
             }, 50);
         }
     });
@@ -156,20 +159,27 @@
         } else {
             pendingChanges.set(path, !currentTracked);
         }
+
+        // Trigger reactivity for Svelte 5 state
+        pendingChanges = new Map(pendingChanges);
     }
 
     async function commitChanges() {
         if (pendingChanges.size === 0) return;
         committing = true;
         try {
-            const updates = Array.from(pendingChanges.entries()).map(([path, tracked]) => ({
-                path,
-                tracked
-            }));
+            const tracks = Array.from(pendingChanges.entries())
+                .filter(([_, tracked]) => tracked)
+                .map(([path, _]) => path);
+            const untracks = Array.from(pendingChanges.entries())
+                .filter(([_, tracked]) => !tracked)
+                .map(([path, _]) => path);
+
             await batchUpdateTrackingSystemTrackBatchPost({
-                body: { updates }
+                body: { tracks, untracks }
             });
             pendingChanges.clear();
+            pendingChanges = new Map(); // Trigger reactivity
             await loadFiles(currentPath);
             toast.success("Changes committed to index");
         } catch (error) {
@@ -237,12 +247,11 @@
         <div class="flex-1 flex flex-col min-h-0">
             <FileBrowser
                 {files}
-                {currentPath}
-                {loading}
-                {searchQuery}
+                bind:currentPath
+                isSearching={searchLoading}
+                bind:searchQuery
                 onNavigate={handleNavigate}
                 onToggleTrack={handleToggleTrack}
-                onSearch={(q) => searchQuery = q}
                 {pendingChanges}
                 mode="live"
             />
