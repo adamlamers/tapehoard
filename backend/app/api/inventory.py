@@ -73,8 +73,8 @@ class ItemMetadataSchema(BaseModel):
 def get_source_roots(db_session: Session) -> List[str]:
     """Retrieves the list of configured root paths from system settings."""
     setting = (
-        db_session.query(models.SystemSettings)
-        .filter(models.SystemSettings.key == "scan_paths")
+        db_session.query(models.SystemSetting)
+        .filter(models.SystemSetting.key == "scan_paths")
         .first()
     )
     if not setting:
