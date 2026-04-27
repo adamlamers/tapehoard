@@ -44,71 +44,90 @@ class LTOProvider(AbstractStorageProvider):
             return {}
 
     def get_mam_info(self) -> dict:
-        """Reads Media Auxiliary Memory (MAM) attributes using sg_read_attr."""
+        """Reads Media Auxiliary Memory (MAM) attributes using sg_read_attr --raw and parses the binary response."""
         if not self.check_online():
             return {}
 
+        import struct
+
         try:
-            # Attribute IDs (Standardized in SPC/SSC)
-            # 0x0000: Library Serial Number (Barcode)
-            # 0x0400: Medium Manufacturer
-            # 0x0401: Medium Serial Number
-            # 0x0800: Medium Type (LTO Gen)
-            # 0x0801: Medium Type Information
-            # 0x0806: Medium Manufacture Date
-
-            mam = {}
-
-            # Use sg_read_attr to get all attributes in text format
-            # This is more robust than trying to parse binary raw attributes
+            # Use sg_read_attr --raw to get the exact SCSI response buffer
             result = subprocess.run(
-                ["sg_read_attr", "-f", "0", self.device_path],
+                ["sg_read_attr", "--raw", self.device_path],
                 capture_output=True,
-                text=True,
                 timeout=10,
             )
 
-            if result.returncode == 0:
-                output = result.stdout
+            if result.returncode != 0 or not result.stdout:
+                return {}
 
-                # Helper to extract values from sg_read_attr output
-                def extract(attr_id_hex: str):
-                    import re
+            data = result.stdout
+            if len(data) < 4:
+                return {}
 
-                    # Look for the hex ID and then the value after it
-                    match = re.search(
-                        f"{attr_id_hex}\\s+(?:.+?)\\s+(.+)$", output, re.MULTILINE
-                    )
-                    if match:
-                        return match.group(1).strip()
-                    return None
+            # SCSI READ ATTRIBUTE parameter data starts with a 4-byte length field (Big Endian)
+            available_len = struct.unpack(">I", data[:4])[0]
+            pos = 4
+            end = min(pos + available_len, len(data))
 
-                # Common MAM Attributes
-                mam["manufacturer"] = extract("0x0400")
-                mam["serial"] = extract("0x0401")
-                mam["barcode"] = extract("0x0000")
-                mam["generation"] = extract("0x0800")
-                mam["manufacture_date"] = extract("0x0806")
+            mam = {}
+            # Standard MAM Attribute IDs (SPC-3 / SSC-2)
+            attr_map = {
+                0x0000: "barcode",
+                0x0400: "manufacturer",
+                0x0401: "serial",
+                0x0800: "density",
+                0x0805: "label",
+                0x0806: "manufacture_date",
+            }
 
-                # Clean up generation string (e.g., "0x01" -> "LTO-1")
-                if mam.get("generation"):
-                    gen_map = {
-                        "0x01": "LTO-1",
-                        "0x02": "LTO-2",
-                        "0x03": "LTO-3",
-                        "0x04": "LTO-4",
-                        "0x05": "LTO-5",
-                        "0x06": "LTO-6",
-                        "0x07": "LTO-7",
-                        "0x08": "LTO-8",
-                        "0x09": "LTO-9",
-                    }
-                    val = mam["generation"].split()[0].lower()
-                    mam["generation_label"] = gen_map.get(val, mam["generation"])
+            while pos + 5 <= end:
+                # Each attribute header: ID (2), Flags (1), Length (2)
+                attr_id, flags, attr_len = struct.unpack(">HBH", data[pos : pos + 5])
+                pos += 5
+
+                if pos + attr_len > end:
+                    break
+
+                val_bytes = data[pos : pos + attr_len]
+                pos += attr_len
+
+                if attr_id in attr_map:
+                    key = attr_map[attr_id]
+                    if attr_id == 0x0800:  # Density is a single byte
+                        mam[key] = hex(val_bytes[0]) if val_bytes else "0x00"
+                    else:
+                        # Most strings are ASCII, null-terminated or space-padded
+                        try:
+                            val = (
+                                val_bytes.decode("ascii", errors="ignore")
+                                .split("\x00")[0]
+                                .strip()
+                            )
+                            if val:
+                                mam[key] = val
+                        except Exception:
+                            continue
+
+            # Map LTO density codes to generation labels
+            if "density" in mam:
+                gen_map = {
+                    "0x40": "LTO-1",
+                    "0x42": "LTO-2",
+                    "0x44": "LTO-3",
+                    "0x46": "LTO-4",
+                    "0x48": "LTO-5",
+                    "0x58": "LTO-6",
+                    "0x5a": "LTO-7",
+                    "0x5c": "LTO-8",
+                    "0x60": "LTO-9",
+                }
+                val = mam["density"].lower()
+                mam["generation_label"] = gen_map.get(val, f"Density {val}")
 
             return {k: v for k, v in mam.items() if v}
         except Exception as e:
-            logger.debug(f"Failed to read MAM for {self.device_path}: {e}")
+            logger.debug(f"Failed to parse MAM binary for {self.device_path}: {e}")
             return {}
 
     def get_name(self) -> str:
