@@ -272,21 +272,23 @@ class LTOProvider(AbstractStorageProvider):
             logger.error(f"Hardware encryption error: {e}")
             raise
 
-    def identify_media(self) -> Optional[str]:
+    def identify_media(self, allow_intrusive=True) -> Optional[str]:
         """
-        Identifies the tape, using MAM Barcode (0x0806) as primary identity
-        to avoid disruptive head movement (rewind).
+        Identifies the tape, using MAM Barcode (0x0806) as the primary and
+        most reliable identity to avoid disruptive head movement.
         """
         if not self.check_online():
             return None
 
-        # 1. Try non-intrusive MAM barcode first
+        # 1. Try non-intrusive MAM barcode first (FAST and SILENT)
         mam = self.get_mam_info()
         barcode = mam.get("barcode")
         if barcode:
             return barcode
 
-        # 2. Fallback to physical tape label read (intrusive!)
+        # 2. If no MAM barcode, try fallback to physical tape label read (SLOW and INTRUSIVE)
+        if not allow_intrusive:
+            return None
         try:
             self._setup_encryption()
             self._run_mt("rewind")
@@ -351,6 +353,20 @@ class LTOProvider(AbstractStorageProvider):
 
             self._run_mt("weof")
             self._run_mt("rewind")
+
+            # 3. Write identifier to MAM chip (Non-intrusive identity)
+            try:
+                # Use sg_write_attr to set the Barcode attribute (0x0806)
+                # Some drives/drivers allow the name, otherwise use the hex ID
+                subprocess.run(
+                    ["sg_write_attr", "-w", f"0x0806={media_id}", self.device_path],
+                    capture_output=True,
+                    check=False,  # Don't fail the whole init if MAM write is refused
+                )
+                logger.info(f"Identity '{media_id}' written to cartridge MAM chip")
+            except Exception as mam_err:
+                logger.warning(f"Failed to write MAM identity: {mam_err}")
+
             logger.info(f"Initialized LTO tape with label {media_id}")
             return True
         except PermissionError as e:
