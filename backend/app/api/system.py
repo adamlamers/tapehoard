@@ -605,7 +605,7 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
 
                 tape_provider = LTOProvider(device_path=dev_path)
                 if tape_provider.check_online():
-                    barcode = tape_provider.identify_media()
+                    barcode = tape_provider.identify_media(allow_intrusive=False)
                     mam_info = tape_provider.get_mam_info()
                     drive_info = tape_provider.get_drive_info()
 

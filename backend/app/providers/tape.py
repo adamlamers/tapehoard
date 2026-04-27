@@ -6,8 +6,12 @@ from loguru import logger
 
 
 class LTOProvider(AbstractStorageProvider):
-    # Class-level cache to avoid thrashing the drive during periodic polls
-    # Maps device_path -> { "identifier": str, "timestamp": datetime }
+    # Class-level caches to ensure UI stability during busy periods
+    # device_path -> { info }
+    _drive_cache: dict = {}
+    # device_path -> { info }
+    _mam_cache: dict = {}
+    # barcode/serial -> label_id
     _id_cache: dict = {}
 
     def __init__(
@@ -19,6 +23,10 @@ class LTOProvider(AbstractStorageProvider):
 
     def get_drive_info(self) -> dict:
         """Retrieves vendor, model, and firmware version of the tape drive using sg_inq."""
+        # Drive hardware info never changes, so cache it forever per device path
+        if self.device_path in self._drive_cache:
+            return self._drive_cache[self.device_path]
+
         try:
             # Use sg_inq for reliable SCSI inquiry
             result = subprocess.run(
@@ -35,14 +43,9 @@ class LTOProvider(AbstractStorageProvider):
                     info["model"] = line.split(":", 1)[1].strip()
                 elif "Product revision level:" in line:
                     info["firmware"] = line.split(":", 1)[1].strip()
-                elif "Standard Inquiry response:" in line:
-                    # Fallback parser for some versions of sg_inq
-                    parts = line.split()
-                    if len(parts) >= 4:
-                        info["vendor"] = parts[1]
-                        info["model"] = parts[2]
-                        info["firmware"] = parts[3]
 
+            if info:
+                self._drive_cache[self.device_path] = info
             return info
         except Exception as e:
             logger.debug(f"Failed to get drive info for {self.device_path}: {e}")
@@ -50,9 +53,6 @@ class LTOProvider(AbstractStorageProvider):
 
     def get_mam_info(self) -> dict:
         """Reads Media Auxiliary Memory (MAM) attributes using sg_read_attr --raw and parses the binary response."""
-        if not self.check_online():
-            return {}
-
         import struct
 
         try:
@@ -64,11 +64,12 @@ class LTOProvider(AbstractStorageProvider):
             )
 
             if result.returncode != 0 or not result.stdout:
-                return {}
+                # If busy, return the last known MAM for this drive
+                return self._mam_cache.get(self.device_path, {})
 
             data = result.stdout
             if len(data) < 4:
-                return {}
+                return self._mam_cache.get(self.device_path, {})
 
             # SCSI READ ATTRIBUTE parameter data starts with a 4-byte length field (Big Endian)
             available_len = struct.unpack(">I", data[:4])[0]
@@ -76,9 +77,9 @@ class LTOProvider(AbstractStorageProvider):
             end = min(pos + available_len, len(data))
 
             mam = {}
-            # Standard MAM Attribute IDs (SPC-3 / SSC-2)
             attr_map = {
                 0x0000: "barcode",
+                0x0002: "load_count",
                 0x0400: "manufacturer",
                 0x0401: "serial",
                 0x0800: "density",
@@ -87,22 +88,20 @@ class LTOProvider(AbstractStorageProvider):
             }
 
             while pos + 5 <= end:
-                # Each attribute header: ID (2), Flags (1), Length (2)
                 attr_id, flags, attr_len = struct.unpack(">HBH", data[pos : pos + 5])
                 pos += 5
-
                 if pos + attr_len > end:
                     break
-
                 val_bytes = data[pos : pos + attr_len]
                 pos += attr_len
 
                 if attr_id in attr_map:
                     key = attr_map[attr_id]
-                    if attr_id == 0x0800:  # Density is a single byte
+                    if attr_id == 0x0800:
                         mam[key] = hex(val_bytes[0]) if val_bytes else "0x00"
+                    elif attr_id == 0x0002:
+                        mam[key] = int.from_bytes(val_bytes, "big")
                     else:
-                        # Most strings are ASCII, null-terminated or space-padded
                         try:
                             val = (
                                 val_bytes.decode("ascii", errors="ignore")
@@ -114,7 +113,6 @@ class LTOProvider(AbstractStorageProvider):
                         except Exception:
                             continue
 
-            # Map LTO density codes to generation labels
             if "density" in mam:
                 gen_map = {
                     "0x40": "LTO-1",
@@ -130,27 +128,37 @@ class LTOProvider(AbstractStorageProvider):
                 val = mam["density"].lower()
                 mam["generation_label"] = gen_map.get(val, f"Density {val}")
 
-            return {k: v for k, v in mam.items() if v}
+            # Update cache with new successful read
+            if mam:
+                self._mam_cache[self.device_path] = mam
+            return mam
         except Exception as e:
-            logger.debug(f"Failed to parse MAM binary for {self.device_path}: {e}")
-            return {}
+            if "Device or resource busy" in str(e):
+                self.drive_busy = True
+            return self._mam_cache.get(self.device_path, {})
 
     def get_name(self) -> str:
         return "LTO Tape"
 
     def check_online(self) -> bool:
-        """Checks if the tape drive is present and READY"""
+        """Checks if the tape drive is present and READY (or BUSY which implies online)"""
         if not os.path.exists(self.device_path):
+            # If device node disappeared, clear caches for this path
+            self._drive_cache.pop(self.device_path, None)
+            self._mam_cache.pop(self.device_path, None)
             return False
         try:
-            # mt status returns 0 if drive is ready and tape is loaded
             result = subprocess.run(
                 ["mt", "-f", self.device_path, "status"],
                 capture_output=True,
                 text=True,
                 timeout=5,
             )
-            # Look for "ONLINE" or "READY" in output depending on driver
+            # "Device or resource busy" is a SUCCESS for "is it online"
+            if result.returncode != 0 and "Device or resource busy" in result.stderr:
+                self.drive_busy = True
+                return True
+
             is_ready = (
                 "ONLINE" in result.stdout
                 or "READY" in result.stdout
@@ -267,21 +275,41 @@ class LTOProvider(AbstractStorageProvider):
             logger.error(f"Hardware encryption error: {e}")
             raise
 
-    def identify_media(self) -> Optional[str]:
-        """Identifies the tape, using MAM barcode as a cache key to avoid rewinding."""
+    def identify_media(self, allow_intrusive=True) -> Optional[str]:
+        """
+        Identifies the tape, using MAM barcode/serial and load_count as cache keys.
+        Set allow_intrusive=False to skip physical tape reads (rewind/tar) if not cached.
+        """
         if not self.check_online():
             return None
 
         # 1. Try to get MAM info first (FAST and NON-INTRUSIVE)
         mam = self.get_mam_info()
         barcode = mam.get("barcode")
+        serial = mam.get("serial")
+        load_count = mam.get("load_count")
 
-        # 2. Check if we have this barcode in our class-level cache
+        # Unique key for this specific tape session
+        # (device_path, load_count) is globally unique for a "loaded" tape
+        session_key = None
+        if load_count is not None:
+            session_key = f"{self.device_path}:{load_count}"
+
+        # 2. Check caches
+        # First check barcode/serial cache
         if barcode and barcode in self._id_cache:
             return self._id_cache[barcode]
+        if serial and serial in self._id_cache:
+            return self._id_cache[serial]
 
-        # 3. If no barcode or not in cache, we MUST read the physical label
-        # BUT only if the drive isn't currently busy with a job
+        # Then check session cache (handles tapes with no barcode/serial)
+        if session_key and session_key in self._id_cache:
+            return self._id_cache[session_key]
+
+        # 3. If not in cache and intrusive allowed, we MUST read the physical label
+        if not allow_intrusive:
+            return None
+
         try:
             # We must set up encryption BEFORE trying to read the label if it's an encrypted tape
             self._setup_encryption()
@@ -292,13 +320,17 @@ class LTOProvider(AbstractStorageProvider):
                 ["tar", "-xf", self.device_path, "-O", ".tapehoard_label"],
                 capture_output=True,
                 text=True,
-                timeout=15,  # Shorter timeout for polls
+                timeout=15,  # Shorter timeout for status polls
             )
             if result.returncode == 0:
                 label_id = result.stdout.strip()
-                # If we have a barcode, cache this association
+                # Store in all relevant caches
                 if barcode:
                     self._id_cache[barcode] = label_id
+                if serial:
+                    self._id_cache[serial] = label_id
+                if session_key:
+                    self._id_cache[session_key] = label_id
                 return label_id
 
         except Exception as e:

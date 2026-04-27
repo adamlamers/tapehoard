@@ -466,7 +466,7 @@ class ArchiverService:
                         break
                     time.sleep(10)
 
-                detected_id = provider.identify_media()
+                detected_id = provider.identify_media(allow_intrusive=False)
                 # HDD UUID Special Case
                 if (
                     media_record.media_type == "hdd"

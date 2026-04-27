@@ -68,7 +68,7 @@ def list_storage_fleet(db_session: Session = Depends(get_db)):
             is_online = provider.check_online()
             if is_online:
                 try:
-                    detected_id = provider.identify_media()
+                    detected_id = provider.identify_media(allow_intrusive=False)
                     hardware_identified = detected_id == media.identifier
 
                     if media.media_type == "tape":

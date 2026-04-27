@@ -126,7 +126,8 @@ class SchedulerService:
                     if (
                         provider
                         and provider.check_online()
-                        and provider.identify_media() == media.identifier
+                        and provider.identify_media(allow_intrusive=False)
+                        == media.identifier
                     ):
                         found_media = media
                         break
