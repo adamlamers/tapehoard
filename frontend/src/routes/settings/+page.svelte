@@ -14,6 +14,7 @@
     } from '$lib/api';
     import { toast } from "svelte-sonner";
     import { cn } from "$lib/utils";
+    import { beforeNavigate } from '$app/navigation';
 
     let sourceRoots = $state<string[]>(["/source_data"]);
     let restoreDestinations = $state<string[]>(["/restores"]);
@@ -22,6 +23,36 @@
     let scanSchedule = $state("");
     let archivalSchedule = $state("");
     let notificationUrls = $state<string[]>([]);
+
+    let initialState = $state("");
+    const isDirty = $derived(initialState !== JSON.stringify({
+        sourceRoots,
+        restoreDestinations,
+        tapeDrives,
+        globalExclusions,
+        scanSchedule,
+        archivalSchedule,
+        notificationUrls
+    }));
+
+    beforeNavigate((navigation) => {
+        if (isDirty) {
+            if (!confirm("You have unsaved changes. Are you sure you want to leave?")) {
+                navigation.cancel();
+            }
+        }
+    });
+
+    $effect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = "";
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    });
 
     let activeTab = $state("hardware");
     let loading = $state(true);
@@ -75,6 +106,17 @@
                 if (data.schedule_archival) archivalSchedule = data.schedule_archival;
                 if (data.notification_urls) notificationUrls = JSON.parse(data.notification_urls);
             }
+
+            // Capture snapshot for dirty check
+            initialState = JSON.stringify({
+                sourceRoots,
+                restoreDestinations,
+                tapeDrives,
+                globalExclusions,
+                scanSchedule,
+                archivalSchedule,
+                notificationUrls
+            });
         } catch (error) {
             toast.error("Failed to load system configuration");
         } finally {
@@ -94,6 +136,18 @@
                 updateSystemSettingSystemSettingsPost({ body: { key: "schedule_archival", value: archivalSchedule } }),
                 updateSystemSettingSystemSettingsPost({ body: { key: "notification_urls", value: JSON.stringify(notificationUrls) } })
             ]);
+
+            // Snapshot saved state
+            initialState = JSON.stringify({
+                sourceRoots,
+                restoreDestinations,
+                tapeDrives,
+                globalExclusions,
+                scanSchedule,
+                archivalSchedule,
+                notificationUrls
+            });
+
             toast.success("System configuration committed");
         } catch (error) {
             toast.error("Failed to save settings");

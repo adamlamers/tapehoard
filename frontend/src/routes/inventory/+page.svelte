@@ -42,6 +42,7 @@
     } from '$lib/api';
     import { dndzone } from 'svelte-dnd-action';
     import { toast } from 'svelte-sonner';
+    import { beforeNavigate } from '$app/navigation';
 
     let mediaList = $state<MediaSchema[]>([]);
     let discoveredAssets = $state<any[]>([]);
@@ -49,6 +50,31 @@
     let showRegisterDialog = $state(false);
     let showAdvancedCloud = $state(false);
     let editingMedia = $state<MediaSchema | null>(null);
+
+    // Track "dirty" state for dialogs
+    const isFormDirty = $derived(
+        (showRegisterDialog && (newMedia.identifier !== '' || newMedia.mount_path !== '')) ||
+        (editingMedia !== null)
+    );
+
+    beforeNavigate((navigation) => {
+        if (isFormDirty) {
+            if (!confirm("You have a registration or edit dialog open. Your changes will be lost. Leave anyway?")) {
+                navigation.cancel();
+            }
+        }
+    });
+
+    $effect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (isFormDirty) {
+                e.preventDefault();
+                e.returnValue = "";
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    });
 
     // New Media Form State
     let newMedia = $state({
