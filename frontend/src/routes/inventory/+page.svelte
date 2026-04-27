@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
     import {
         Plus,
         CassetteTape,
@@ -97,8 +97,10 @@
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     });
 
-    async function loadMedia() {
-        loading = true;
+    let pollInterval: any;
+
+    async function loadMedia(silent = false) {
+        if (!silent) loading = true;
         try {
             const [mediaRes, hardwareRes] = await Promise.all([
                 listStorageFleetInventoryMediaGet(),
@@ -107,11 +109,20 @@
             if (mediaRes.data) mediaList = mediaRes.data;
             if (hardwareRes.data) discoveredAssets = hardwareRes.data as any[];
         } catch (error) {
-            toast.error("Failed to load inventory details");
+            if (!silent) toast.error("Failed to load inventory details");
         } finally {
-            loading = false;
+            if (!silent) loading = false;
         }
     }
+
+    onMount(() => {
+        loadMedia();
+        pollInterval = setInterval(() => loadMedia(true), 5000);
+    });
+
+    onDestroy(() => {
+        if (pollInterval) clearInterval(pollInterval);
+    });
 
     function handleDndConsider(e: CustomEvent) {
         // Only allow reordering within the active list visually
@@ -342,21 +353,6 @@
                         <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
                             <Globe size={10} /> {media.config.bucket_name}
                         </div>
-                    {:else if media.media_type === 'tape' && media.live_info}
-                        {@const info = media.live_info as any}
-                        {#if info.drive}
-                            <div class="flex items-center gap-2 text-[8px] font-bold text-blue-400/80 uppercase tracking-tight">
-                                <Cpu size={10} /> {info.drive.vendor} {info.drive.model} (FW: {info.drive.firmware})
-                            </div>
-                        {/if}
-                        {#if info.tape}
-                            <div class="flex flex-wrap gap-x-2 gap-y-1 mt-0.5">
-                                <span class="text-[7px] font-black bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary uppercase">MFR: {info.tape.manufacturer}</span>
-                                <span class="text-[7px] font-black bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary uppercase">S/N: {info.tape.serial}</span>
-                                <span class="text-[7px] font-black bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 text-blue-400 uppercase">{info.tape.generation_label || info.tape.generation}</span>
-                                <span class="text-[7px] font-black bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary uppercase">BORN: {info.tape.manufacture_date}</span>
-                            </div>
-                        {/if}
                     {/if}
                     <div class="flex gap-2 mt-0.5">
                         {#if media.config?.encryption_key || media.config?.encryption_passphrase}
@@ -545,6 +541,98 @@
 
         <!-- INVENTORY SECTION -->
         <section class="space-y-12">
+            <!-- Hardware Status -->
+            {#if mediaList.some(m => m.is_online && m.media_type === 'tape')}
+                <div class="space-y-6">
+                    <div class="flex items-center gap-3 px-2">
+                        <div class="p-1.5 bg-blue-500/10 rounded-md text-blue-500"><Cpu size={16} /></div>
+                        <h2 class="text-[11px] font-black uppercase tracking-[0.2em] text-text-primary">Live Hardware Status</h2>
+                        <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent"></div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-6">
+                        {#each mediaList.filter(m => m.is_online && m.media_type === 'tape') as media}
+                            {#if media.live_info}
+                                {@const info = media.live_info as any}
+                                <Card class="bg-bg-secondary border-blue-500/30 shadow-2xl relative overflow-hidden">
+                                    <div class="absolute top-0 right-0 p-4">
+                                        <div class="flex items-center gap-2 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20">
+                                            <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse"></div>
+                                            <span class="text-[9px] font-black uppercase tracking-widest text-blue-400">Drive Online</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="p-8 flex flex-col md:flex-row gap-12">
+                                        <!-- Drive Info -->
+                                        <div class="flex-1 space-y-6">
+                                            <div>
+                                                <div class="text-[9px] font-black uppercase tracking-[0.2em] text-text-secondary opacity-50 mb-3 flex items-center gap-2">
+                                                    <Cpu size={12} /> Physical Tape Drive
+                                                </div>
+                                                <div class="flex items-baseline gap-3">
+                                                    <h3 class="text-3xl font-black text-text-primary tracking-tighter uppercase">{info.drive?.vendor || 'Unknown'}</h3>
+                                                    <span class="text-xl font-bold text-text-secondary opacity-40">{info.drive?.model || 'Generic LTO'}</span>
+                                                </div>
+                                                <div class="mt-2 flex items-center gap-4 text-[10px] font-mono text-text-secondary/60">
+                                                    <span>FIRMWARE: <span class="text-text-primary font-bold">{info.drive?.firmware || 'N/A'}</span></span>
+                                                    <span class="h-3 w-px bg-border-color"></span>
+                                                    <span>DEVICE: <span class="text-text-primary font-bold">{media.config?.device_path || '/dev/nst0'}</span></span>
+                                                </div>
+                                            </div>
+
+                                            <div class="grid grid-cols-2 gap-8 pt-6 border-t border-border-color/30">
+                                                <div>
+                                                    <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Assigned ID</span>
+                                                    <span class="text-lg font-black text-text-primary mono tracking-tighter">{media.identifier}</span>
+                                                </div>
+                                                <div>
+                                                    <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Reported MAM Barcode</span>
+                                                    <span class="text-lg font-black text-text-primary mono tracking-tighter">{info.tape?.barcode || 'NO BARCODE'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Media/MAM Info -->
+                                        <div class="flex-1 bg-bg-primary/30 rounded-2xl p-6 border border-border-color/50 relative">
+                                            <div class="text-[9px] font-black uppercase tracking-[0.2em] text-text-secondary opacity-50 mb-6 flex items-center gap-2">
+                                                <Database size={12} /> Medium Auxiliary Memory (MAM)
+                                            </div>
+
+                                            <div class="grid grid-cols-2 gap-y-6 gap-x-12">
+                                                <div>
+                                                    <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Manufacturer</span>
+                                                    <span class="text-xs font-bold text-text-primary uppercase tracking-wider">{info.tape?.manufacturer || 'Unknown'}</span>
+                                                </div>
+                                                <div>
+                                                    <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Media Serial</span>
+                                                    <span class="text-xs font-bold text-text-primary mono">{info.tape?.serial || 'N/A'}</span>
+                                                </div>
+                                                <div>
+                                                    <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">LTO Generation</span>
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[10px] font-black border border-blue-500/20">
+                                                        {info.tape?.generation_label || info.tape?.generation || 'LTO'}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Manufacture Date</span>
+                                                    <span class="text-xs font-bold text-text-primary mono">{info.tape?.manufacture_date || 'N/A'}</span>
+                                                </div>
+                                                <div class="col-span-2 pt-2">
+                                                    <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Medium Application Label</span>
+                                                    <div class="bg-bg-secondary p-3 rounded-lg border border-border-color font-mono text-xs text-text-primary italic shadow-inner">
+                                                        "{info.tape?.label || 'UNLABELED'}"
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            {/if}
+                        {/each}
+                    </div>
+                </div>
+            {/if}
+
             <!-- Active Media -->
             <div class="space-y-6">
                 <div class="flex items-center gap-3 px-2">
