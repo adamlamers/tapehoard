@@ -28,10 +28,31 @@ class LTOProvider(AbstractStorageProvider):
                 timeout=5,
             )
             # Look for "ONLINE" or "READY" in output depending on driver
-            return (
+            is_ready = (
                 "ONLINE" in result.stdout
                 or "READY" in result.stdout
                 or result.returncode == 0
+            )
+            return is_ready
+        except Exception:
+            return False
+
+    def is_write_protected(self) -> bool:
+        """Checks if the tape is write-protected (read-only)"""
+        try:
+            result = subprocess.run(
+                ["mt", "-f", self.device_path, "status"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            # Common indicators of write protection in mt status
+            # WR_PROT is common on Linux, 'read-only' on others
+            output = result.stdout.upper()
+            return (
+                "WR_PROT" in output
+                or "READ-ONLY" in output
+                or "WRITE PROTECT" in output
             )
         except Exception:
             return False
@@ -128,6 +149,11 @@ class LTOProvider(AbstractStorageProvider):
     def initialize_media(self, media_id: str) -> bool:
         """Writes the identifier to File Mark 0 on the tape"""
         try:
+            if self.is_write_protected():
+                raise PermissionError(
+                    f"Hardware '{self.device_path}' is write-protected (read-only mode). Flip the physical switch on the tape."
+                )
+
             self._run_mt("rewind")
             self._run_mt("weof")  # Ensure we are starting clean
             self._run_mt("rewind")
@@ -148,16 +174,31 @@ class LTOProvider(AbstractStorageProvider):
                         proc = subprocess.Popen(
                             ["dd", f"of={self.device_path}", "bs=256k"],
                             stdin=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
                         )
                         if proc.stdin:
                             proc.stdin.write(f.read())
                             proc.stdin.close()
-                        proc.wait()
+                        _, stderr = proc.communicate()
+
+                        if proc.returncode != 0:
+                            stderr_text = stderr.decode() if stderr else "Unknown error"
+                            if (
+                                "Read-only file system" in stderr_text
+                                or "Permission denied" in stderr_text
+                            ):
+                                raise PermissionError(
+                                    f"Tape is write-protected: {stderr_text}"
+                                )
+                            raise RuntimeError(f"dd failed: {stderr_text}")
 
             self._run_mt("weof")
             self._run_mt("rewind")
             logger.info(f"Initialized LTO tape with label {media_id}")
             return True
+        except PermissionError as e:
+            logger.error(f"Tape write protection detected: {e}")
+            raise
         except Exception as e:
             logger.error(f"Failed to initialize tape: {e}")
             return False

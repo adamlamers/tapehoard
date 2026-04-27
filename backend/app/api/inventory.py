@@ -295,8 +295,15 @@ def initialize_storage_hardware(
                 detail=f"Hardware '{media_record.identifier}' contains existing data. Use 'force' to overwrite.",
             )
 
-    if storage_provider.initialize_media(media_record.identifier):
-        return {"message": "Hardware initialization complete."}
+    try:
+        if storage_provider.initialize_media(media_record.identifier):
+            return {"message": "Hardware initialization complete."}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Hardware initialization failed: {str(e)}"
+        )
 
     raise HTTPException(
         status_code=500, detail="Hardware refused initialization command."
