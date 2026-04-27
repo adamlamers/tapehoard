@@ -6,11 +6,16 @@ from loguru import logger
 
 
 class LTOProvider(AbstractStorageProvider):
+    # Class-level cache to avoid thrashing the drive during periodic polls
+    # Maps device_path -> { "identifier": str, "timestamp": datetime }
+    _id_cache: dict = {}
+
     def __init__(
         self, device_path: str = "/dev/nst0", encryption_key: Optional[str] = None
     ):
         self.device_path = device_path
         self.encryption_key = encryption_key
+        self.drive_busy = False
 
     def get_drive_info(self) -> dict:
         """Retrieves vendor, model, and firmware version of the tape drive using sg_inq."""
@@ -203,9 +208,21 @@ class LTOProvider(AbstractStorageProvider):
 
     def _run_mt(self, command: str):
         try:
-            subprocess.run(["mt", "-f", self.device_path, command], check=True)
+            result = subprocess.run(
+                ["mt", "-f", self.device_path, command], capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                if "Device or resource busy" in result.stderr:
+                    self.drive_busy = True
+                raise subprocess.CalledProcessError(
+                    result.returncode,
+                    ["mt", "-f", self.device_path, command],
+                    output=result.stdout,
+                    stderr=result.stderr,
+                )
         except subprocess.CalledProcessError as e:
-            logger.error(f"Tape command 'mt {command}' failed: {e}")
+            if not self.drive_busy:
+                logger.error(f"Tape command 'mt {command}' failed: {e}")
             raise
 
     def _setup_encryption(self):
@@ -237,15 +254,34 @@ class LTOProvider(AbstractStorageProvider):
                 raise RuntimeError(f"LTO Encryption Setup Failed: {stderr}")
 
             # Verify encryption is on
-            subprocess.run(["stenc", "-f", self.device_path, "--on"], check=True)
+            subprocess.run(
+                ["stenc", "-f", self.device_path, "--on"],
+                check=True,
+                capture_output=True,
+            )
             logger.info("LTO Hardware Encryption ENABLED and LOCKED")
 
         except Exception as e:
+            if "Device or resource busy" in str(e):
+                self.drive_busy = True
             logger.error(f"Hardware encryption error: {e}")
             raise
 
     def identify_media(self) -> Optional[str]:
-        """Reads the label from the beginning of the tape (File Mark 0)"""
+        """Identifies the tape, using MAM barcode as a cache key to avoid rewinding."""
+        if not self.check_online():
+            return None
+
+        # 1. Try to get MAM info first (FAST and NON-INTRUSIVE)
+        mam = self.get_mam_info()
+        barcode = mam.get("barcode")
+
+        # 2. Check if we have this barcode in our class-level cache
+        if barcode and barcode in self._id_cache:
+            return self._id_cache[barcode]
+
+        # 3. If no barcode or not in cache, we MUST read the physical label
+        # BUT only if the drive isn't currently busy with a job
         try:
             # We must set up encryption BEFORE trying to read the label if it's an encrypted tape
             self._setup_encryption()
@@ -256,12 +292,24 @@ class LTOProvider(AbstractStorageProvider):
                 ["tar", "-xf", self.device_path, "-O", ".tapehoard_label"],
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=15,  # Shorter timeout for polls
             )
             if result.returncode == 0:
-                return result.stdout.strip()
+                label_id = result.stdout.strip()
+                # If we have a barcode, cache this association
+                if barcode:
+                    self._id_cache[barcode] = label_id
+                return label_id
+
         except Exception as e:
-            logger.error(f"Failed to identify tape: {e}")
+            if "Device or resource busy" in str(e):
+                self.drive_busy = True
+            # Only log if it's a real failure, not just a busy drive
+            if not self.drive_busy:
+                logger.debug(
+                    f"Identification skipped or failed for {self.device_path}: {e}"
+                )
+
         return None
 
     def initialize_media(self, media_id: str) -> bool:
