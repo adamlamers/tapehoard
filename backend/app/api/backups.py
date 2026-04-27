@@ -18,8 +18,7 @@ router = APIRouter(prefix="/backups", tags=["Backups"])
 
 class BackupJobSchema(BaseModel):
     id: int
-    job_name: str
-    backup_type: str
+    job_type: str
     status: str
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

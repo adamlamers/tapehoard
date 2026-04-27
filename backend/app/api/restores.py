@@ -8,6 +8,7 @@ from app.db import models
 from app.services.archiver import archiver_manager
 from app.services.scanner import JobManager
 from loguru import logger
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/restores", tags=["Restores"])
 
@@ -66,7 +67,7 @@ class DirectoryCartRequest(BaseModel):
 # --- Endpoints ---
 
 
-@router.get("/cart", response_model=List[CartItemSchema])
+@router.get("/queue", response_model=List[CartItemSchema])
 def list_recovery_queue(db_session: Session = Depends(get_db)):
     """Returns all items currently queued for data recovery."""
     queue_items = (
@@ -85,7 +86,7 @@ def list_recovery_queue(db_session: Session = Depends(get_db)):
     ]
 
 
-@router.post("/cart/clear")
+@router.post("/queue/clear")
 def clear_recovery_queue(db_session: Session = Depends(get_db)):
     """Removes all items from the data recovery queue."""
     db_session.query(models.RestoreCart).delete()
@@ -93,7 +94,37 @@ def clear_recovery_queue(db_session: Session = Depends(get_db)):
     return {"message": "Recovery queue cleared."}
 
 
-@router.post("/cart/{file_id}")
+@router.post("/queue/directory")
+def add_directory_to_recovery_queue(
+    request_data: DirectoryCartRequest, db_session: Session = Depends(get_db)
+):
+    """Recursively adds all restorable files within a directory to the recovery queue."""
+    target_directory = request_data.path
+    if not target_directory.endswith("/"):
+        target_directory += "/"
+
+    # Explicitly providing created_at for the raw SQL insert to satisfy Integrity Constraints
+    now = datetime.now(timezone.utc)
+    discovery_sql = text("""
+        INSERT INTO restore_cart (filesystem_state_id, created_at)
+        SELECT DISTINCT fs.id, :now
+        FROM filesystem_state fs
+        JOIN file_versions fv ON fv.filesystem_state_id = fs.id
+        LEFT JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
+        WHERE fs.file_path LIKE :prefix
+        AND rc.id IS NULL
+    """)
+
+    db_session.execute(discovery_sql, {"prefix": f"{target_directory}%", "now": now})
+    db_session.commit()
+
+    total_in_queue = db_session.query(models.RestoreCart).count()
+    logger.info(f"Directory recovery queued. Total items: {total_in_queue}")
+
+    return {"message": f"Added restorable items from {target_directory} to queue."}
+
+
+@router.post("/queue/file/{file_id}")
 def add_file_to_recovery_queue(file_id: int, db_session: Session = Depends(get_db)):
     """Adds a specific file to the recovery queue if it has valid backups."""
     existing_item = (
@@ -117,7 +148,7 @@ def add_file_to_recovery_queue(file_id: int, db_session: Session = Depends(get_d
     return {"message": "Added to recovery queue."}
 
 
-@router.delete("/cart/{item_id}")
+@router.delete("/queue/item/{item_id}")
 def remove_from_recovery_queue(item_id: int, db_session: Session = Depends(get_db)):
     """Removes a specific item from the data recovery queue."""
     queue_item = db_session.get(models.RestoreCart, item_id)
@@ -125,36 +156,6 @@ def remove_from_recovery_queue(item_id: int, db_session: Session = Depends(get_d
         db_session.delete(queue_item)
         db_session.commit()
     return {"message": "Removed from recovery queue."}
-
-
-@router.post("/cart/directory")
-def add_directory_to_recovery_queue(
-    request_data: DirectoryCartRequest, db_session: Session = Depends(get_db)
-):
-    """Recursively adds all restorable files within a directory to the recovery queue."""
-    target_directory = request_data.path
-    if not target_directory.endswith("/"):
-        target_directory += "/"
-
-    # Efficient bulk insert: Find all indexed files under this path that have AT LEAST ONE version
-    # and ARE NOT already in the cart.
-    discovery_sql = text("""
-        INSERT INTO restore_cart (filesystem_state_id)
-        SELECT DISTINCT fs.id
-        FROM filesystem_state fs
-        JOIN file_versions fv ON fv.filesystem_state_id = fs.id
-        LEFT JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
-        WHERE fs.file_path LIKE :prefix
-        AND rc.id IS NULL
-    """)
-
-    db_session.execute(discovery_sql, {"prefix": f"{target_directory}%"})
-    db_session.commit()
-
-    total_in_queue = db_session.query(models.RestoreCart).count()
-    logger.info(f"Directory recovery queued. Total items: {total_in_queue}")
-
-    return {"message": f"Added restorable items from {target_directory} to queue."}
 
 
 @router.get("/manifest", response_model=RestoreManifestSchema)
@@ -220,7 +221,7 @@ def trigger_recovery_job(
     return {"message": "Recovery job initiated.", "job_id": job_record.id}
 
 
-@router.get("/cart/browse", response_model=List[CartFileItemSchema])
+@router.get("/queue/browse", response_model=List[CartFileItemSchema])
 def browse_recovery_queue_virtual_fs(
     path: Optional[str] = None, db_session: Session = Depends(get_db)
 ):
@@ -300,7 +301,7 @@ def browse_recovery_queue_virtual_fs(
     return results
 
 
-@router.get("/cart/tree", response_model=List[CartTreeNodeSchema])
+@router.get("/queue/tree", response_model=List[CartTreeNodeSchema])
 def get_recovery_queue_tree(
     path: Optional[str] = None, db_session: Session = Depends(get_db)
 ):

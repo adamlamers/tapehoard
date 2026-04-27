@@ -22,10 +22,10 @@
     import {
         browseArchiveIndexInventoryBrowseGet,
         getArchiveItemMetadataInventoryMetadataGet,
-        listRecoveryQueueRestoresCartGet,
-        addFileToRecoveryQueueRestoresCartFileIdPost,
-        removeFromRecoveryQueueRestoresCartItemIdDelete,
-        addDirectoryToRecoveryQueueRestoresCartDirectoryPost,
+        listRecoveryQueueRestoresQueueGet,
+        addFileToRecoveryQueueRestoresQueueFileFileIdPost,
+        removeFromRecoveryQueueRestoresQueueItemItemIdDelete,
+        addDirectoryToRecoveryQueueRestoresQueueDirectoryPost,
         searchArchiveIndexInventorySearchGet,
         type ItemMetadataSchema,
         type CartItemSchema
@@ -48,7 +48,7 @@
 
     async function loadCart() {
         try {
-            const response = await listRecoveryQueueRestoresCartGet();
+            const response = await listRecoveryQueueRestoresQueueGet();
             if (response.data) {
                 restoreCartItems = response.data;
             }
@@ -160,7 +160,7 @@
                 if (item.type === 'file') {
                     const cartItem = restoreCartItems.find(i => i.file_path === item.path);
                     if (cartItem) {
-                        await removeFromRecoveryQueueRestoresCartItemIdDelete({
+                        await removeFromRecoveryQueueRestoresQueueItemItemIdDelete({
                             path: { item_id: cartItem.id }
                         });
                     }
@@ -178,13 +178,13 @@
                     });
 
                     if (metaResponse.data?.id) {
-                        await addFileToRecoveryQueueRestoresCartFileIdPost({
+                        await addFileToRecoveryQueueRestoresQueueFileFileIdPost({
                             path: { file_id: metaResponse.data.id }
                         });
                     }
                 } else {
                     // It's a directory
-                    await addDirectoryToRecoveryQueueRestoresCartDirectoryPost({
+                    await addDirectoryToRecoveryQueueRestoresQueueDirectoryPost({
                         body: { path: item.path }
                     });
                 }
@@ -207,7 +207,7 @@
 
     async function handleToggleDirectoryCart(itemPath: string) {
         try {
-            await addDirectoryToRecoveryQueueRestoresCartDirectoryPost({
+            await addDirectoryToRecoveryQueueRestoresQueueDirectoryPost({
                 body: { path: itemPath }
             });
 

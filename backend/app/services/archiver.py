@@ -1,22 +1,26 @@
-import os
-import tarfile
 import json
-import uuid
+import os
+import shutil
+import tarfile
 import time
+import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
 from loguru import logger
+from sqlalchemy import func, not_
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import not_, func
+
 from app.db import models
-from app.services.scanner import JobManager
+from app.providers.cloud import CloudStorageProvider
 from app.providers.hdd import OfflineHDDProvider
 from app.providers.tape import LTOProvider
-from app.providers.cloud import CloudStorageProvider
+from app.services.scanner import JobManager
 
 
 class RangeFile:
-    """A file-like object that only reads a specific byte range of a file."""
+    """A file-like object that only reads a specific byte range of a file,
+    ensuring strict byte-count delivery for tar alignment."""
 
     def __init__(self, file_path: str, offset_start: int, length: int):
         self.file_path = file_path
@@ -30,11 +34,20 @@ class RangeFile:
         if self.remaining_bytes <= 0:
             return b""
 
-        bytes_to_read = self.remaining_bytes
-        if size > 0:
-            bytes_to_read = min(size, self.remaining_bytes)
+        # If size is -1 or exceeds remaining, read only what is left
+        if size < 0 or size > self.remaining_bytes:
+            size = self.remaining_bytes
 
-        chunk_data = self.file_handle.read(bytes_to_read)
+        chunk_data = self.file_handle.read(size)
+
+        # Alignment Guard: If file was truncated on disk, pad with nulls
+        # to prevent corrupting the entire tar archive structure.
+        if len(chunk_data) < size:
+            logger.error(
+                f"Bitstream misalignment: {self.file_path} was truncated during archival. Padding {size - len(chunk_data)} bytes."
+            )
+            chunk_data += b"\x00" * (size - len(chunk_data))
+
         self.remaining_bytes -= len(chunk_data)
         return chunk_data
 
@@ -61,6 +74,17 @@ class ArchiverService:
                 self.staging_directory = os.path.join(os.getcwd(), "staging_area")
                 os.makedirs(self.staging_directory, exist_ok=True)
 
+    def normalize_path(self, p: str) -> str:
+        """Strips leading slashes and ./ prefixes for robust comparison."""
+        p = p.replace("\\", "/")  # Normalize separators
+        while p.startswith("/"):
+            p = p[1:]
+        while p.startswith("./"):
+            p = p[2:]
+        if p.endswith("/"):
+            p = p[:-1]
+        return p
+
     def _get_storage_provider(self, media_record: models.StorageMedia):
         """Initializes the appropriate hardware provider based on media type."""
         provider_config: Dict[str, Any] = {}
@@ -82,14 +106,13 @@ class ArchiverService:
                 mount_base=provider_config.get("mount_path", "/mnt/backup"),
                 device_uuid=provider_config.get("device_uuid"),
             )
-        elif media_record.media_type == "cloud":
+        elif media_record.media_type == "s3" or media_record.media_type == "cloud":
             return CloudStorageProvider(config=provider_config)
 
         return None
 
     def get_unbacked_files(self, db_session: Session):
         """Identifies files that are indexed but lack full version coverage on media."""
-        # Calculate covered size per file using an optimized subquery
         coverage_subquery = (
             db_session.query(
                 models.FileVersion.filesystem_state_id,
@@ -144,7 +167,6 @@ class ArchiverService:
 
             remaining_file_bytes = file_state.size - covered_bytes
 
-            # 0-byte file handling
             if file_state.size == 0:
                 has_any_version = (
                     db_session.query(models.FileVersion)
@@ -184,7 +206,7 @@ class ArchiverService:
                     }
                 )
                 accumulated_size += available_space
-                break  # Media filled
+                break
 
         return backup_workload
 
@@ -192,18 +214,14 @@ class ArchiverService:
         self, base_destination: str, relative_file_path: str
     ) -> str:
         """Prevents path traversal attacks by validating the final extraction path."""
-        # Strip leading slashes to ensure it's relative
         cleaned_relative = relative_file_path.lstrip("/")
         absolute_target = os.path.abspath(
             os.path.join(base_destination, cleaned_relative)
         )
-
-        # Verify target is still within the destination root
         if not absolute_target.startswith(os.path.abspath(base_destination)):
             raise PermissionError(
                 f"Restricted path traversal detected: {relative_file_path}"
             )
-
         return absolute_target
 
     def run_backup(self, db_session: Session, media_id: int, job_id: int):
@@ -228,12 +246,6 @@ class ArchiverService:
         )
         safe_divisor = max(total_payload_bytes, 1)
 
-        JobManager.update_job(
-            job_id,
-            10.0,
-            f"Preparing {len(workload_batch)} items ({total_payload_bytes / 1e9:.2f} GB)...",
-        )
-
         storage_provider = self._get_storage_provider(media_record)
         if not storage_provider:
             JobManager.fail_job(
@@ -241,21 +253,15 @@ class ArchiverService:
             )
             return
 
-        # Hardware Validation
         try:
-            detected_id = storage_provider.identify_media()
-            if detected_id != media_record.identifier:
-                JobManager.fail_job(
-                    job_id,
-                    f"Hardware mismatch. Insert {media_record.identifier} (Found: {detected_id})",
-                )
+            if storage_provider.identify_media() != media_record.identifier:
+                JobManager.fail_job(job_id, "Hardware mismatch.")
                 return
 
             if not storage_provider.prepare_for_write(media_record.identifier):
                 JobManager.fail_job(job_id, "Hardware refused write initialization.")
                 return
 
-            # Staging Logic
             archive_filename = (
                 f"backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.tar"
             )
@@ -264,60 +270,48 @@ class ArchiverService:
             processed_bytes = 0
             remaining_to_write = []
 
-            # --- Optimized Deduplication Check (Chunked for SQLite limits) ---
+            # --- Optimized Deduplication ---
             target_hashes = [
                 item["file_state"].sha256_hash
                 for item in workload_batch
                 if item["file_state"].sha256_hash
             ]
-
             existing_versions = {}
-            # Chunking to avoid (sqlite3.OperationalError) too many SQL variables
             SQLITE_VARIABLE_LIMIT = 500
             for i in range(0, len(target_hashes), SQLITE_VARIABLE_LIMIT):
                 chunk = target_hashes[i : i + SQLITE_VARIABLE_LIMIT]
-                chunk_versions = (
+                chunk_v = (
                     db_session.query(models.FileVersion)
                     .join(models.FilesystemState)
                     .filter(models.FilesystemState.sha256_hash.in_(chunk))
                     .all()
                 )
-                for version in chunk_versions:
-                    key = (
-                        version.file_state.sha256_hash,
-                        version.offset_start,
-                        version.offset_end,
-                    )
-                    existing_versions[key] = version
+                for v in chunk_v:
+                    existing_versions[
+                        (v.file_state.sha256_hash, v.offset_start, v.offset_end)
+                    ] = v
 
             for item in workload_batch:
                 file_state = item["file_state"]
-                dedupe_key = (
-                    file_state.sha256_hash,
-                    item["offset_start"],
-                    item["offset_end"],
+                dupe = existing_versions.get(
+                    (file_state.sha256_hash, item["offset_start"], item["offset_end"])
                 )
-                duplicate_version = existing_versions.get(dedupe_key)
-
-                if duplicate_version:
-                    logger.info(
-                        f"Deduplicating {file_state.file_path} -> Linked to existing storage"
+                if dupe:
+                    db_session.add(
+                        models.FileVersion(
+                            filesystem_state_id=file_state.id,
+                            media_id=dupe.media_id,
+                            file_number=dupe.file_number,
+                            is_split=dupe.is_split,
+                            split_id=dupe.split_id,
+                            offset_start=item["offset_start"],
+                            offset_end=item["offset_end"],
+                        )
                     )
-                    new_version = models.FileVersion(
-                        filesystem_state_id=file_state.id,
-                        media_id=duplicate_version.media_id,
-                        file_number=duplicate_version.file_number,
-                        is_split=duplicate_version.is_split,
-                        split_id=duplicate_version.split_id,
-                        offset_start=item["offset_start"],
-                        offset_end=item["offset_end"],
-                    )
-                    db_session.add(new_version)
-                    continue
+                else:
+                    remaining_to_write.append(item)
 
-                remaining_to_write.append(item)
-
-            # Packaging Logic
+            # Packaging
             if remaining_to_write:
                 with tarfile.open(staging_full_path, "w") as tar_bundle:
                     for item in remaining_to_write:
@@ -330,40 +324,51 @@ class ArchiverService:
                             item["offset_end"],
                         )
                         chunk_size = end - start
+                        internal_name = self.normalize_path(file_state.file_path)
+                        if item["is_split"]:
+                            internal_name += f".part_{start}_{end}"
 
+                        if os.path.lexists(file_state.file_path):
+                            # Manual TarInfo to ensure strict alignment and bitstream independence
+                            tar_info = tar_bundle.gettarinfo(
+                                file_state.file_path, arcname=internal_name
+                            )
+
+                            if os.path.islink(file_state.file_path):
+                                # Preserve Symlinks with their relative targets
+                                tar_info.type = tarfile.SYMTYPE
+                                tar_info.linkname = os.readlink(file_state.file_path)
+                                tar_bundle.addfile(
+                                    tar_info
+                                )  # Links have no data payload
+                            else:
+                                # FORCE regular file for everything else (destroys hard-links for reliability)
+                                tar_info.type = tarfile.REGTYPE
+                                tar_info.linkname = ""
+                                tar_info.size = chunk_size
+
+                                with RangeFile(
+                                    file_state.file_path, start, chunk_size
+                                ) as rh:
+                                    tar_bundle.addfile(tar_info, rh)
+
+                        processed_bytes += chunk_size
                         JobManager.update_job(
                             job_id,
                             15.0 + (70.0 * (processed_bytes / safe_divisor)),
                             f"Archiving: {os.path.basename(file_state.file_path)}",
                         )
 
-                        if os.path.exists(file_state.file_path):
-                            archive_internal_name = file_state.file_path.lstrip("/")
-                            if item["is_split"]:
-                                archive_internal_name = (
-                                    f"{archive_internal_name}.part_{start}_{end}"
-                                )
-
-                            tar_info = tar_bundle.gettarinfo(
-                                file_state.file_path, arcname=archive_internal_name
-                            )
-                            tar_info.size = chunk_size
-
-                            with RangeFile(
-                                file_state.file_path, start, chunk_size
-                            ) as range_handle:
-                                tar_bundle.addfile(tar_info, range_handle)
-
-                        processed_bytes += chunk_size
-
             if JobManager.is_cancelled(job_id):
-                if os.path.exists(staging_full_path):
-                    os.remove(staging_full_path)
                 return
 
-            # Hardware Streaming
-            archive_location_id = "DEDUPLICATED"
+            # Finalize Staging
             if remaining_to_write:
+                # Sync staging file to disk
+                with open(staging_full_path, "a") as f:
+                    f.flush()
+                    os.fsync(f.fileno())
+
                 JobManager.update_job(
                     job_id, 85.0, f"Streaming bitstream to {media_record.media_type}..."
                 )
@@ -373,36 +378,33 @@ class ArchiverService:
                     )
                 media_record.bytes_used += os.path.getsize(staging_full_path)
 
-            # Finalize Batch
-            storage_provider.finalize_media(media_record.identifier)
-            batch_uuid = str(uuid.uuid4())
-
-            for item in remaining_to_write:
-                new_v = models.FileVersion(
-                    filesystem_state_id=item["file_state"].id,
-                    media_id=media_record.id,
-                    file_number=archive_location_id,
-                    is_split=item["is_split"],
-                    split_id=batch_uuid if item["is_split"] else None,
-                    offset_start=item["offset_start"],
-                    offset_end=item["offset_end"],
-                )
-                db_session.add(new_v)
+                batch_uuid = str(uuid.uuid4())
+                for item in remaining_to_write:
+                    db_session.add(
+                        models.FileVersion(
+                            filesystem_state_id=item["file_state"].id,
+                            media_id=media_record.id,
+                            file_number=archive_location_id,
+                            is_split=item["is_split"],
+                            split_id=batch_uuid if item["is_split"] else None,
+                            offset_start=item["offset_start"],
+                            offset_end=item["offset_end"],
+                        )
+                    )
 
             db_session.commit()
             JobManager.complete_job(job_id)
-
             from app.services.notifications import notification_manager
 
             notification_manager.notify(
                 "Archival Complete",
-                f"{media_record.identifier} workload synchronized.",
+                f"{media_record.identifier} synchronized.",
                 "success",
             )
 
-        except Exception as backup_error:
-            logger.exception(f"Archival process failed: {backup_error}")
-            JobManager.fail_job(job_id, str(backup_error))
+        except Exception as e:
+            logger.exception(f"Archival failed: {e}")
+            JobManager.fail_job(job_id, str(e))
         finally:
             if os.path.exists(staging_full_path):
                 os.remove(staging_full_path)
@@ -412,8 +414,6 @@ class ArchiverService:
         JobManager.start_job(job_id)
         JobManager.update_job(job_id, 2.0, "Building recovery manifest...")
 
-        # --- Optimized Manifest Generation (Eradicate N+1) ---
-        # Fetch cart items AND all their versions in a single pass
         active_cart = (
             db_session.query(models.RestoreCart)
             .options(
@@ -423,144 +423,154 @@ class ArchiverService:
             )
             .all()
         )
-
         if not active_cart:
             JobManager.complete_job(job_id)
             return
 
-        total_bytes_to_recover = sum(item.file_state.size for item in active_cart)
-        safe_divisor = max(total_bytes_to_recover, 1)
-
         os.makedirs(destination_root, exist_ok=True)
 
-        # Group tasks by hardware availability
         media_workload: Dict[int, Dict[str, List[models.FileVersion]]] = {}
         for cart_item in active_cart:
-            latest_versions = sorted(
-                cart_item.file_state.versions, key=lambda v: v.created_at, reverse=True
-            )
-            if not latest_versions:
+            if not cart_item.file_state.versions:
                 continue
+            latest_v = max(cart_item.file_state.versions, key=lambda v: v.created_at)
+            v_set = (
+                [
+                    v
+                    for v in cart_item.file_state.versions
+                    if v.split_id == latest_v.split_id
+                ]
+                if latest_v.is_split
+                else [latest_v]
+            )
 
-            # Just retrieve all parts of the versions we find
-            for version_record in latest_versions:
-                m_id, f_num = version_record.media_id, version_record.file_number
-                if m_id not in media_workload:
-                    media_workload[m_id] = {}
-                if f_num not in media_workload[m_id]:
-                    media_workload[m_id][f_num] = []
-                media_workload[m_id][f_num].append(version_record)
+            for v in v_set:
+                if v.media_id not in media_workload:
+                    media_workload[v.media_id] = {}
+                if v.file_number not in media_workload[v.media_id]:
+                    media_workload[v.media_id][v.file_number] = []
+                media_workload[v.media_id][v.file_number].append(v)
 
         processed_bytes = 0
         try:
             for media_id, archive_groups in media_workload.items():
                 if JobManager.is_cancelled(job_id):
                     break
-
                 media_record = db_session.get(models.StorageMedia, media_id)
                 provider = self._get_storage_provider(media_record)
                 if not media_record or not provider:
                     continue
 
-                # Hardware Readiness Check
-                JobManager.update_job(
-                    job_id, 5.0, f"Requesting media: {media_record.identifier}"
-                )
-                detected_id = provider.identify_media()
-
-                while detected_id != media_record.identifier:
+                while not provider.check_online():
                     if JobManager.is_cancelled(job_id):
                         break
-                    from app.services.notifications import notification_manager
-
-                    notification_manager.notify(
-                        "Media Needed",
-                        f"Load {media_record.identifier} to continue recovery.",
-                        "warning",
-                    )
                     time.sleep(10)
-                    detected_id = provider.identify_media()
 
-                if JobManager.is_cancelled(job_id):
-                    break
+                detected_id = provider.identify_media()
+                # HDD UUID Special Case
+                if (
+                    media_record.media_type == "hdd"
+                    and detected_id != media_record.identifier
+                ):
+                    cfg = (
+                        json.loads(media_record.extra_config)
+                        if media_record.extra_config
+                        else {}
+                    )
+                    from app.core.utils import get_path_uuid
 
-                # Sequential Extraction Pass
+                    if get_path_uuid(cfg.get("mount_path", "")) == cfg.get(
+                        "device_uuid"
+                    ):
+                        detected_id = media_record.identifier  # Verified by UUID
+
+                if detected_id != media_record.identifier:
+                    JobManager.fail_job(job_id, f"Load {media_record.identifier}")
+                    return
+
                 for archive_id in sorted(archive_groups.keys()):
                     if JobManager.is_cancelled(job_id):
                         break
-
                     target_versions = archive_groups[archive_id]
-                    JobManager.update_job(
-                        job_id,
-                        10.0 + (80.0 * (processed_bytes / safe_divisor)),
-                        f"Extracting from {media_record.identifier}",
-                    )
 
                     bitstream = provider.read_archive(
                         media_record.identifier, archive_id
                     )
-                    with tarfile.open(fileobj=bitstream, mode="r|*") as tar_bundle:
-                        # Build internal names map
-                        name_to_version = {}
-                        for v in target_versions:
-                            internal_name = v.file_state.file_path.lstrip("/")
-                            if v.is_split:
-                                internal_name = f"{internal_name}.part_{v.offset_start}_{v.offset_end}"
-                            name_to_version[internal_name] = v
+                    tar_mode = "r|*" if media_record.media_type == "tape" else "r:*"
 
+                    with tarfile.open(fileobj=bitstream, mode=tar_mode) as tar_bundle:
+                        normalized_map = {}
+                        for v in target_versions:
+                            name = self.normalize_path(v.file_state.file_path)
+                            if v.is_split:
+                                name += f".part_{v.offset_start}_{v.offset_end}"
+                            normalized_map[name] = v
+
+                        found_count = 0
                         for member in tar_bundle:
                             if JobManager.is_cancelled(job_id):
                                 break
-                            if member.name in name_to_version:
-                                version = name_to_version[member.name]
-                                final_system_path = self._sanitize_recovery_path(
-                                    destination_root, version.file_state.file_path
+                            clean_name = self.normalize_path(member.name)
+                            if clean_name in normalized_map:
+                                found_count += 1
+                                v = normalized_map[clean_name]
+                                final_path = self._sanitize_recovery_path(
+                                    destination_root, v.file_state.file_path
                                 )
+                                os.makedirs(os.path.dirname(final_path), exist_ok=True)
 
-                                os.makedirs(
-                                    os.path.dirname(final_system_path), exist_ok=True
-                                )
+                                # Handle based on member type
+                                if member.isreg():
+                                    src = tar_bundle.extractfile(member)
+                                    if src:
+                                        mode = (
+                                            "r+b"
+                                            if os.path.exists(final_path)
+                                            else "wb"
+                                        )
+                                        with open(final_path, mode) as dst:
+                                            if v.is_split:
+                                                if mode == "wb":
+                                                    dst.truncate(v.file_state.size)
+                                                dst.seek(v.offset_start)
+                                            shutil.copyfileobj(src, dst)
 
-                                if version.is_split:
-                                    # Concurrent Chunk Reassembly
-                                    write_mode = (
-                                        "r+b"
-                                        if os.path.exists(final_system_path)
-                                        else "wb"
-                                    )
-                                    with open(
-                                        final_system_path, write_mode
-                                    ) as target_file:
-                                        if write_mode == "wb":
-                                            target_file.truncate(
-                                                version.file_state.size
+                                        # APPLY METADATA: Restore permissions, ownership, and times
+                                        try:
+                                            # Copy mode bits
+                                            os.chmod(final_path, member.mode)
+                                            # Copy timestamps
+                                            os.utime(
+                                                final_path, (member.mtime, member.mtime)
                                             )
-                                        target_file.seek(version.offset_start)
-                                        chunk_handle = tar_bundle.extractfile(member)
-                                        if chunk_handle:
-                                            target_file.write(chunk_handle.read())
+                                            # Attempt to copy ownership (may fail if not root)
+                                            try:
+                                                os.chown(
+                                                    final_path, member.uid, member.gid
+                                                )
+                                            except Exception:
+                                                pass
+                                        except Exception as meta_err:
+                                            logger.debug(
+                                                f"Failed to apply metadata to {final_path}: {meta_err}"
+                                            )
+
+                                        processed_bytes += v.offset_end - v.offset_start
                                 else:
+                                    # Standard tar extraction for symlinks/dirs/etc handles metadata natively
                                     tar_bundle.extract(member, path=destination_root)
 
-                                processed_bytes += (
-                                    version.offset_end - version.offset_start
-                                )
+                        if found_count == 0:
+                            raise FileNotFoundError(f"Archive {archive_id} mismatch")
 
             if not JobManager.is_cancelled(job_id):
                 db_session.query(models.RestoreCart).delete()
                 db_session.commit()
                 JobManager.complete_job(job_id)
-                from app.services.notifications import notification_manager
 
-                notification_manager.notify(
-                    "Recovery Success",
-                    f"Data extracted to {destination_root}",
-                    "success",
-                )
-
-        except Exception as restore_error:
-            logger.exception(f"Recovery failed: {restore_error}")
-            JobManager.fail_job(job_id, str(restore_error))
+        except Exception as e:
+            logger.exception(f"Restore failed: {e}")
+            JobManager.fail_job(job_id, str(e))
 
 
 archiver_manager = ArchiverService()

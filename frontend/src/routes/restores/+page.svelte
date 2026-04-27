@@ -21,13 +21,13 @@
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
     import type { FileItem } from '$lib/types';
     import {
-        listRecoveryQueueRestoresCartGet,
+        listRecoveryQueueRestoresQueueGet,
         calculateRecoveryManifestRestoresManifestGet,
-        removeFromRecoveryQueueRestoresCartItemIdDelete,
-        clearRecoveryQueueRestoresCartClearPost,
+        removeFromRecoveryQueueRestoresQueueItemItemIdDelete,
+        clearRecoveryQueueRestoresQueueClearPost,
         getSystemSettingsSystemSettingsGet,
         triggerRecoveryJobRestoresTriggerPost,
-        browseRecoveryQueueVirtualFsRestoresCartBrowseGet,
+        browseRecoveryQueueVirtualFsRestoresQueueBrowseGet,
         type CartItemSchema,
         type RestoreManifestSchema,
         type CartFileItemSchema
@@ -77,7 +77,7 @@
     async function loadCartFiles(path: string) {
         loading = true;
         try {
-            const response = await browseRecoveryQueueVirtualFsRestoresCartBrowseGet({
+            const response = await browseRecoveryQueueVirtualFsRestoresQueueBrowseGet({
                 query: { path }
             });
             if (response.data) {
@@ -136,7 +136,7 @@
     async function clearCart() {
         if (!confirm("Are you sure you want to clear the entire recovery queue?")) return;
         try {
-            await clearRecoveryQueueRestoresCartClearPost();
+            await clearRecoveryQueueRestoresQueueClearPost();
             cartFiles = [];
             manifest = null;
             await loadData();

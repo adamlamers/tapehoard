@@ -13,13 +13,9 @@ export type BackupJobSchema = {
      */
     id: number;
     /**
-     * Job Name
+     * Job Type
      */
-    job_name: string;
-    /**
-     * Backup Type
-     */
-    backup_type: string;
+    job_type: string;
     /**
      * Status
      */
@@ -1533,39 +1529,62 @@ export type ListArchivalHistoryBackupsGetResponses = {
 
 export type ListArchivalHistoryBackupsGetResponse = ListArchivalHistoryBackupsGetResponses[keyof ListArchivalHistoryBackupsGetResponses];
 
-export type ListRecoveryQueueRestoresCartGetData = {
+export type ListRecoveryQueueRestoresQueueGetData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/restores/cart';
+    url: '/restores/queue';
 };
 
-export type ListRecoveryQueueRestoresCartGetResponses = {
+export type ListRecoveryQueueRestoresQueueGetResponses = {
     /**
-     * Response List Recovery Queue Restores Cart Get
+     * Response List Recovery Queue Restores Queue Get
      *
      * Successful Response
      */
     200: Array<CartItemSchema>;
 };
 
-export type ListRecoveryQueueRestoresCartGetResponse = ListRecoveryQueueRestoresCartGetResponses[keyof ListRecoveryQueueRestoresCartGetResponses];
+export type ListRecoveryQueueRestoresQueueGetResponse = ListRecoveryQueueRestoresQueueGetResponses[keyof ListRecoveryQueueRestoresQueueGetResponses];
 
-export type ClearRecoveryQueueRestoresCartClearPostData = {
+export type ClearRecoveryQueueRestoresQueueClearPostData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/restores/cart/clear';
+    url: '/restores/queue/clear';
 };
 
-export type ClearRecoveryQueueRestoresCartClearPostResponses = {
+export type ClearRecoveryQueueRestoresQueueClearPostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type AddFileToRecoveryQueueRestoresCartFileIdPostData = {
+export type AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostData = {
+    body: DirectoryCartRequest;
+    path?: never;
+    query?: never;
+    url: '/restores/queue/directory';
+};
+
+export type AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostError = AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostErrors[keyof AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostErrors];
+
+export type AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type AddFileToRecoveryQueueRestoresQueueFileFileIdPostData = {
     body?: never;
     path: {
         /**
@@ -1574,26 +1593,26 @@ export type AddFileToRecoveryQueueRestoresCartFileIdPostData = {
         file_id: number;
     };
     query?: never;
-    url: '/restores/cart/{file_id}';
+    url: '/restores/queue/file/{file_id}';
 };
 
-export type AddFileToRecoveryQueueRestoresCartFileIdPostErrors = {
+export type AddFileToRecoveryQueueRestoresQueueFileFileIdPostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AddFileToRecoveryQueueRestoresCartFileIdPostError = AddFileToRecoveryQueueRestoresCartFileIdPostErrors[keyof AddFileToRecoveryQueueRestoresCartFileIdPostErrors];
+export type AddFileToRecoveryQueueRestoresQueueFileFileIdPostError = AddFileToRecoveryQueueRestoresQueueFileFileIdPostErrors[keyof AddFileToRecoveryQueueRestoresQueueFileFileIdPostErrors];
 
-export type AddFileToRecoveryQueueRestoresCartFileIdPostResponses = {
+export type AddFileToRecoveryQueueRestoresQueueFileFileIdPostResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type RemoveFromRecoveryQueueRestoresCartItemIdDeleteData = {
+export type RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteData = {
     body?: never;
     path: {
         /**
@@ -1602,42 +1621,19 @@ export type RemoveFromRecoveryQueueRestoresCartItemIdDeleteData = {
         item_id: number;
     };
     query?: never;
-    url: '/restores/cart/{item_id}';
+    url: '/restores/queue/item/{item_id}';
 };
 
-export type RemoveFromRecoveryQueueRestoresCartItemIdDeleteErrors = {
+export type RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RemoveFromRecoveryQueueRestoresCartItemIdDeleteError = RemoveFromRecoveryQueueRestoresCartItemIdDeleteErrors[keyof RemoveFromRecoveryQueueRestoresCartItemIdDeleteErrors];
+export type RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteError = RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteErrors[keyof RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteErrors];
 
-export type RemoveFromRecoveryQueueRestoresCartItemIdDeleteResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type AddDirectoryToRecoveryQueueRestoresCartDirectoryPostData = {
-    body: DirectoryCartRequest;
-    path?: never;
-    query?: never;
-    url: '/restores/cart/directory';
-};
-
-export type AddDirectoryToRecoveryQueueRestoresCartDirectoryPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type AddDirectoryToRecoveryQueueRestoresCartDirectoryPostError = AddDirectoryToRecoveryQueueRestoresCartDirectoryPostErrors[keyof AddDirectoryToRecoveryQueueRestoresCartDirectoryPostErrors];
-
-export type AddDirectoryToRecoveryQueueRestoresCartDirectoryPostResponses = {
+export type RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteResponses = {
     /**
      * Successful Response
      */
@@ -1683,7 +1679,7 @@ export type TriggerRecoveryJobRestoresTriggerPostResponses = {
     200: unknown;
 };
 
-export type BrowseRecoveryQueueVirtualFsRestoresCartBrowseGetData = {
+export type BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetData = {
     body?: never;
     path?: never;
     query?: {
@@ -1692,30 +1688,30 @@ export type BrowseRecoveryQueueVirtualFsRestoresCartBrowseGetData = {
          */
         path?: string | null;
     };
-    url: '/restores/cart/browse';
+    url: '/restores/queue/browse';
 };
 
-export type BrowseRecoveryQueueVirtualFsRestoresCartBrowseGetErrors = {
+export type BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type BrowseRecoveryQueueVirtualFsRestoresCartBrowseGetError = BrowseRecoveryQueueVirtualFsRestoresCartBrowseGetErrors[keyof BrowseRecoveryQueueVirtualFsRestoresCartBrowseGetErrors];
+export type BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetError = BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetErrors[keyof BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetErrors];
 
-export type BrowseRecoveryQueueVirtualFsRestoresCartBrowseGetResponses = {
+export type BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetResponses = {
     /**
-     * Response Browse Recovery Queue Virtual Fs Restores Cart Browse Get
+     * Response Browse Recovery Queue Virtual Fs Restores Queue Browse Get
      *
      * Successful Response
      */
     200: Array<CartFileItemSchema>;
 };
 
-export type BrowseRecoveryQueueVirtualFsRestoresCartBrowseGetResponse = BrowseRecoveryQueueVirtualFsRestoresCartBrowseGetResponses[keyof BrowseRecoveryQueueVirtualFsRestoresCartBrowseGetResponses];
+export type BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetResponse = BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetResponses[keyof BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetResponses];
 
-export type GetRecoveryQueueTreeRestoresCartTreeGetData = {
+export type GetRecoveryQueueTreeRestoresQueueTreeGetData = {
     body?: never;
     path?: never;
     query?: {
@@ -1724,28 +1720,28 @@ export type GetRecoveryQueueTreeRestoresCartTreeGetData = {
          */
         path?: string | null;
     };
-    url: '/restores/cart/tree';
+    url: '/restores/queue/tree';
 };
 
-export type GetRecoveryQueueTreeRestoresCartTreeGetErrors = {
+export type GetRecoveryQueueTreeRestoresQueueTreeGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetRecoveryQueueTreeRestoresCartTreeGetError = GetRecoveryQueueTreeRestoresCartTreeGetErrors[keyof GetRecoveryQueueTreeRestoresCartTreeGetErrors];
+export type GetRecoveryQueueTreeRestoresQueueTreeGetError = GetRecoveryQueueTreeRestoresQueueTreeGetErrors[keyof GetRecoveryQueueTreeRestoresQueueTreeGetErrors];
 
-export type GetRecoveryQueueTreeRestoresCartTreeGetResponses = {
+export type GetRecoveryQueueTreeRestoresQueueTreeGetResponses = {
     /**
-     * Response Get Recovery Queue Tree Restores Cart Tree Get
+     * Response Get Recovery Queue Tree Restores Queue Tree Get
      *
      * Successful Response
      */
     200: Array<CartTreeNodeSchema>;
 };
 
-export type GetRecoveryQueueTreeRestoresCartTreeGetResponse = GetRecoveryQueueTreeRestoresCartTreeGetResponses[keyof GetRecoveryQueueTreeRestoresCartTreeGetResponses];
+export type GetRecoveryQueueTreeRestoresQueueTreeGetResponse = GetRecoveryQueueTreeRestoresQueueTreeGetResponses[keyof GetRecoveryQueueTreeRestoresQueueTreeGetResponses];
 
 export type HealthHeartbeatHealthGetData = {
     body?: never;

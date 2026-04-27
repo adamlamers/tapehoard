@@ -7,13 +7,26 @@ from sqlalchemy.orm import sessionmaker
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///tapehoard.db")
 
 # connect_args={"check_same_thread": False} is required for SQLite in FastAPI
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False, "timeout": 30},
-    pool_size=20,
-    max_overflow=10,
-    pool_timeout=30,
-)
+engine_kwargs = {"connect_args": {"check_same_thread": False, "timeout": 30}}
+
+# For testing environment, we want immediate visibility across sessions
+if (
+    "mode=memory" in SQLALCHEMY_DATABASE_URL
+    or SQLALCHEMY_DATABASE_URL == "sqlite:///:memory:"
+):
+    engine_kwargs["isolation_level"] = None
+
+# Only apply pooling arguments for non-memory databases
+if SQLALCHEMY_DATABASE_URL != "sqlite:///:memory:":
+    engine_kwargs.update(
+        {
+            "pool_size": 20,
+            "max_overflow": 10,
+            "pool_timeout": 30,
+        }
+    )
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, **engine_kwargs)
 
 
 # Enable WAL mode for SQLite to allow concurrent reads and writes

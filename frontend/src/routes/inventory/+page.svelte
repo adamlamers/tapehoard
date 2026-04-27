@@ -51,6 +51,27 @@
     let showAdvancedCloud = $state(false);
     let editingMedia = $state<MediaSchema | null>(null);
 
+    // New Media Form State
+    let newMedia = $state({
+        media_type: 'tape',
+        identifier: '',
+        generation_tier: 'LTO-6',
+        capacity_gb: 2500,
+        location: 'Storage Shelf',
+        // Type-specific config
+        encryption_key: '', // 256-bit Hex Key
+        enable_encryption: false,
+        mount_path: '', // For HDD
+        bucket_name: '', // For S3
+        cloud_provider: 'S3-Compatible',
+        cloud_region: 'us-east-1',
+        endpoint_url: '',
+        access_key: '',
+        secret_key: '',
+        encryption_passphrase: '',
+        device_uuid: ''
+    });
+
     // Track "dirty" state for dialogs
     const isFormDirty = $derived(
         (showRegisterDialog && (newMedia.identifier !== '' || newMedia.mount_path !== '')) ||
@@ -74,27 +95,6 @@
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    });
-
-    // New Media Form State
-    let newMedia = $state({
-        media_type: 'tape',
-        identifier: '',
-        generation_tier: 'LTO-6',
-        capacity_gb: 2500,
-        location: 'Storage Shelf',
-        // Type-specific config
-        encryption_key: '', // 256-bit Hex Key
-        enable_encryption: false,
-        mount_path: '', // For HDD
-        bucket_name: '', // For S3
-        cloud_provider: 'S3-Compatible',
-        cloud_region: 'us-east-1',
-        endpoint_url: '',
-        access_key: '',
-        secret_key: '',
-        encryption_passphrase: '',
-        device_uuid: ''
     });
 
     async function loadMedia() {
@@ -317,7 +317,7 @@
             <div class={cn("p-2 rounded-lg shrink-0", media.status === 'failed' ? "bg-error-color/10 text-error-color" : "bg-blue-500/10 text-blue-500")}>
                 {#if media.media_type === 'tape'}<CassetteTape size={18} />{/if}
                 {#if media.media_type === 'hdd'}<HardDrive size={18} />{/if}
-                {#if media.media_type === 's3' || media.media_type === 's3'}<Cloud size={18} />{/if}
+                {#if media.media_type === 's3'}<Cloud size={18} />{/if}
             </div>
             <div class="min-w-0">
                 <div class="flex items-center gap-2">
@@ -338,7 +338,7 @@
                         <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
                             <Monitor size={10} /> {media.config.mount_path}
                         </div>
-                    {:else if (media.media_type === 's3' || media.media_type === 's3') && media.config?.bucket_name}
+                    {:else if media.media_type === 's3' && media.config?.bucket_name}
                         <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
                             <Globe size={10} /> {media.config.bucket_name}
                         </div>
@@ -365,8 +365,8 @@
             <div class="flex items-center gap-2 mt-1">
                 <span class="text-[10px] font-medium text-text-secondary/40">{media.generation_tier || 'Generic'}</span>
                 {#if media.media_type === 'hdd' && media.config?.device_uuid}
-                    <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2 truncate max-w-[100px]" title={media.config.device_uuid}>
-                        UUID: {media.config.device_uuid.split('-')[0]}...
+                    <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2 truncate max-w-[100px]" title={String(media.config.device_uuid)}>
+                        UUID: {String(media.config.device_uuid).split('-')[0]}...
                     </span>
                 {:else if media.media_type === 's3' && media.config?.provider}
                     <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2">
