@@ -107,7 +107,7 @@
                 {#if indexing}
                     <RotateCw size={14} class="mr-2 animate-spin" /> Starting...
                 {:else}
-                    <Zap size={14} class="mr-2" /> Index Data
+                    <Zap size={14} class="mr-2" /> Calculate Missing Hashes
                 {/if}
             </Button>
             <Button variant="default" class="h-10 px-6 font-black uppercase tracking-widest text-[10px]" onclick={startScan} disabled={scanning}>
@@ -198,7 +198,7 @@
                             </div>
                             <div>
                                 <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 block">Redundancy Ratio</span>
-                                <span class="text-xs font-black text-success-color mono uppercase">{stats.redundancy_ratio}x REPLICATION</span>
+                                <span class="text-xs font-black text-success-color mono uppercase">{stats.redundancy_ratio}% REPLICATION</span>
                             </div>
                         </div>
                     </div>

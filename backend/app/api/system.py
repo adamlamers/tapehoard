@@ -169,7 +169,8 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
             SUM(CASE WHEN is_ignored = 1 THEN size ELSE 0 END) as ignored_size,
             SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN 1 ELSE 0 END) as unprotected_count,
             SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN size ELSE 0 END) as unprotected_size,
-            SUM(CASE WHEN is_indexed = 1 THEN 1 ELSE 0 END) as hashed_count
+            SUM(CASE WHEN is_indexed = 1 AND is_ignored = 0 THEN 1 ELSE 0 END) as hashed_count,
+            SUM(CASE WHEN is_ignored = 0 THEN 1 ELSE 0 END) as eligible_count
         FROM filesystem_state
     """)
 
@@ -179,10 +180,11 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
         ignored_count, ignored_size = res[2] or 0, res[3] or 0
         unprotected_count, unprotected_size = res[4] or 0, res[5] or 0
         hashed_count = res[6] or 0
+        eligible_count = res[7] or 0
     else:
         total_count = total_size = ignored_count = ignored_size = unprotected_count = (
             unprotected_size
-        ) = hashed_count = 0
+        ) = hashed_count = eligible_count = 0
 
     media_counts = {
         "LTO": db_session.query(models.StorageMedia)
@@ -204,11 +206,11 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
     )
 
     total_versions = db_session.query(func.count(models.FileVersion.id)).scalar() or 0
-    eligible_count = max(total_count - ignored_count, 1)
-    redundancy = total_versions / eligible_count
+    eligible_redundancy_count = max(total_count - ignored_count, 1)
+    redundancy_percentage = (total_versions / eligible_redundancy_count) * 100
 
     return DashboardStatsSchema(
-        total_files_indexed=total_count,
+        total_files_indexed=eligible_count,
         hashed_files_count=hashed_count,
         total_data_size=total_size,
         ignored_files_count=ignored_count,
@@ -217,7 +219,7 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
         unprotected_data_size=unprotected_size,
         media_distribution=media_counts,
         last_scan_time=last_scan.completed_at if last_scan else None,
-        redundancy_ratio=round(redundancy, 2),
+        redundancy_ratio=round(redundancy_percentage, 1),
     )
 
 
@@ -410,13 +412,15 @@ def search_system_index(
         return []
 
     ignore_filter = " AND fs.is_ignored = 0" if not include_ignored else ""
-    search_sql = text(f"""
+    search_sql = text(
+        f"""
         SELECT fs.file_path, fs.size, fs.mtime, fs.id, fs.is_ignored
         FROM filesystem_fts
         JOIN filesystem_state fs ON fs.id = filesystem_fts.rowid
         WHERE filesystem_fts MATCH :query {ignore_filter}
         LIMIT 200
-    """)
+    """
+    )
 
     files = db_session.execute(search_sql, {"query": f'"{q}"'}).fetchall()
     tracking_rules = db_session.query(models.TrackedSource).all()
@@ -498,6 +502,13 @@ def update_system_setting(
             models.SystemSetting(key=setting_data.key, value=setting_data.value)
         )
     db_session.commit()
+
+    # Reload schedules in case scan/archival frequency changed
+    if setting_data.key in ["schedule_scan", "schedule_archival"]:
+        from app.services.scheduler import scheduler_manager
+
+        scheduler_manager.reload()
+
     return {"message": "Setting committed."}
 
 

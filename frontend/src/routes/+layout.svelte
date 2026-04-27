@@ -31,7 +31,7 @@
 		{ name: 'Overview', href: '/', icon: LayoutDashboard },
 		{ name: 'Insights', href: '/insights', icon: PieChart },
 		{ name: 'Archive Index', href: '/index-browser', icon: Library },
-		{ name: 'Live Filesystem', href: '/tracking', icon: FolderTree },
+		{ name: 'Filesystem', href: '/tracking', icon: FolderTree },
 		{ name: 'Jobs', href: '/jobs', icon: Activity },
 		{ name: 'Media Inventory', href: '/inventory', icon: CassetteTape },
 		{ name: 'Data Recovery', href: '/restores', icon: History }
@@ -183,7 +183,7 @@
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Overview</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">D</kbd></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Insights</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">G</kbd></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Archive Index</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">I</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Live Filesystem</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">T</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Filesystem</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">T</kbd></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-bold text-text-primary">Jobs</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-[10px] mono">A</kbd></div>
 				</div>
 				<div class="space-y-4">

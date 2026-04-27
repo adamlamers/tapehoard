@@ -19,7 +19,10 @@
         Star,
         GripVertical,
         Cpu,
-        AlertCircle
+        AlertCircle,
+        ShieldAlert,
+        Library,
+        Minus
     } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import { Card } from '$lib/components/ui/card';
@@ -85,11 +88,17 @@
     }
 
     function handleDndConsider(e: CustomEvent) {
-        mediaList = e.detail.items;
+        // Only allow reordering within the active list visually
+        const activeItems = e.detail.items;
+        const inactiveItems = mediaList.filter(m => m.status !== 'active');
+        mediaList = [...activeItems, ...inactiveItems];
     }
 
     async function handleDndFinalize(e: CustomEvent) {
-        mediaList = e.detail.items;
+        const activeItems = e.detail.items;
+        const inactiveItems = mediaList.filter(m => m.status !== 'active');
+        mediaList = [...activeItems, ...inactiveItems];
+
         try {
             await reorderArchivalPriorityInventoryMediaReorderPost({
                 body: { media_ids: mediaList.map(m => m.id) },
@@ -125,7 +134,8 @@
         }
     }
 
-    async function handleStartBackup(mediaId: number, identifier: string) {        try {
+    async function handleStartBackup(mediaId: number, identifier: string) {
+        try {
             await triggerBackupJobBackupsTriggerMediaIdPost({
                 path: { media_id: mediaId },
                 throwOnError: true
@@ -249,6 +259,151 @@
     <title>Media Inventory - TapeHoard</title>
 </svelte:head>
 
+{#snippet mediaRow(media: MediaSchema)}
+    <td class="px-2 py-4 text-center">
+        <div class="flex justify-center">
+            {#if media.is_online}
+                {#if media.is_identified}
+                    <div class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)] animate-pulse" title="Online & Verified"></div>
+                {:else}
+                    <div class="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.6)] animate-pulse" title="Hardware Present but Uninitialized"></div>
+                {/if}
+            {:else}
+                <div class="w-2.5 h-2.5 rounded-full bg-white/5 border border-white/10" title="Offline"></div>
+            {/if}
+        </div>
+    </td>
+    <td class="px-6 py-4">
+        <div class="flex items-center gap-3">
+            <div
+                class={cn(
+                    "p-1.5 rounded border transition-all shrink-0",
+                    mediaList.indexOf(mediaList.find(m => m.id === media.id)!) === 0 && media.status === 'active'
+                        ? "bg-yellow-500/10 border-yellow-500/40 text-yellow-500"
+                        : "bg-transparent border-transparent text-text-secondary opacity-0"
+                )}
+            >
+                <Star size={14} fill={mediaList.indexOf(mediaList.find(m => m.id === media.id)!) === 0 ? "currentColor" : "none"} />
+            </div>
+            <div class={cn("p-2 rounded-lg shrink-0", media.status === 'failed' ? "bg-error-color/10 text-error-color" : "bg-blue-500/10 text-blue-500")}>
+                {#if media.media_type === 'tape'}<CassetteTape size={18} />{/if}
+                {#if media.media_type === 'hdd'}<HardDrive size={18} />{/if}
+                {#if media.media_type === 'cloud'}<Cloud size={18} />{/if}
+            </div>
+            <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-black text-text-primary mono tracking-tight truncate">{media.identifier}</span>
+                    {#if mediaList.indexOf(mediaList.find(m => m.id === media.id)!) === 0 && media.status === 'active'}
+                        <span class="text-[8px] font-black uppercase bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20">Next Target</span>
+                    {/if}
+                    {#if media.status === 'failed'}
+                        <span class="text-[8px] font-black uppercase bg-error-color/10 text-error-color px-1.5 py-0.5 rounded border border-error-color/20 flex items-center gap-1">
+                            <ShieldAlert size={10} /> CRITICAL FAILURE
+                        </span>
+                    {:else if media.status === 'retired'}
+                        <span class="text-[8px] font-black uppercase bg-bg-tertiary text-text-secondary px-1.5 py-0.5 rounded border border-border-color">RETIRED</span>
+                    {/if}
+                </div>
+                <div class="mt-1 flex flex-col gap-0.5">
+                    {#if media.media_type === 'hdd' && media.config?.mount_path}
+                        <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
+                            <Monitor size={10} /> {media.config.mount_path}
+                        </div>
+                    {:else if media.media_type === 'cloud' && media.config?.bucket_name}
+                        <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
+                            <Globe size={10} /> {media.config.bucket_name}
+                        </div>
+                    {/if}
+                    <div class="flex gap-2 mt-0.5">
+                        {#if media.config?.encryption_key || media.config?.encryption_passphrase}
+                            <span class="text-[8px] font-black uppercase tracking-tighter text-blue-400 bg-blue-500/10 px-1 rounded flex items-center gap-1 border border-blue-500/20">
+                                <ShieldCheck size={8} /> ENCRYPTED
+                            </span>
+                        {/if}
+                        {#if media.is_online && !media.is_identified && media.status === 'active'}
+                            <span class="text-[8px] font-black uppercase tracking-tighter text-orange-400 bg-orange-500/10 px-1 rounded flex items-center gap-1 border border-orange-500/20">
+                                <AlertCircle size={8} /> UNINITIALIZED
+                            </span>
+                        {/if}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </td>
+    <td class="px-6 py-4">
+        <div class="flex flex-col">
+            <span class="text-[10px] font-bold uppercase text-text-secondary">{media.media_type}</span>
+            <div class="flex items-center gap-2 mt-1">
+                <span class="text-[10px] font-medium text-text-secondary/40">{media.generation_tier || 'Generic'}</span>
+                {#if media.media_type === 'hdd' && media.config?.device_uuid}
+                    <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2 truncate max-w-[100px]" title={media.config.device_uuid}>
+                        UUID: {media.config.device_uuid.split('-')[0]}...
+                    </span>
+                {:else if media.media_type === 'cloud' && media.config?.provider}
+                    <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2">
+                        {media.config.provider} / {media.config.region}
+                    </span>
+                {/if}
+            </div>
+        </div>
+    </td>
+    <td class="px-6 py-4">
+        <div class="flex items-center gap-1.5 text-text-secondary">
+            <MapPin size={12} class="opacity-40" />
+            <span class="text-[11px] font-bold uppercase tracking-tight">{media.location || 'Unknown'}</span>
+        </div>
+    </td>
+    <td class="px-6 py-4">
+        <div class="w-48 space-y-1.5">
+            <div class="flex justify-between text-[9px] font-black mono text-text-secondary uppercase">
+                <span>{formatSize(media.bytes_used)}</span>
+                <span class="opacity-40">/ {formatSize(media.capacity)}</span>
+            </div>
+            <div class="w-full bg-bg-primary h-1.5 rounded-full border border-border-color overflow-hidden">
+                <div class={cn("h-full transition-all duration-1000", media.status === 'failed' ? "bg-error-color" : "bg-blue-500")} style="width: {(media.bytes_used / media.capacity) * 100}%"></div>
+            </div>
+            {#if media.media_type === 'hdd' && media.host_total_bytes}
+                <div class="pt-1">
+                    <div class="flex justify-between text-[8px] font-bold text-text-secondary/40 uppercase tracking-tighter">
+                        <span>System Total</span>
+                        <span>{Math.round(((media.host_total_bytes - (media.host_free_bytes ?? 0)) / media.host_total_bytes) * 100)}% Used</span>
+                    </div>
+                    <div class="w-full bg-bg-primary/30 h-1 mt-0.5 rounded-full overflow-hidden flex">
+                        <div class="bg-blue-500/20 h-full" style="width: {(media.bytes_used / media.host_total_bytes) * 100}%" title="TapeHoard Data"></div>
+                        <div class="bg-text-secondary/10 h-full" style="width: {((media.host_total_bytes - (media.host_free_bytes ?? 0) - media.bytes_used) / media.host_total_bytes) * 100}%" title="Other Data"></div>
+                    </div>
+                </div>
+            {/if}
+        </div>
+    </td>
+    <td class="px-6 py-4 text-right">
+        <div class="flex items-center justify-end gap-2">
+            {#if media.status === 'active'}
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    class="h-9 px-4 font-black uppercase tracking-widest text-[9px] border-action-color/30 text-action-color hover:bg-action-color/10"
+                    onclick={() => handleInitialize(media.id, media.identifier)}
+                    disabled={!media.is_online}
+                >
+                    <RotateCw size={14} class="mr-1.5" /> Initialize
+                </Button>
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    class="h-9 px-4 font-black uppercase tracking-widest text-[9px] border-success-color/30 text-success-color hover:bg-success-color/10"
+                    onclick={() => handleStartBackup(media.id, media.identifier)}
+                    disabled={!media.is_online || !media.is_identified}
+                >
+                    <PlayCircle size={14} class="mr-1.5" /> Archive
+                </Button>
+            {/if}
+            <Button variant="ghost" size="icon" class="h-9 w-9 hover:bg-white/10" onclick={() => openEdit(media)} title="Edit Configuration"><Edit3 size={16} /></Button>
+            <Button variant="ghost" size="icon" class="h-9 w-9 hover:bg-error-color/10 hover:text-error-color" onclick={() => handleDelete(media.id)} title="Delete Media"><Trash2 size={16} /></Button>
+        </div>
+    </td>
+{/snippet}
+
 <div class="flex flex-col gap-8 animate-in fade-in duration-700">
     <!-- Header -->
     <header class="flex justify-between items-center bg-bg-secondary px-8 py-5 rounded-xl border border-border-color shadow-2xl relative overflow-hidden">
@@ -273,9 +428,9 @@
         </div>
     </header>
 
-    <div class="space-y-10">
+    <div class="space-y-16">
         <!-- DISCOVERED HARDWARE SECTION -->
-        {#if discoveredAssets.length > 0}
+        {#if discoveredAssets.filter(a => !a.is_registered).length > 0}
             <section class="space-y-6">
                 <div class="flex items-center gap-3 px-2">
                     <div class="p-1.5 bg-action-color/10 rounded-md text-action-color"><Cpu size={16} /></div>
@@ -328,197 +483,99 @@
         {/if}
 
         <!-- INVENTORY SECTION -->
-        <section class="space-y-6">
-            <div class="flex items-center gap-3 px-2">
-                <div class="p-1.5 bg-blue-500/10 rounded-md text-blue-500"><Database size={16} /></div>
-                <h2 class="text-[11px] font-black uppercase tracking-[0.2em] text-text-primary">Media Inventory</h2>
-                <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent"></div>
-            </div>
-
-            <Card class="bg-bg-secondary border-border-color shadow-2xl overflow-hidden flex flex-col">
-                <!-- Table Legend -->
-                <div class="px-6 py-3 bg-bg-tertiary/30 border-b border-border-color flex items-center justify-end gap-6">
-                    <div class="flex items-center gap-2">
-                        <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
-                        <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-70">Identified & Online</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]"></div>
-                        <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-70">Hardware Needs Initialization</span>
-                    </div>
-                    <div class="h-4 w-px bg-border-color mx-2"></div>
-                    <div class="flex items-center gap-2">
-                        <Star size={10} class="text-yellow-500" fill="currentColor" />
-                        <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-70">Next Archival Target</span>
-                    </div>
+        <section class="space-y-12">
+            <!-- Active Media -->
+            <div class="space-y-6">
+                <div class="flex items-center gap-3 px-2">
+                    <div class="p-1.5 bg-blue-500/10 rounded-md text-blue-500"><Database size={16} /></div>
+                    <h2 class="text-[11px] font-black uppercase tracking-[0.2em] text-text-primary">Active Archive Media</h2>
+                    <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent"></div>
                 </div>
 
-                <table class="w-full border-collapse">
-                    <thead>
-                        <tr class="bg-bg-tertiary/50 border-b border-border-color">
-                            <th class="px-6 py-4 w-12"></th>
-                            <th class="px-2 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary">Stat</th>
-                            <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Identity</th>
-                            <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Type & Tier</th>
-                            <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Location</th>
-                            <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Utilization</th>
-                            <th class="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest text-text-secondary">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody
-                        use:dndzone={{items: mediaList, flipDurationMs: 200}}
-                        onconsider={handleDndConsider}
-                        onfinalize={handleDndFinalize}
-                        class="divide-y divide-border-color/30"
-                    >
-                        {#each mediaList as media (media.id)}
-                            <tr class="hover:bg-bg-primary/30 transition-colors group">
-                                <td class="px-6 py-4 text-center">
-                                    <div class="cursor-grab active:cursor-grabbing text-text-secondary opacity-20 group-hover:opacity-100 transition-opacity">
-                                        <GripVertical size={16} />
-                                    </div>
-                                </td>
-                                <td class="px-2 py-4 text-center">
-                                    <div class="flex justify-center">
-                                        {#if media.is_online}
-                                            {#if media.is_identified}
-                                                <div class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)] animate-pulse" title="Online & Verified"></div>
-                                            {:else}
-                                                <div class="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.6)] animate-pulse" title="Hardware Present but Uninitialized"></div>
-                                            {/if}
-                                        {:else}
-                                            <div class="w-2.5 h-2.5 rounded-full bg-white/5 border border-white/10" title="Offline"></div>
-                                        {/if}
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <div class="flex items-center gap-3">
-                                        <div
-                                            class={cn(
-                                                "p-1.5 rounded border transition-all shrink-0",
-                                                mediaList.indexOf(mediaList.find(m => m.id === media.id)!) === 0
-                                                    ? "bg-yellow-500/10 border-yellow-500/40 text-yellow-500"
-                                                    : "bg-transparent border-transparent text-text-secondary opacity-0"
-                                            )}
-                                        >
-                                            <Star size={14} fill={mediaList.indexOf(mediaList.find(m => m.id === media.id)!) === 0 ? "currentColor" : "none"} />
-                                        </div>
-                                        <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500 shrink-0">
-                                            {#if media.media_type === 'tape'}<CassetteTape size={18} />{/if}
-                                            {#if media.media_type === 'hdd'}<HardDrive size={18} />{/if}
-                                            {#if media.media_type === 'cloud'}<Cloud size={18} />{/if}
-                                        </div>
-                                        <div class="min-w-0">
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-sm font-black text-text-primary mono tracking-tight truncate">{media.identifier}</span>
-                                                {#if mediaList.indexOf(mediaList.find(m => m.id === media.id)!) === 0}
-                                                    <span class="text-[8px] font-black uppercase bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20">Next Target</span>
-                                                {/if}
-                                            </div>
-                                            <div class="mt-1 flex flex-col gap-0.5">
-                                                {#if media.media_type === 'hdd' && media.config?.mount_path}
-                                                    <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
-                                                        <Monitor size={10} /> {media.config.mount_path}
-                                                    </div>
-                                                {:else if media.media_type === 'cloud' && media.config?.bucket_name}
-                                                    <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
-                                                        <Globe size={10} /> {media.config.bucket_name}
-                                                    </div>
-                                                {/if}
-                                                <div class="flex gap-2 mt-0.5">
-                                                    {#if media.config?.encryption_key || media.config?.encryption_passphrase}
-                                                        <span class="text-[8px] font-black uppercase tracking-tighter text-blue-400 bg-blue-500/10 px-1 rounded flex items-center gap-1 border border-blue-500/20">
-                                                            <ShieldCheck size={8} /> ENCRYPTED
-                                                        </span>
-                                                    {/if}
-                                                    {#if media.is_online && !media.is_identified}
-                                                        <span class="text-[8px] font-black uppercase tracking-tighter text-orange-400 bg-orange-500/10 px-1 rounded flex items-center gap-1 border border-orange-500/20">
-                                                            <AlertCircle size={8} /> UNINITIALIZED
-                                                        </span>
-                                                    {/if}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <div class="flex flex-col">
-                                        <span class="text-[10px] font-bold uppercase text-text-secondary">{media.media_type}</span>
-                                        <div class="flex items-center gap-2 mt-1">
-                                            <span class="text-[10px] font-medium text-text-secondary/40">{media.generation_tier || 'Generic'}</span>
-                                            {#if media.media_type === 'hdd' && media.config?.device_uuid}
-                                                <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2 truncate max-w-[100px]" title={media.config.device_uuid}>
-                                                    UUID: {media.config.device_uuid.split('-')[0]}...
-                                                </span>
-                                            {:else if media.media_type === 'cloud' && media.config?.provider}
-                                                <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2">
-                                                    {media.config.provider} / {media.config.region}
-                                                </span>
-                                            {/if}
-                                        </div>
-                                    </div>
-                                </td>                                <td class="px-6 py-4">
-                                    <div class="flex items-center gap-1.5 text-text-secondary">
-                                        <MapPin size={12} class="opacity-40" />
-                                        <span class="text-[11px] font-bold uppercase tracking-tight">{media.location || 'Unknown'}</span>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <div class="w-48 space-y-1.5">
-                                        <div class="flex justify-between text-[9px] font-black mono text-text-secondary uppercase">
-                                            <span>{formatSize(media.bytes_used)}</span>
-                                            <span class="opacity-40">/ {formatSize(media.capacity)}</span>
-                                        </div>
-                                        <div class="w-full bg-bg-primary h-1.5 rounded-full border border-border-color overflow-hidden">
-                                            <div class="bg-blue-500 h-full transition-all duration-1000" style="width: {(media.bytes_used / media.capacity) * 100}%"></div>
-                                        </div>
-                                        {#if media.media_type === 'hdd' && media.host_total_bytes}
-                                            <div class="pt-1">
-                                                <div class="flex justify-between text-[8px] font-bold text-text-secondary/40 uppercase tracking-tighter">
-                                                    <span>System Total</span>
-                                                    <span>{Math.round(((media.host_total_bytes - (media.host_free_bytes ?? 0)) / media.host_total_bytes) * 100)}% Used</span>
-                                                </div>
-                                                <div class="w-full bg-bg-primary/30 h-1 mt-0.5 rounded-full overflow-hidden flex">
-                                                    <div class="bg-blue-500/20 h-full" style="width: {(media.bytes_used / media.host_total_bytes) * 100}%" title="TapeHoard Data"></div>
-                                                    <div class="bg-text-secondary/10 h-full" style="width: {((media.host_total_bytes - (media.host_free_bytes ?? 0) - media.bytes_used) / media.host_total_bytes) * 100}%" title="Other Data"></div>
-                                                </div>
-                                            </div>
-                                        {/if}
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4 text-right">
-                                    <div class="flex items-center justify-end gap-2">
-                                        {#if media.status === 'active'}
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                class="h-9 px-4 font-black uppercase tracking-widest text-[9px] border-action-color/30 text-action-color hover:bg-action-color/10"
-                                                onclick={() => handleInitialize(media.id, media.identifier)}
-                                                disabled={!media.is_online}
-                                            >
-                                                <RotateCw size={14} class="mr-1.5" /> Initialize
-                                            </Button>
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                class="h-9 px-4 font-black uppercase tracking-widest text-[9px] border-success-color/30 text-success-color hover:bg-success-color/10"
-                                                onclick={() => handleStartBackup(media.id, media.identifier)}
-                                                disabled={!media.is_online || !media.is_identified}
-                                            >
-                                                <PlayCircle size={14} class="mr-1.5" /> Archive
-                                            </Button>
-                                        {/if}
-                                        <Button variant="ghost" size="icon" class="h-9 w-9 hover:bg-white/10" onclick={() => openEdit(media)} title="Edit Configuration"><Edit3 size={16} /></Button>
-                                        <Button variant="ghost" size="icon" class="h-9 w-9 hover:bg-error-color/10 hover:text-error-color" onclick={() => handleDelete(media.id)} title="Delete Media"><Trash2 size={16} /></Button>
-                                    </div>
-                                </td>
+                <Card class="bg-bg-secondary border-border-color shadow-2xl overflow-hidden flex flex-col">
+                    <div class="px-6 py-3 bg-bg-tertiary/30 border-b border-border-color flex items-center justify-end gap-6">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                            <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-70">Identified & Online</span>
+                        </div>
+                        <div class="h-4 w-px bg-border-color mx-2"></div>
+                        <div class="flex items-center gap-2">
+                            <Star size={10} class="text-yellow-500" fill="currentColor" />
+                            <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-70">Next Archival Target</span>
+                        </div>
+                    </div>
+
+                    <table class="w-full border-collapse">
+                        <thead>
+                            <tr class="bg-bg-tertiary/50 border-b border-border-color">
+                                <th class="px-6 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary">#</th>
+                                <th class="px-2 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary">Stat</th>
+                                <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Identity</th>
+                                <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Type & Tier</th>
+                                <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Location</th>
+                                <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Utilization</th>
+                                <th class="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest text-text-secondary">Actions</th>
                             </tr>
-                        {:else}
-                            <tr><td colspan="8" class="px-8 py-24 text-center opacity-20"><Database size={48} class="mx-auto mb-3" /><p class="text-sm font-black uppercase tracking-[0.2em]">No Media Assets Registered</p></td></tr>
-                        {/each}
-                    </tbody>
-                </table>
-            </Card>
+                        </thead>
+                        <tbody
+                            use:dndzone={{items: mediaList.filter(m => m.status === 'active'), flipDurationMs: 200}}
+                            onconsider={handleDndConsider}
+                            onfinalize={handleDndFinalize}
+                            class="divide-y divide-border-color/30"
+                        >
+                            {#each mediaList.filter(m => m.status === 'active') as media (media.id)}
+                                <tr class="hover:bg-bg-primary/30 transition-colors group">
+                                    <td class="px-6 py-4 text-center">
+                                        <div class="cursor-grab active:cursor-grabbing text-text-secondary opacity-20 group-hover:opacity-100 transition-opacity">
+                                            <GripVertical size={16} />
+                                        </div>
+                                    </td>
+                                    {@render mediaRow(media)}
+                                </tr>
+                            {:else}
+                                <tr><td colspan="8" class="px-8 py-24 text-center opacity-20"><Database size={48} class="mx-auto mb-3" /><p class="text-sm font-black uppercase tracking-[0.2em]">No Active Archive Media</p></td></tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                </Card>
+            </div>
+
+            <!-- Retired & Failed Media -->
+            {#if mediaList.some(m => m.status !== 'active')}
+                <div class="space-y-6">
+                    <div class="flex items-center gap-3 px-2">
+                        <div class="p-1.5 bg-error-color/10 rounded-md text-error-color"><ShieldAlert size={16} /></div>
+                        <h2 class="text-[11px] font-black uppercase tracking-[0.2em] text-text-primary opacity-60">Retired & Failed Media</h2>
+                        <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent opacity-30"></div>
+                    </div>
+
+                    <Card class="bg-bg-secondary/60 border border-border-color/60 rounded-xl overflow-hidden shadow-xl grayscale-[0.5] opacity-80">
+                        <table class="w-full border-collapse">
+                            <thead>
+                                <tr class="bg-bg-tertiary/20 border-b border-border-color/40">
+                                    <th class="px-6 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">#</th>
+                                    <th class="px-2 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Stat</th>
+                                    <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Identity</th>
+                                    <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Type & Tier</th>
+                                    <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Location</th>
+                                    <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Utilization</th>
+                                    <th class="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border-color/20">
+                                {#each mediaList.filter(m => m.status !== 'active') as media (media.id)}
+                                    <tr class="hover:bg-bg-primary/20 transition-colors">
+                                        <td class="px-6 py-4 text-center opacity-20">
+                                            <Minus size={16} />
+                                        </td>
+                                        {@render mediaRow(media)}
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </Card>
+                </div>
+            {/if}
         </section>
     </div>
 

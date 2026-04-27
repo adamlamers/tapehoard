@@ -18,7 +18,7 @@
     let sourceRoots = $state<string[]>(["/source_data"]);
     let restoreDestinations = $state<string[]>(["/restores"]);
     let tapeDrives = $state<string[]>(["/dev/nst0"]);
-    let globalExclusions = $state("*.tmp\nnode_modules/\n.DS_Store\nThumbs.db\nCache/\n");
+    let globalExclusions = $state("");
     let scanSchedule = $state("");
     let archivalSchedule = $state("");
     let notificationUrls = $state<string[]>([]);
@@ -33,6 +33,24 @@
     // Path Picker state
     let pickerType = $state<"root" | "dest" | null>(null);
     let pickerIndex = $state<number | null>(null);
+
+    const commonExclusions = [
+        { label: "Git Objects", pattern: ".git/" },
+        { label: "Node Modules", pattern: "node_modules/" },
+        { label: "macOS Junk", pattern: ".DS_Store" },
+        { label: "Windows Junk", pattern: "Thumbs.db" },
+        { label: "Generic Cache", pattern: "Cache/" },
+        { label: "Temporary Files", pattern: "*.tmp" },
+        { label: "Python Cache", pattern: "__pycache__/" },
+        { label: "Docker Files", pattern: "docker-compose.yml" },
+        { label: "Build Output", pattern: "dist/" },
+    ];
+
+    function addCommonExclusion(pattern: string) {
+        if (!globalExclusions.includes(pattern)) {
+            globalExclusions = (globalExclusions.trim() + "\n" + pattern).trim() + "\n";
+        }
+    }
 
     const tabs = [
         { id: "hardware", label: "Tape Drives", icon: Monitor },
@@ -326,18 +344,34 @@
                     <div class="animate-in slide-in-from-bottom-4 duration-500">
                         <Card class="p-8 shadow-xl border-border-color/60 bg-bg-secondary">
                             <div class="flex items-center gap-4 mb-8">
-                                <div class="p-3 bg-orange-500/10 rounded-xl text-orange-500 border border-orange-500/20"><FolderSearch size={24} /></div>
+                                <div class="p-3 bg-orange-500/10 rounded-xl text-orange-500 border border-orange-500/20"><ListX size={24} /></div>
                                 <div>
-                                    <h3 class="text-xl font-black text-text-primary uppercase tracking-tight">Global Exclusion Policy</h3>
+                                    <h3 class="text-xl font-black text-text-primary uppercase tracking-tight">Exclusion Policy</h3>
                                     <p class="text-[11px] text-text-secondary font-medium uppercase tracking-wider opacity-60">Git-style ignore patterns for all scans.</p>
                                 </div>
                             </div>
                             <div class="space-y-6">
                                 <textarea
                                     bind:value={globalExclusions}
-                                    class="w-full h-80 bg-bg-primary/50 border border-border-color rounded-2xl p-6 font-mono text-sm text-text-primary focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/40 transition-all outline-none resize-none"
-                                    placeholder="*.tmp&#10;node_modules/&#10;.DS_Store"
+                                    class="w-full h-64 bg-bg-primary/50 border border-border-color rounded-2xl p-6 font-mono text-sm text-text-primary focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/40 transition-all outline-none resize-none"
+                                    placeholder="Add one pattern per line (e.g. .git/)"
                                 ></textarea>
+
+                                <div class="space-y-3">
+                                    <h4 class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Common Patterns</h4>
+                                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                        {#each commonExclusions as item}
+                                            <button
+                                                class="flex items-center justify-between px-3 py-2 bg-bg-primary/40 border border-border-color/60 rounded-lg hover:border-orange-500/40 hover:bg-orange-500/5 transition-all group"
+                                                onclick={() => addCommonExclusion(item.pattern)}
+                                            >
+                                                <span class="text-[10px] font-bold text-text-secondary group-hover:text-text-primary">{item.label}</span>
+                                                <Plus size={10} class="text-text-secondary opacity-20 group-hover:opacity-100" />
+                                            </button>
+                                        {/each}
+                                    </div>
+                                </div>
+
                                 <div class="p-5 bg-orange-500/5 border border-dashed border-orange-500/30 rounded-xl flex gap-4 items-start">
                                     <ShieldAlert size={24} class="text-orange-500 shrink-0 mt-0.5" />
                                     <div class="space-y-1">

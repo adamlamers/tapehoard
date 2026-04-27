@@ -110,8 +110,7 @@
                 isSelected
                         ? "bg-blue-500/15 border-l-2 border-l-blue-500"
                         : "hover:bg-white/5 border-l-2 border-l-transparent",
-                item.ignored && "opacity-40 grayscale-[0.5]",
-                (mode === 'index' && item.type === 'file' && item.vulnerable) && "opacity-60 cursor-not-allowed"
+                item.ignored && "opacity-40 grayscale-[0.5]"
         )}
         role="button"
         tabindex="0"
@@ -125,7 +124,6 @@
                 onclick={(e) => {
                         e.stopPropagation();
                         if (item.ignored) return;
-                        if (mode === 'index' && item.type === 'file' && item.vulnerable) return;
                         onToggleTrack();
                 }}
                 onkeydown={(e) => e.key === " " && e.stopPropagation()}
@@ -150,7 +148,6 @@
                                 checked={item.selected}
                                 indeterminate={item.indeterminate}
                                 onCheckedChange={onToggleTrack}
-                                disabled={item.type === 'file' && item.vulnerable}
                         />
                 {/if}
         </div>
@@ -199,21 +196,6 @@
                                                                 </span>
                                                         {/each}
                                                 </div>
-                                        {:else if item.vulnerable}
-                                                <span class="inline-flex items-center gap-1 bg-error-color/10 text-error-color text-[8px] px-1.5 py-0.5 rounded border border-error-color/20 font-black uppercase tracking-widest">
-                                                        <ShieldAlert size={10} />
-                                                        Vulnerable
-                                                </span>
-                                        {:else if item.type === 'directory'}
-                                                <span class="inline-flex items-center gap-1 bg-success-color/10 text-success-color text-[8px] px-1.5 py-0.5 rounded border border-success-color/20 font-black uppercase tracking-widest">
-                                                        <ShieldCheck size={10} />
-                                                        Protected
-                                                </span>
-                                        {:else if item.type === 'file'}
-                                                <span class="inline-flex items-center gap-1 bg-error-color/10 text-error-color text-[8px] px-1.5 py-0.5 rounded border border-error-color/20 font-black uppercase tracking-widest">
-                                                        <ShieldAlert size={10} />
-                                                        Vulnerable
-                                                </span>
                                         {/if}
                                 {/if}
                         </div>

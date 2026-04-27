@@ -8,6 +8,7 @@ from app.db import models
 from datetime import datetime, timezone
 import json
 import os
+from loguru import logger
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
@@ -271,6 +272,18 @@ def update_media_record(
         raise HTTPException(status_code=404, detail="Media asset not found.")
 
     if request_data.status:
+        # If status is changing to 'failed', we must acknowledge the data loss
+        if request_data.status == "failed" and media_record.status != "failed":
+            logger.warning(
+                f"Hardware failure reported for {media_record.identifier}. Purging version index for this media."
+            )
+            # Delete all file versions associated with this failed media
+            db_session.query(models.FileVersion).filter(
+                models.FileVersion.media_id == media_id
+            ).delete()
+            # Reset bytes used since the data is no longer accessible
+            media_record.bytes_used = 0
+
         media_record.status = request_data.status
     if request_data.location:
         media_record.location = request_data.location
@@ -556,7 +569,7 @@ def browse_archive_index(
     """Browses the virtual archive index with recursive protection stats."""
     source_roots = get_source_roots(db_session)
     if path is None or path == "ROOT":
-        # Root-level aggregate status
+        # Root-level aggregate status (Only show roots that have at least one restorable item)
         results = []
         for root in source_roots:
             prefix = root if root.endswith("/") else root + "/"
@@ -572,8 +585,11 @@ def browse_archive_index(
             """)
             stats = db_session.execute(stats_sql, {"prefix": f"{prefix}%"}).fetchone()
 
-            is_vuln = stats[0] if stats else 0
             restorable = stats[1] if stats else 0
+            if restorable == 0:
+                continue
+
+            is_vuln = stats[0] if stats else 0
             queued = stats[2] if stats else 0
 
             results.append(
@@ -594,7 +610,7 @@ def browse_archive_index(
     ignore_filter = " AND fs.is_ignored = 0" if not include_ignored else ""
     results = []
 
-    # Aggregated subdirectory metadata (No N+1)
+    # Aggregated subdirectory metadata (Only return dirs with at least one restorable item)
     subdir_agg_sql = text(f"""
         SELECT
             SUBSTR(fs.file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(fs.file_path, LENGTH(:prefix) + 1), '/') - 1) as dirname,
@@ -607,6 +623,7 @@ def browse_archive_index(
         WHERE fs.file_path LIKE :search_prefix
         AND SUBSTR(fs.file_path, LENGTH(:prefix) + 1) LIKE '%/%' {ignore_filter}
         GROUP BY dirname
+        HAVING restorable_count > 0
     """)
 
     subdirs = db_session.execute(
@@ -627,7 +644,7 @@ def browse_archive_index(
             )
         )
 
-    # File retrieval with version status
+    # File retrieval (Only return files that have a version on media)
     file_query_sql = text(f"""
         SELECT
             fs.file_path, fs.size, fs.mtime, fs.id,
@@ -641,6 +658,7 @@ def browse_archive_index(
         WHERE fs.file_path LIKE :search_prefix
         AND SUBSTR(fs.file_path, LENGTH(:prefix) + 1) NOT LIKE '%/%' {ignore_filter}
         GROUP BY fs.id
+        HAVING has_version = 1
     """)
 
     files_found = db_session.execute(
@@ -687,6 +705,7 @@ def search_archive_index(
         LEFT JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
         WHERE filesystem_fts MATCH :query {ignore_filter}
         GROUP BY fs.id
+        HAVING has_version = 1
         LIMIT 200
     """)
 
@@ -720,17 +739,26 @@ def get_archive_tree(
     """Returns a recursive tree view of the virtual archive index."""
     if path is None or path == "ROOT":
         source_roots = get_source_roots(db_session)
-        return [
-            TreeNodeSchema(name=root, path=root, has_children=True)
-            for root in source_roots
-        ]
+        results = []
+        for root in source_roots:
+            prefix = root if root.endswith("/") else root + "/"
+            # Only show roots that contain at least one file with a version
+            has_versions_sql = text("""
+                SELECT 1 FROM file_versions fv
+                JOIN filesystem_state fs ON fs.id = fv.filesystem_state_id
+                WHERE fs.file_path LIKE :prefix LIMIT 1
+            """)
+            if db_session.execute(has_versions_sql, {"prefix": f"{prefix}%"}).scalar():
+                results.append(TreeNodeSchema(name=root, path=root, has_children=True))
+        return results
 
     prefix = path if path.endswith("/") else path + "/"
-    ignore_filter = " AND is_ignored = 0" if not include_ignored else ""
+    ignore_filter = " AND fs.is_ignored = 0" if not include_ignored else ""
     subdir_sql = text(f"""
-        SELECT DISTINCT SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) as dirname
-        FROM filesystem_state
-        WHERE file_path LIKE :search_prefix AND SUBSTR(file_path, LENGTH(:prefix) + 1) LIKE '%/%' {ignore_filter}
+        SELECT DISTINCT SUBSTR(fs.file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(fs.file_path, LENGTH(:prefix) + 1), '/') - 1) as dirname
+        FROM filesystem_state fs
+        JOIN file_versions fv ON fv.filesystem_state_id = fs.id
+        WHERE fs.file_path LIKE :search_prefix AND SUBSTR(fs.file_path, LENGTH(:prefix) + 1) LIKE '%/%' {ignore_filter}
     """)
     subdirs = db_session.execute(
         subdir_sql, {"prefix": prefix, "search_prefix": f"{prefix}%"}

@@ -12,9 +12,13 @@ from app.api import backups, inventory, restores, system
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     """Handles startup and shutdown events for the FastAPI application."""
+    from app.services.scheduler import scheduler_manager
+
     logger.info("Initializing TapeHoard: Backup Manager...")
+    scheduler_manager.start()
     yield
     logger.info("Shutting down Archive Command...")
+    scheduler_manager.stop()
 
 
 app = FastAPI(

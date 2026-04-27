@@ -150,16 +150,16 @@
                                 <div class="flex justify-between items-end px-1">
                                     <span class="text-[10px] font-black text-text-primary mono truncate max-w-[70%]">{root.root}</span>
                                     <span class="text-[10px] font-bold text-text-secondary uppercase">
-                                        {((root.protected / (root.protected + root.vulnerable || 1)) * 100).toFixed(1)}% SECURED
+                                        {((root.protected / (root.protected + root.vulnerable || 1)) * 100).toFixed(1)}% ARCHIVED
                                     </span>
                                 </div>
                                 <div class="h-4 w-full bg-bg-primary rounded-full border border-border-color overflow-hidden flex">
                                     <div class="h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all duration-1000" style="width: {(root.protected / (root.protected + root.vulnerable || 1)) * 100}%"></div>
-                                    <div class="h-full bg-orange-500/30 transition-all duration-1000" style="width: {(root.vulnerable / (root.protected + root.vulnerable || 1)) * 100}%"></div>
+                                    <div class="h-full bg-text-secondary/10 transition-all duration-1000" style="width: {(root.vulnerable / (root.protected + root.vulnerable || 1)) * 100}%"></div>
                                 </div>
                                 <div class="flex justify-between px-1">
-                                    <span class="text-[9px] font-black uppercase text-text-secondary opacity-40">Secured: {formatSize(root.protected)}</span>
-                                    <span class="text-[9px] font-black uppercase text-orange-500/60">Vulnerable: {formatSize(root.vulnerable)}</span>
+                                    <span class="text-[9px] font-black uppercase text-text-secondary opacity-40">Archived: {formatSize(root.protected)}</span>
+                                    <span class="text-[9px] font-black uppercase text-text-secondary/60">Pending: {formatSize(root.vulnerable)}</span>
                                 </div>
                             </div>
                         {/each}

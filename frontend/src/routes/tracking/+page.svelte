@@ -222,7 +222,7 @@
         <div class="relative z-10">
             <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
                 <FolderTree class="text-action-color" size={28} />
-                Live Filesystem
+                Filesystem
             </h1>
             <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
                 Select files and directories for duplication in physical archives

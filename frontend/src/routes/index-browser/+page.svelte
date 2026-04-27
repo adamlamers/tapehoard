@@ -400,21 +400,12 @@
                                 {(selectedItemMetadata as any).selected ? 'Remove from Queue' : 'Add to Recovery Queue'}
                             </Button>
                         </div>
-                    {:else if selectedItemMetadata.type === 'file'}
-                        <div class="p-6 bg-bg-tertiary/30 border-t border-border-color mt-auto opacity-50">
-                            <Button disabled class="w-full h-11 font-black uppercase tracking-widest text-[11px] border-error-color/30 text-error-color">
-                                <ShieldAlert size={16} class="mr-2" />
-                                File Vulnerable (Not Backed Up)
-                            </Button>
-                        </div>
                     {:else if selectedItemMetadata.type === 'directory' && (selectedItemMetadata.child_count || 0) > 0}
                         <div class="p-6 bg-bg-tertiary/30 border-t border-border-color mt-auto">
-                            <Button variant="outline" class={cn("w-full h-11 font-black uppercase tracking-widest text-[11px]", (selectedItemMetadata as any).vulnerable ? "border-orange-500/30 text-orange-400 hover:bg-orange-500/10" : "border-success-color/30 text-success-color hover:bg-success-color/10")} onclick={() => handleToggleDirectoryCart(selectedItemMetadata?.file_path || '')} disabled={(selectedItemMetadata as any).selected}>
+                            <Button variant="outline" class={cn("w-full h-11 font-black uppercase tracking-widest text-[11px]", "border-success-color/30 text-success-color hover:bg-success-color/10")} onclick={() => handleToggleDirectoryCart(selectedItemMetadata?.file_path || '')} disabled={(selectedItemMetadata as any).selected}>
                                 <ListPlus size={16} class="mr-2" />
                                 {#if (selectedItemMetadata as any).selected}
                                     Folder Fully Queued
-                                {:else if (selectedItemMetadata as any).vulnerable}
-                                    Add Backed Up Items to Queue
                                 {:else}
                                     Add Folder to Recovery Queue
                                 {/if}
