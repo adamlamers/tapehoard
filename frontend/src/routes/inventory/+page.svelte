@@ -87,10 +87,10 @@
         encryption_key: '', // 256-bit Hex Key
         enable_encryption: false,
         mount_path: '', // For HDD
-        bucket_name: '', // For Cloud
-        cloud_provider: 'AWS S3',
+        bucket_name: '', // For S3
+        cloud_provider: 'S3-Compatible',
         cloud_region: 'us-east-1',
-        endpoint_url: '', // For Custom S3
+        endpoint_url: '',
         access_key: '',
         secret_key: '',
         encryption_passphrase: '',
@@ -190,15 +190,18 @@
             }
             config.mount_path = newMedia.mount_path;
             config.device_uuid = newMedia.device_uuid;
-        } else if (newMedia.media_type === 'cloud') {
+        } else if (newMedia.media_type === 's3') {
             if (!newMedia.bucket_name) { toast.error("Bucket name required"); return; }
+            if (!newMedia.endpoint_url) { toast.error("Endpoint URL required"); return; }
+            if (!newMedia.access_key || !newMedia.secret_key) { toast.error("S3 Credentials required"); return; }
+
             config.bucket_name = newMedia.bucket_name;
-            config.provider = newMedia.cloud_provider;
-            config.region = newMedia.cloud_region;
             config.endpoint_url = newMedia.endpoint_url;
+            config.region = newMedia.cloud_region;
             config.access_key = newMedia.access_key;
             config.secret_key = newMedia.secret_key;
             config.encryption_passphrase = newMedia.encryption_passphrase;
+            config.provider = 'S3-Compatible';
         }
 
         try {
@@ -314,7 +317,7 @@
             <div class={cn("p-2 rounded-lg shrink-0", media.status === 'failed' ? "bg-error-color/10 text-error-color" : "bg-blue-500/10 text-blue-500")}>
                 {#if media.media_type === 'tape'}<CassetteTape size={18} />{/if}
                 {#if media.media_type === 'hdd'}<HardDrive size={18} />{/if}
-                {#if media.media_type === 'cloud'}<Cloud size={18} />{/if}
+                {#if media.media_type === 's3' || media.media_type === 's3'}<Cloud size={18} />{/if}
             </div>
             <div class="min-w-0">
                 <div class="flex items-center gap-2">
@@ -335,7 +338,7 @@
                         <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
                             <Monitor size={10} /> {media.config.mount_path}
                         </div>
-                    {:else if media.media_type === 'cloud' && media.config?.bucket_name}
+                    {:else if (media.media_type === 's3' || media.media_type === 's3') && media.config?.bucket_name}
                         <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
                             <Globe size={10} /> {media.config.bucket_name}
                         </div>
@@ -365,7 +368,7 @@
                     <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2 truncate max-w-[100px]" title={media.config.device_uuid}>
                         UUID: {media.config.device_uuid.split('-')[0]}...
                     </span>
-                {:else if media.media_type === 'cloud' && media.config?.provider}
+                {:else if media.media_type === 's3' && media.config?.provider}
                     <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2">
                         {media.config.provider} / {media.config.region}
                     </span>
@@ -618,12 +621,19 @@
                 </header>
 
                 <div class="grid grid-cols-3 gap-4">
-                    {#each ['tape', 'hdd', 'cloud'] as type}
-                        <button class={cn("flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all", newMedia.media_type === type ? "bg-blue-500/10 border-blue-500 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.15)]" : "bg-bg-primary/50 border-border-color text-text-secondary hover:border-text-secondary/30")} onclick={() => newMedia.media_type = type}>
+                    {#each ['tape', 'hdd', 's3'] as type}
+                        <button class={cn("flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all", newMedia.media_type === type ? "bg-blue-500/10 border-blue-500 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.15)]" : "bg-bg-primary/50 border-border-color text-text-secondary hover:border-text-secondary/30")}
+                            onclick={() => {
+                                newMedia.media_type = type;
+                                if (type === 'tape') newMedia.location = 'Storage Shelf';
+                                else if (type === 'hdd') newMedia.location = 'Offsite Safe';
+                                else if (type === 's3') newMedia.location = 'Cloud';
+                            }}
+                        >
                             {#if type === 'tape'}<CassetteTape size={24} />{/if}
                             {#if type === 'hdd'}<HardDrive size={24} />{/if}
-                            {#if type === 'cloud'}<Cloud size={24} />{/if}
-                            <span class="text-[10px] font-black uppercase tracking-widest">{type}</span>
+                            {#if type === 's3'}<Cloud size={24} />{/if}
+                            <span class="text-[10px] font-black uppercase tracking-widest">{type === 's3' ? 'S3-Compatible' : type}</span>
                         </button>
                     {/each}
                 </div>
@@ -641,7 +651,7 @@
                         </div>
                     </div>
 
-                    {#if newMedia.media_type !== 'cloud'}
+                    {#if newMedia.media_type !== 's3'}
                         <div class="space-y-2 animate-in fade-in duration-300">
                             <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="location">Physical Location</label>
                             <div class="relative">
@@ -699,19 +709,25 @@
                                 <Input id="tier" bind:value={newMedia.generation_tier} class="h-12 bg-bg-primary/50 border-border-color" />
                             </div>
                         </div>
-                    {:else if newMedia.media_type === 'cloud'}
+                    {:else if newMedia.media_type === 's3'}
                         <div class="space-y-6 animate-in slide-in-from-top-2">
-                            <div class="space-y-2">
-                                <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="bucket">Bucket Name</label>
-                                <Input id="bucket" bind:value={newMedia.bucket_name} placeholder="my-backups" class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                            <div class="grid grid-cols-2 gap-6">
+                                <div class="space-y-2">
+                                    <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="endpoint">Endpoint URL</label>
+                                    <Input id="endpoint" bind:value={newMedia.endpoint_url} placeholder="https://s3.amazonaws.com" class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="bucket">Bucket Name</label>
+                                    <Input id="bucket" bind:value={newMedia.bucket_name} placeholder="my-backups" class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                                </div>
                             </div>
 
                             <div class="p-5 bg-bg-tertiary/50 border border-border-color rounded-xl space-y-4">
                                 <div class="flex items-center gap-2 mb-2">
                                     <ShieldCheck size={18} class="text-blue-400" />
                                     <div class="flex flex-col">
-                                        <span class="text-[11px] font-black uppercase tracking-widest text-text-primary">Cloud Security Bundle</span>
-                                        <span class="text-[9px] text-text-secondary font-medium uppercase tracking-tighter opacity-50 italic">AES-256 Client-Side Encryption</span>
+                                        <span class="text-[11px] font-black uppercase tracking-widest text-text-primary">S3 Security Configuration</span>
+                                        <span class="text-[9px] text-text-secondary font-medium uppercase tracking-tighter opacity-50 italic">HMAC Credentials & Client-Side GCM Encryption</span>
                                     </div>
                                 </div>
 
@@ -726,39 +742,16 @@
                                     </div>
                                 </div>
 
-                                <div class="space-y-2 pt-2 border-t border-border-color/30">
-                                    <label for="cloud_pass" class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1">Local Encryption Passphrase</label>
-                                    <Input id="cloud_pass" type="password" bind:value={newMedia.encryption_passphrase} placeholder="Keep this safe!" class="h-10 bg-bg-primary/80 border-blue-500/30 font-mono text-xs focus:border-blue-500/60" />
-                                </div>
-                            </div>
-
-                            <!-- Advanced Hardware Toggle -->
-                            <div class="pt-2">
-                                <button
-                                    type="button"
-                                    class="text-[10px] font-black uppercase tracking-widest text-text-secondary hover:text-text-primary flex items-center gap-2 transition-colors"
-                                    onclick={() => showAdvancedCloud = !showAdvancedCloud}
-                                >
-                                    <Monitor size={12} />
-                                    {showAdvancedCloud ? 'Hide' : 'Show'} Advanced Provider Config
-                                </button>
-
-                                {#if showAdvancedCloud}
-                                    <div class="grid grid-cols-2 gap-6 mt-4 p-5 bg-bg-primary/30 border border-border-color/40 rounded-xl animate-in slide-in-from-top-2 duration-300">
-                                        <div class="space-y-2">
-                                            <label class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1" for="endpoint">Endpoint URL</label>
-                                            <Input id="endpoint" bind:value={newMedia.endpoint_url} placeholder="https://s3.amazonaws.com" class="h-10 bg-bg-primary/50 border-border-color font-mono text-xs" />
-                                        </div>
-                                        <div class="space-y-2">
-                                            <label class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1" for="region">Region</label>
-                                            <Input id="region" bind:value={newMedia.cloud_region} placeholder="us-east-1" class="h-10 bg-bg-primary/50 border-border-color font-mono text-xs" />
-                                        </div>
-                                        <div class="space-y-2 col-span-2">
-                                            <label class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1" for="provider">Provider Label</label>
-                                            <Input id="provider" bind:value={newMedia.cloud_provider} placeholder="AWS S3" class="h-10 bg-bg-primary/50 border-border-color font-mono text-xs" />
-                                        </div>
+                                <div class="grid grid-cols-2 gap-4 pt-2 border-t border-border-color/30">
+                                    <div class="space-y-2">
+                                        <label for="cloud_region" class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1">Region (Optional)</label>
+                                        <Input id="cloud_region" bind:value={newMedia.cloud_region} placeholder="us-east-1" class="h-10 bg-bg-primary/80 border-border-color/50 font-mono text-xs" />
                                     </div>
-                                {/if}
+                                    <div class="space-y-2">
+                                        <label for="cloud_pass" class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1">Encryption Passphrase</label>
+                                        <Input id="cloud_pass" type="password" bind:value={newMedia.encryption_passphrase} placeholder="Keep this safe!" class="h-10 bg-bg-primary/80 border-blue-500/30 font-mono text-xs focus:border-blue-500/60" />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     {/if}
@@ -792,7 +785,7 @@
                         <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500 shrink-0">
                             {#if editingMedia.media_type === 'tape'}<CassetteTape size={20} />{/if}
                             {#if editingMedia.media_type === 'hdd'}<HardDrive size={20} />{/if}
-                            {#if editingMedia.media_type === 'cloud'}<Cloud size={20} />{/if}
+                            {#if editingMedia.media_type === 's3'}<Cloud size={20} />{/if}
                         </div>
                         <div>
                             <span class="text-xs font-black text-text-primary uppercase tracking-widest">{editingMedia.identifier}</span>
@@ -800,7 +793,7 @@
                         </div>
                     </div>
 
-                    {#if editingMedia.media_type !== 'cloud'}
+                    {#if editingMedia.media_type !== 's3'}
                         <div class="space-y-2 animate-in fade-in duration-300">
                             <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="edit-location">Physical Location</label>
                             <Input id="edit-location" bind:value={editingMedia.location} class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
@@ -819,7 +812,7 @@
                             <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="edit-mount">System Mount Point</label>
                             <Input id="edit-mount" bind:value={editingMedia.config.mount_path} class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
                         </div>
-                    {:else if editingMedia.media_type === 'cloud'}
+                    {:else if editingMedia.media_type === 's3'}
                          <div class="space-y-2">
                             <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="edit-endpoint">Endpoint URL</label>
                             <Input id="edit-endpoint" bind:value={editingMedia.config.endpoint_url} class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
