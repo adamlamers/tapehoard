@@ -6,11 +6,11 @@
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
     import type { FileItem } from '$lib/types';
     import {
-        browsePathSystemBrowseGet,
-        trackBatchSystemTrackBatchPost,
+        browseSystemPathSystemBrowseGet,
+        batchUpdateTrackingSystemTrackBatchPost,
         triggerScanSystemScanPost,
         getScanStatusSystemScanStatusGet,
-        searchSystemSystemSearchGet,
+        searchSystemIndexSystemSearchGet,
         type ScanStatusSchema
     } from '$lib/api';
     import { toast } from "svelte-sonner";
@@ -36,11 +36,11 @@
         if (searchQuery.trim().length >= 3) return; // Prevent loading path if searching
         loading = true;
         try {
-            const response = await browsePathSystemBrowseGet({
+            const response = await browseSystemPathSystemBrowseGet({
                 query: { path }
             });
             if (response.data) {
-                files = response.data.map(f => ({
+                files = response.data.map((f: any) => ({
                     name: f.name,
                     path: f.path,
                     type: f.type as 'file' | 'directory' | 'link',
@@ -62,11 +62,11 @@
     async function searchFiles(query: string) {
         searchLoading = true;
         try {
-            const response = await searchSystemSystemSearchGet({
+            const response = await searchSystemIndexSystemSearchGet({
                 query: { q: query }
             });
             if (response.data) {
-                files = response.data.map(f => ({
+                files = response.data.map((f: any) => ({
                     name: f.name,
                     path: f.path,
                     type: f.type as 'file' | 'directory' | 'link',
@@ -188,7 +188,7 @@
         }
 
         const promise = (async () => {
-            await trackBatchSystemTrackBatchPost({
+            await batchUpdateTrackingSystemTrackBatchPost({
                 body: { tracks, untracks }
             });
             pendingChanges = new Map();

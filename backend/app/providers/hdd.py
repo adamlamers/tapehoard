@@ -6,15 +6,40 @@ from loguru import logger
 
 
 class OfflineHDDProvider(AbstractStorageProvider):
-    def __init__(self, mount_base: str = "/mnt/backup_disk"):
+    def __init__(
+        self, mount_base: str = "/mnt/backup_disk", device_uuid: Optional[str] = None
+    ):
         self.mount_base = mount_base
+        self.device_uuid = device_uuid
 
     def get_name(self) -> str:
         return "Offline HDD"
 
     def check_online(self) -> bool:
-        """Checks if the HDD mount point is physically accessible"""
-        return os.path.exists(self.mount_base) and os.path.isdir(self.mount_base)
+        """Checks if the HDD mount point is physically accessible and matches UUID if provided"""
+        is_accessible = os.path.exists(self.mount_base) and os.path.isdir(
+            self.mount_base
+        )
+        if not is_accessible:
+            # If we have a UUID but the path is gone, we could potentially scan for it
+            if self.device_uuid:
+                logger.debug(
+                    f"HDD {self.device_uuid} not found at {self.mount_base}. Attempting to locate..."
+                )
+                # Future implementation: scan psutil.disk_partitions()
+            return False
+
+        if self.device_uuid:
+            from app.core.utils import get_path_uuid
+
+            current_uuid = get_path_uuid(self.mount_base)
+            if current_uuid and current_uuid != self.device_uuid:
+                logger.warning(
+                    f"UUID Mismatch at {self.mount_base}. Expected {self.device_uuid}, found {current_uuid}"
+                )
+                return False
+
+        return True
 
     def check_existing_data(self) -> bool:
         """Checks if the HDD already has tapehoard backups"""

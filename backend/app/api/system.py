@@ -23,6 +23,7 @@ router = APIRouter(prefix="/system", tags=["System"])
 
 class DashboardStatsSchema(BaseModel):
     total_files_indexed: int
+    hashed_files_count: int
     total_data_size: int
     ignored_files_count: int
     ignored_data_size: int
@@ -167,7 +168,8 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
             SUM(CASE WHEN is_ignored = 1 THEN 1 ELSE 0 END) as ignored_count,
             SUM(CASE WHEN is_ignored = 1 THEN size ELSE 0 END) as ignored_size,
             SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN 1 ELSE 0 END) as unprotected_count,
-            SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN size ELSE 0 END) as unprotected_size
+            SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN size ELSE 0 END) as unprotected_size,
+            SUM(CASE WHEN is_indexed = 1 THEN 1 ELSE 0 END) as hashed_count
         FROM filesystem_state
     """)
 
@@ -176,10 +178,11 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
         total_count, total_size = res[0] or 0, res[1] or 0
         ignored_count, ignored_size = res[2] or 0, res[3] or 0
         unprotected_count, unprotected_size = res[4] or 0, res[5] or 0
+        hashed_count = res[6] or 0
     else:
         total_count = total_size = ignored_count = ignored_size = unprotected_count = (
             unprotected_size
-        ) = 0
+        ) = hashed_count = 0
 
     media_counts = {
         "LTO": db_session.query(models.StorageMedia)
@@ -206,6 +209,7 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
 
     return DashboardStatsSchema(
         total_files_indexed=total_count,
+        hashed_files_count=hashed_count,
         total_data_size=total_size,
         ignored_files_count=ignored_count,
         ignored_data_size=ignored_size,
@@ -633,6 +637,19 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
                     )
 
                     if not is_known:
+                        # Auto-detect capacity and UUID for HDDs
+                        capacity_bytes = None
+                        device_uuid = None
+                        try:
+                            from app.core.utils import get_path_uuid
+
+                            device_uuid = get_path_uuid(entry.path)
+
+                            st = os.statvfs(entry.path)
+                            capacity_bytes = st.f_blocks * st.f_frsize
+                        except Exception:
+                            pass
+
                         discovered_nodes.append(
                             {
                                 "type": "hdd",
@@ -640,6 +657,8 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
                                 "identifier": disk_barcode or "NEW DISK",
                                 "is_registered": False,
                                 "status": "uninitialized",
+                                "capacity_bytes": capacity_bytes,
+                                "device_uuid": device_uuid,
                             }
                         )
         except Exception:

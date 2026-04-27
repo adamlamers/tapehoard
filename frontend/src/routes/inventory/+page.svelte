@@ -26,15 +26,15 @@
     import { Input } from '$lib/components/ui/input';
     import { cn } from '$lib/utils';
     import {
-        listMediaInventoryMediaGet,
-        registerMediaInventoryMediaPost,
-        deleteMediaInventoryMediaMediaIdDelete,
-        triggerBackupBackupsTriggerMediaIdPost,
-        initializeMediaInventoryMediaMediaIdInitializePost,
-        reorderMediaInventoryMediaReorderPost,
-        updateMediaInventoryMediaMediaIdPatch,
-        discoverHardwareSystemHardwareDiscoverGet,
-        ignoreHardwareSystemHardwareIgnorePost,
+        listStorageMediaInventoryMediaGet,
+        registerNewMediaInventoryMediaPost,
+        deleteMediaAssetInventoryMediaMediaIdDelete,
+        triggerBackupJobBackupsTriggerMediaIdPost,
+        initializeStorageHardwareInventoryMediaMediaIdInitializePost,
+        reorderArchivalPriorityInventoryMediaReorderPost,
+        updateMediaRecordInventoryMediaMediaIdPatch,
+        discoverHardwareNodesSystemHardwareDiscoverGet,
+        ignoreHardwareNodeSystemHardwareIgnorePost,
         type MediaSchema
     } from '$lib/api';
     import { dndzone } from 'svelte-dnd-action';
@@ -64,15 +64,16 @@
         endpoint_url: '', // For Custom S3
         access_key: '',
         secret_key: '',
-        encryption_passphrase: ''
+        encryption_passphrase: '',
+        device_uuid: ''
     });
 
     async function loadMedia() {
         loading = true;
         try {
             const [mediaRes, hardwareRes] = await Promise.all([
-                listMediaInventoryMediaGet(),
-                discoverHardwareSystemHardwareDiscoverGet()
+                listStorageMediaInventoryMediaGet(),
+                discoverHardwareNodesSystemHardwareDiscoverGet()
             ]);
             if (mediaRes.data) mediaList = mediaRes.data;
             if (hardwareRes.data) discoveredAssets = hardwareRes.data as any[];
@@ -90,7 +91,7 @@
     async function handleDndFinalize(e: CustomEvent) {
         mediaList = e.detail.items;
         try {
-            await reorderMediaInventoryMediaReorderPost({
+            await reorderArchivalPriorityInventoryMediaReorderPost({
                 body: { media_ids: mediaList.map(m => m.id) },
                 throwOnError: true
             });
@@ -106,7 +107,7 @@
 
         try {
             toast.info(`Initializing ${identifier}...`);
-            await initializeMediaInventoryMediaMediaIdInitializePost({
+            await initializeStorageHardwareInventoryMediaMediaIdInitializePost({
                 path: { media_id: mediaId },
                 query: { force },
                 throwOnError: true
@@ -125,7 +126,7 @@
     }
 
     async function handleStartBackup(mediaId: number, identifier: string) {        try {
-            await triggerBackupBackupsTriggerMediaIdPost({
+            await triggerBackupJobBackupsTriggerMediaIdPost({
                 path: { media_id: mediaId },
                 throwOnError: true
             });
@@ -147,8 +148,12 @@
                 config.encryption_key = newMedia.encryption_key;
             }
         } else if (newMedia.media_type === 'hdd') {
-            if (!newMedia.mount_path) { toast.error("Mount path required"); return; }
+            if (!newMedia.mount_path) {
+                toast.error("Mount path required");
+                return;
+            }
             config.mount_path = newMedia.mount_path;
+            config.device_uuid = newMedia.device_uuid;
         } else if (newMedia.media_type === 'cloud') {
             if (!newMedia.bucket_name) { toast.error("Bucket name required"); return; }
             config.bucket_name = newMedia.bucket_name;
@@ -161,7 +166,7 @@
         }
 
         try {
-            await registerMediaInventoryMediaPost({
+            await registerNewMediaInventoryMediaPost({
                 body: {
                     media_type: newMedia.media_type,
                     identifier: newMedia.identifier,
@@ -187,7 +192,7 @@
     async function handleUpdate() {
         if (!editingMedia) return;
         try {
-            await updateMediaInventoryMediaMediaIdPatch({
+            await updateMediaRecordInventoryMediaMediaIdPatch({
                 path: { media_id: editingMedia.id },
                 body: {
                     location: editingMedia.location,
@@ -206,7 +211,7 @@
 
     async function handleIgnore(identifier: string) {
         try {
-            await ignoreHardwareSystemHardwareIgnorePost({
+            await ignoreHardwareNodeSystemHardwareIgnorePost({
                 body: { identifier },
                 throwOnError: true
             });
@@ -220,7 +225,7 @@
     async function handleDelete(mediaId: number) {
         if (!confirm("Are you sure? This will remove the media and its entire version history from the system index.")) return;
         try {
-            await deleteMediaInventoryMediaMediaIdDelete({
+            await deleteMediaAssetInventoryMediaMediaIdDelete({
                 path: { media_id: mediaId },
                 throwOnError: true
             });
@@ -302,9 +307,15 @@
                                             <Button variant="default" size="sm" class="h-8 text-[9px] font-black uppercase tracking-widest flex-1" onclick={() => {
                                                 newMedia.media_type = asset.type;
                                                 newMedia.identifier = asset.identifier === 'Unrecognized Disk' ? '' : asset.identifier;
-                                                if (asset.type === 'hdd') newMedia.mount_path = asset.mount_path;
+                                                if (asset.type === 'hdd') {
+                                                    newMedia.mount_path = asset.mount_path;
+                                                    newMedia.device_uuid = asset.device_uuid || '';
+                                                    if (asset.capacity_bytes) {
+                                                        newMedia.capacity_gb = Math.floor(asset.capacity_bytes / (1024 * 1024 * 1024));
+                                                    }
+                                                }
                                                 showRegisterDialog = true;
-                                            }}>Ingest Asset</Button>
+                                            }}>Add Media</Button>
                                             <Button variant="outline" size="sm" class="h-8 text-[9px] font-black uppercase tracking-widest border-border-color/60 text-text-secondary hover:bg-white/5" onclick={() => handleIgnore(asset.type === 'tape' ? asset.identifier : asset.mount_path)}>Ignore</Button>
                                         </div>
                                     </div>
@@ -397,40 +408,63 @@
                                             {#if media.media_type === 'hdd'}<HardDrive size={18} />{/if}
                                             {#if media.media_type === 'cloud'}<Cloud size={18} />{/if}
                                         </div>
-                                        <div>
+                                        <div class="min-w-0">
                                             <div class="flex items-center gap-2">
-                                                <span class="text-sm font-black text-text-primary mono tracking-tight">{media.identifier}</span>
+                                                <span class="text-sm font-black text-text-primary mono tracking-tight truncate">{media.identifier}</span>
                                                 {#if mediaList.indexOf(mediaList.find(m => m.id === media.id)!) === 0}
                                                     <span class="text-[8px] font-black uppercase bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20">Next Target</span>
                                                 {/if}
                                             </div>
-                                            <div class="flex gap-2 mt-0.5">
-                                                {#if media.config?.encryption_key || media.config?.encryption_passphrase}
-                                                    <span class="text-[8px] font-black uppercase tracking-tighter text-blue-400 bg-blue-500/10 px-1 rounded flex items-center gap-1">
-                                                        <ShieldCheck size={8} /> ENCRYPTED
-                                                    </span>
+                                            <div class="mt-1 flex flex-col gap-0.5">
+                                                {#if media.media_type === 'hdd' && media.config?.mount_path}
+                                                    <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
+                                                        <Monitor size={10} /> {media.config.mount_path}
+                                                    </div>
+                                                {:else if media.media_type === 'cloud' && media.config?.bucket_name}
+                                                    <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
+                                                        <Globe size={10} /> {media.config.bucket_name}
+                                                    </div>
                                                 {/if}
-                                                {#if media.is_online && !media.is_identified}
-                                                    <span class="text-[8px] font-black uppercase tracking-tighter text-orange-400 bg-orange-500/10 px-1 rounded flex items-center gap-1 border border-orange-500/20">
-                                                        <AlertCircle size={8} /> UNINITIALIZED
-                                                    </span>
-                                                {/if}
+                                                <div class="flex gap-2 mt-0.5">
+                                                    {#if media.config?.encryption_key || media.config?.encryption_passphrase}
+                                                        <span class="text-[8px] font-black uppercase tracking-tighter text-blue-400 bg-blue-500/10 px-1 rounded flex items-center gap-1 border border-blue-500/20">
+                                                            <ShieldCheck size={8} /> ENCRYPTED
+                                                        </span>
+                                                    {/if}
+                                                    {#if media.is_online && !media.is_identified}
+                                                        <span class="text-[8px] font-black uppercase tracking-tighter text-orange-400 bg-orange-500/10 px-1 rounded flex items-center gap-1 border border-orange-500/20">
+                                                            <AlertCircle size={8} /> UNINITIALIZED
+                                                        </span>
+                                                    {/if}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <span class="text-[10px] font-bold uppercase text-text-secondary">{media.media_type}</span>
-                                    <span class="text-[10px] font-medium text-text-secondary/40 ml-2 border-l border-border-color pl-2">{media.generation_tier || 'Generic'}</span>
-                                </td>
-                                <td class="px-6 py-4">
+                                    <div class="flex flex-col">
+                                        <span class="text-[10px] font-bold uppercase text-text-secondary">{media.media_type}</span>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <span class="text-[10px] font-medium text-text-secondary/40">{media.generation_tier || 'Generic'}</span>
+                                            {#if media.media_type === 'hdd' && media.config?.device_uuid}
+                                                <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2 truncate max-w-[100px]" title={media.config.device_uuid}>
+                                                    UUID: {media.config.device_uuid.split('-')[0]}...
+                                                </span>
+                                            {:else if media.media_type === 'cloud' && media.config?.provider}
+                                                <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2">
+                                                    {media.config.provider} / {media.config.region}
+                                                </span>
+                                            {/if}
+                                        </div>
+                                    </div>
+                                </td>                                <td class="px-6 py-4">
                                     <div class="flex items-center gap-1.5 text-text-secondary">
                                         <MapPin size={12} class="opacity-40" />
                                         <span class="text-[11px] font-bold uppercase tracking-tight">{media.location || 'Unknown'}</span>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <div class="w-32 space-y-1.5">
+                                    <div class="w-48 space-y-1.5">
                                         <div class="flex justify-between text-[9px] font-black mono text-text-secondary uppercase">
                                             <span>{formatSize(media.bytes_used)}</span>
                                             <span class="opacity-40">/ {formatSize(media.capacity)}</span>
@@ -438,6 +472,18 @@
                                         <div class="w-full bg-bg-primary h-1.5 rounded-full border border-border-color overflow-hidden">
                                             <div class="bg-blue-500 h-full transition-all duration-1000" style="width: {(media.bytes_used / media.capacity) * 100}%"></div>
                                         </div>
+                                        {#if media.media_type === 'hdd' && media.host_total_bytes}
+                                            <div class="pt-1">
+                                                <div class="flex justify-between text-[8px] font-bold text-text-secondary/40 uppercase tracking-tighter">
+                                                    <span>System Total</span>
+                                                    <span>{Math.round(((media.host_total_bytes - (media.host_free_bytes ?? 0)) / media.host_total_bytes) * 100)}% Used</span>
+                                                </div>
+                                                <div class="w-full bg-bg-primary/30 h-1 mt-0.5 rounded-full overflow-hidden flex">
+                                                    <div class="bg-blue-500/20 h-full" style="width: {(media.bytes_used / media.host_total_bytes) * 100}%" title="TapeHoard Data"></div>
+                                                    <div class="bg-text-secondary/10 h-full" style="width: {((media.host_total_bytes - (media.host_free_bytes ?? 0) - media.bytes_used) / media.host_total_bytes) * 100}%" title="Other Data"></div>
+                                                </div>
+                                            </div>
+                                        {/if}
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 text-right">
@@ -508,6 +554,7 @@
                         <div class="space-y-2">
                             <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="capacity">Capacity (GB)</label>
                             <Input id="capacity" type="number" bind:value={newMedia.capacity_gb} class="h-12 bg-bg-primary/50 border-border-color font-mono" />
+                            <p class="text-[9px] text-text-secondary leading-tight opacity-60">Auto-detected when possible. You can manually reduce this to reserve space.</p>
                         </div>
                     </div>
 

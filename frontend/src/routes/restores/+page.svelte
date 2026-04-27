@@ -21,13 +21,13 @@
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
     import type { FileItem } from '$lib/types';
     import {
-        listCartRestoresCartGet,
-        getManifestRestoresManifestGet,
-        removeFromCartRestoresCartItemIdDelete,
-        clearCartRestoresCartClearPost,
-        getSettingsSystemSettingsGet,
-        triggerRestoreRestoresTriggerPost,
-        browseCartRestoresCartBrowseGet,
+        listRecoveryQueueRestoresCartGet,
+        calculateRecoveryManifestRestoresManifestGet,
+        removeFromRecoveryQueueRestoresCartItemIdDelete,
+        clearRecoveryQueueRestoresCartClearPost,
+        getSystemSettingsSystemSettingsGet,
+        triggerRecoveryJobRestoresTriggerPost,
+        browseRecoveryQueueVirtualFsRestoresCartBrowseGet,
         type CartItemSchema,
         type RestoreManifestSchema,
         type CartFileItemSchema
@@ -46,7 +46,7 @@
     async function loadData() {
         loading = true;
         try {
-            const settingsRes = await getSettingsSystemSettingsGet();
+            const settingsRes = await getSystemSettingsSystemSettingsGet();
             if (settingsRes.data?.restore_destinations) {
                 restoreDests = JSON.parse(settingsRes.data.restore_destinations);
                 if (restoreDests.length > 0 && !selectedDest) selectedDest = restoreDests[0];
@@ -67,7 +67,7 @@
 
     async function refreshManifest() {
         try {
-            const manifestRes = await getManifestRestoresManifestGet();
+            const manifestRes = await calculateRecoveryManifestRestoresManifestGet();
             if (manifestRes.data) manifest = manifestRes.data;
         } catch (err) {
             console.error("Failed to load manifest:", err);
@@ -77,7 +77,7 @@
     async function loadCartFiles(path: string) {
         loading = true;
         try {
-            const response = await browseCartRestoresCartBrowseGet({
+            const response = await browseRecoveryQueueVirtualFsRestoresCartBrowseGet({
                 query: { path }
             });
             if (response.data) {
@@ -85,8 +85,7 @@
                     name: f.name,
                     path: f.path,
                     type: f.type as any,
-                    size: f.size ?? null,
-                    media: f.media ?? []
+                    size: f.size ?? null
                 }));
             }
         } catch (error) {
@@ -111,8 +110,8 @@
 
         restoring = true;
         try {
-            await triggerRestoreRestoresTriggerPost({
-                body: { destination: selectedDest }
+            await triggerRecoveryJobRestoresTriggerPost({
+                body: { destination_path: selectedDest }
             });
             toast.success("Recovery job initiated! Check System Activity for progress.");
             // Reset queue UI
@@ -137,7 +136,7 @@
     async function clearCart() {
         if (!confirm("Are you sure you want to clear the entire recovery queue?")) return;
         try {
-            await clearCartRestoresCartClearPost();
+            await clearRecoveryQueueRestoresCartClearPost();
             cartFiles = [];
             manifest = null;
             await loadData();

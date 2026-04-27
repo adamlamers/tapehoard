@@ -79,7 +79,8 @@ class ArchiverService:
             )
         elif media_record.media_type == "hdd":
             return OfflineHDDProvider(
-                mount_base=provider_config.get("mount_path", "/mnt/backup")
+                mount_base=provider_config.get("mount_path", "/mnt/backup"),
+                device_uuid=provider_config.get("device_uuid"),
             )
         elif media_record.media_type == "cloud":
             return CloudStorageProvider(config=provider_config)

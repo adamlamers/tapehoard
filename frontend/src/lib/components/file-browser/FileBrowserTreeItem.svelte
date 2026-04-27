@@ -4,7 +4,7 @@
         import type { TreeNode } from "$lib/types";
         import { cn } from "$lib/utils";
         import FileBrowserTreeItem from "./FileBrowserTreeItem.svelte";
-        import { getTreeSystemTreeGet, getIndexTreeInventoryTreeGet, type TreeNodeSchema } from "$lib/api";
+        import { getSystemTreeSystemTreeGet, getArchiveTreeInventoryTreeGet, type TreeNodeSchema } from "$lib/api";
 
         let {
                 node,
@@ -59,7 +59,7 @@
 
                 loading = true;
                 try {
-                        const fetchFn = mode === "host" ? getTreeSystemTreeGet : getIndexTreeInventoryTreeGet;
+                        const fetchFn = mode === "host" ? getSystemTreeSystemTreeGet : getArchiveTreeInventoryTreeGet;
                         const response = await fetchFn({
                                 query: { path: node.path }
                         });

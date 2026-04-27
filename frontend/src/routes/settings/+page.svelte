@@ -6,11 +6,11 @@
     import { Input } from '$lib/components/ui/input';
     import DirectoryPicker from '$lib/components/DirectoryPicker.svelte';
     import {
-        getSettingsSystemSettingsGet,
-        updateSettingSystemSettingsPost,
-        exportDatabaseSystemDatabaseExportGet,
-        importDatabaseSystemDatabaseImportPost,
-        testNotificationSystemNotificationsTestPost
+        getSystemSettingsSystemSettingsGet,
+        updateSystemSettingSystemSettingsPost,
+        exportDatabaseIndexSystemDatabaseExportGet,
+        importDatabaseIndexSystemDatabaseImportPost,
+        testNotificationDispatchSystemNotificationsTestPost
     } from '$lib/api';
     import { toast } from "svelte-sonner";
     import { cn } from "$lib/utils";
@@ -46,7 +46,7 @@
     async function loadSettings() {
         loading = true;
         try {
-            const response = await getSettingsSystemSettingsGet();
+            const response = await getSystemSettingsSystemSettingsGet();
             if (response.data) {
                 const data = response.data;
                 if (data.source_roots) sourceRoots = JSON.parse(data.source_roots);
@@ -68,13 +68,13 @@
         saving = true;
         try {
             await Promise.all([
-                updateSettingSystemSettingsPost({ body: { key: "source_roots", value: JSON.stringify(sourceRoots) } }),
-                updateSettingSystemSettingsPost({ body: { key: "restore_destinations", value: JSON.stringify(restoreDestinations) } }),
-                updateSettingSystemSettingsPost({ body: { key: "tape_drives", value: JSON.stringify(tapeDrives) } }),
-                updateSettingSystemSettingsPost({ body: { key: "global_exclusions", value: globalExclusions } }),
-                updateSettingSystemSettingsPost({ body: { key: "schedule_scan", value: scanSchedule } }),
-                updateSettingSystemSettingsPost({ body: { key: "schedule_archival", value: archivalSchedule } }),
-                updateSettingSystemSettingsPost({ body: { key: "notification_urls", value: JSON.stringify(notificationUrls) } })
+                updateSystemSettingSystemSettingsPost({ body: { key: "source_roots", value: JSON.stringify(sourceRoots) } }),
+                updateSystemSettingSystemSettingsPost({ body: { key: "restore_destinations", value: JSON.stringify(restoreDestinations) } }),
+                updateSystemSettingSystemSettingsPost({ body: { key: "tape_drives", value: JSON.stringify(tapeDrives) } }),
+                updateSystemSettingSystemSettingsPost({ body: { key: "global_exclusions", value: globalExclusions } }),
+                updateSystemSettingSystemSettingsPost({ body: { key: "schedule_scan", value: scanSchedule } }),
+                updateSystemSettingSystemSettingsPost({ body: { key: "schedule_archival", value: archivalSchedule } }),
+                updateSystemSettingSystemSettingsPost({ body: { key: "notification_urls", value: JSON.stringify(notificationUrls) } })
             ]);
             toast.success("System configuration committed");
         } catch (error) {
@@ -91,7 +91,7 @@
         }
         testingUrlIdx = index;
         try {
-            await testNotificationSystemNotificationsTestPost({
+            await testNotificationDispatchSystemNotificationsTestPost({
                 body: { url },
                 throwOnError: true
             });
@@ -128,10 +128,10 @@
 
         importing = true;
         try {
-            await importDatabaseSystemDatabaseImportPost({
+            await importDatabaseIndexSystemDatabaseImportPost({
                 body: { file },
                 throwOnError: true
-            });
+            } as any);
             toast.success("Database restored successfully");
             setTimeout(() => window.location.reload(), 1500);
         } catch (error: any) {

@@ -106,6 +106,8 @@ class MediaSchema(BaseModel):
     is_online: bool = False
     is_identified: bool = False
     priority_index: int = 0
+    host_free_bytes: Optional[int] = None
+    host_total_bytes: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -141,6 +143,8 @@ def list_storage_media(db_session: Session = Depends(get_db)):
         # Hardware Pulse Check
         hardware_online = False
         hardware_identified = False
+        host_free_bytes = None
+        host_total_bytes = None
 
         # Access provider through internal helper
         storage_provider = archiver_manager._get_storage_provider(media)
@@ -149,6 +153,34 @@ def list_storage_media(db_session: Session = Depends(get_db)):
             if hardware_online:
                 detected_id = storage_provider.identify_media()
                 hardware_identified = detected_id == media.identifier
+
+            # If not identified by file, try identifying by hardware UUID
+            if (
+                not hardware_identified
+                and media.media_type == "hdd"
+                and extra_config.get("device_uuid")
+            ):
+                from app.core.utils import get_path_uuid
+
+                current_uuid = get_path_uuid(extra_config.get("mount_path"))
+                if current_uuid == extra_config.get("device_uuid"):
+                    # The path is correct and UUID matches
+                    hardware_identified = True
+                else:
+                    # UUID mismatch or path changed.
+                    # Future: scan all mount points for the UUID.
+                    pass
+
+            # Fetch host-level stats for HDDs
+            if hardware_online and media.media_type == "hdd":
+                try:
+                    mount_path = extra_config.get("mount_path")
+                    if mount_path and os.path.exists(mount_path):
+                        st = os.statvfs(mount_path)
+                        host_free_bytes = st.f_bavail * st.f_frsize
+                        host_total_bytes = st.f_blocks * st.f_frsize
+                except Exception:
+                    pass
 
         results.append(
             MediaSchema(
@@ -164,6 +196,8 @@ def list_storage_media(db_session: Session = Depends(get_db)):
                 is_online=hardware_online,
                 is_identified=hardware_identified,
                 priority_index=media.priority_index,
+                host_free_bytes=host_free_bytes,
+                host_total_bytes=host_total_bytes,
             )
         )
     return results

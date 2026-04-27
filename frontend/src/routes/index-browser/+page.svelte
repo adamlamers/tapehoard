@@ -20,13 +20,13 @@
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
     import type { FileItem } from '$lib/types';
     import {
-        browseIndexInventoryBrowseGet,
-        getItemMetadataInventoryMetadataGet,
-        listCartRestoresCartGet,
-        addToCartRestoresCartFileIdPost,
-        removeFromCartRestoresCartItemIdDelete,
-        addDirectoryToCartRestoresCartDirectoryPost,
-        searchIndexInventorySearchGet,
+        browseArchiveIndexInventoryBrowseGet,
+        getArchiveItemMetadataInventoryMetadataGet,
+        listRecoveryQueueRestoresCartGet,
+        addFileToRecoveryQueueRestoresCartFileIdPost,
+        removeFromRecoveryQueueRestoresCartItemIdDelete,
+        addDirectoryToRecoveryQueueRestoresCartDirectoryPost,
+        searchArchiveIndexInventorySearchGet,
         type ItemMetadataSchema,
         type CartItemSchema
     } from '$lib/api';
@@ -48,7 +48,7 @@
 
     async function loadCart() {
         try {
-            const response = await listCartRestoresCartGet();
+            const response = await listRecoveryQueueRestoresCartGet();
             if (response.data) {
                 restoreCartItems = response.data;
             }
@@ -61,7 +61,7 @@
         if (searchQuery.trim().length >= 3) return;
         loading = true;
         try {
-            const response = await browseIndexInventoryBrowseGet({
+            const response = await browseArchiveIndexInventoryBrowseGet({
                 query: { path }
             });
             if (response.data) {
@@ -88,7 +88,7 @@
     async function searchFiles(query: string) {
         searchLoading = true;
         try {
-            const response = await searchIndexInventorySearchGet({
+            const response = await searchArchiveIndexInventorySearchGet({
                 query: { q: query }
             });
             if (response.data) {
@@ -130,7 +130,7 @@
     async function fetchMetadata(item: FileItem) {
         metadataLoading = true;
         try {
-            const response = await getItemMetadataInventoryMetadataGet({
+            const response = await getArchiveItemMetadataInventoryMetadataGet({
                 query: { path: item.path }
             });
             if (response.data) {
@@ -160,7 +160,7 @@
                 if (item.type === 'file') {
                     const cartItem = restoreCartItems.find(i => i.file_path === item.path);
                     if (cartItem) {
-                        await removeFromCartRestoresCartItemIdDelete({
+                        await removeFromRecoveryQueueRestoresCartItemIdDelete({
                             path: { item_id: cartItem.id }
                         });
                     }
@@ -173,18 +173,18 @@
             } else {
                 if (item.type === 'file') {
                     // Fetch metadata to get the DB ID
-                    const metaResponse = await getItemMetadataInventoryMetadataGet({
+                    const metaResponse = await getArchiveItemMetadataInventoryMetadataGet({
                         query: { path: item.path }
                     });
 
                     if (metaResponse.data?.id) {
-                        await addToCartRestoresCartFileIdPost({
+                        await addFileToRecoveryQueueRestoresCartFileIdPost({
                             path: { file_id: metaResponse.data.id }
                         });
                     }
                 } else {
                     // It's a directory
-                    await addDirectoryToCartRestoresCartDirectoryPost({
+                    await addDirectoryToRecoveryQueueRestoresCartDirectoryPost({
                         body: { path: item.path }
                     });
                 }
@@ -207,7 +207,7 @@
 
     async function handleToggleDirectoryCart(itemPath: string) {
         try {
-            await addDirectoryToCartRestoresCartDirectoryPost({
+            await addDirectoryToRecoveryQueueRestoresCartDirectoryPost({
                 body: { path: itemPath }
             });
 

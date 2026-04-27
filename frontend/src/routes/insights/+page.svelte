@@ -20,7 +20,7 @@
     import { Card } from '$lib/components/ui/card';
     import { Button } from '$lib/components/ui/button';
     import Treemap from '$lib/components/Treemap.svelte';
-    import { getFilesystemInsightsInventoryInsightsGet } from '$lib/api';
+    import { getSystemAnalyticsInventoryInsightsGet } from '$lib/api';
     import { cn } from '$lib/utils';
     import { toast } from 'svelte-sonner';
 
@@ -30,7 +30,7 @@
     async function loadInsights() {
         loading = true;
         try {
-            const response = await getFilesystemInsightsInventoryInsightsGet();
+            const response = await getSystemAnalyticsInventoryInsightsGet();
             if (response.data) insights = response.data;
         } catch (error) {
             toast.error("Failed to generate analytics");
@@ -59,7 +59,7 @@
 
     function mapDirectoryTree(nodes: any[]): any[] {
         if (!nodes) return [];
-        return nodes.filter(n => n.size > 0).map(n => ({
+        return nodes.filter((n: any) => n.size > 0).map((n: any) => ({
             label: n.path,
             value: n.size,
             fullPath: n.fullPath,
