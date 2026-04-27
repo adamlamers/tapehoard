@@ -34,6 +34,11 @@ lint:
     @echo "Type checking Svelte..."
     cd frontend && npm run check
 
+# Run all backend tests
+test:
+    @echo "Running backend tests..."
+    cd backend && uv run pytest
+
 # Auto-format all code (Ruff Format)
 format:
     @echo "Formatting Python (Ruff)..."

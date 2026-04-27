@@ -610,9 +610,9 @@ def search_archive_index(
         SELECT
             fs.id, fs.file_path, fs.size, fs.mtime,
             EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) as has_version
-        FROM filesystem_state_fts fts
+        FROM filesystem_fts fts
         JOIN filesystem_state fs ON fs.id = fts.rowid
-        WHERE filesystem_state_fts MATCH :query
+        WHERE filesystem_fts MATCH :query
         AND fs.is_ignored = 0
         {path_filter}
         ORDER BY rank

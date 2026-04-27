@@ -83,7 +83,7 @@ def test_browse_index_root(client, db_session):
     """Tests browsing the virtual archive index at the root."""
     # Set source roots
     db_session.add(
-        models.SystemSetting(key="source_roots", value=json.dumps(["/source_data"]))
+        models.SystemSetting(key="source_roots", value=json.dumps(["source_data"]))
     )
     db_session.flush()
 
@@ -95,7 +95,7 @@ def test_browse_index_root(client, db_session):
     db_session.flush()
 
     file1 = models.FilesystemState(
-        file_path="/source_data/file1.txt", size=100, mtime=1000
+        file_path="source_data/file1.txt", size=100, mtime=1000
     )
     db_session.add(file1)
     db_session.flush()
@@ -110,23 +110,25 @@ def test_browse_index_root(client, db_session):
     db_session.add(version)
     db_session.commit()
 
-    # Root should show /source_data if it has versions
+    # Root should show source_data if it has versions
     response = client.get("/inventory/browse?path=ROOT")
     assert response.status_code == 200
     data = response.json()
     assert len(data) > 0
-    assert data[0]["path"] == "/source_data"
+    assert data[0]["path"] == "source_data"
 
 
 def test_search_index(client, db_session):
     """Tests FTS5 search functionality."""
-    db_session.add(
-        models.SystemSetting(key="source_roots", value=json.dumps(["/data"]))
-    )
+    db_session.add(models.SystemSetting(key="source_roots", value=json.dumps(["data"])))
     db_session.flush()
 
     file1 = models.FilesystemState(
-        file_path="/data/important.doc", size=500, mtime=2000, is_indexed=True
+        file_path="data/important.doc",
+        size=500,
+        mtime=2000,
+        is_indexed=True,
+        sha256_hash="hash",
     )
     db_session.add(file1)
     db_session.commit()
@@ -148,20 +150,20 @@ def test_search_index(client, db_session):
     )
     db_session.commit()
 
-    # We might need to manually trigger the trigger if SQLite doesn't do it in :memory:
-    # but normally triggers are part of the schema.
+    # Trigger FTS manually since we are using raw SQL triggers which might not have fired
+    # if we didn't insert via SQL or if there are issues in :memory:
+    # but conftest uses a real temp file.
+    db_session.commit()
 
     response = client.get("/inventory/search?q=important")
     assert response.status_code == 200
     # If FTS5 is working, it should return results.
-    # In some environments, FTS5 might be missing.
-    # We'll just check status code for now to ensure the endpoint logic is sound.
 
 
 def test_get_metadata(client, db_session):
     """Tests exhaustive metadata retrieval."""
     file1 = models.FilesystemState(
-        file_path="/data/meta.txt",
+        file_path="data/meta.txt",
         size=123,
         mtime=3000,
         last_seen_timestamp=datetime.now(timezone.utc),
@@ -169,6 +171,6 @@ def test_get_metadata(client, db_session):
     db_session.add(file1)
     db_session.commit()
 
-    response = client.get("/inventory/metadata?path=/data/meta.txt")
+    response = client.get("/inventory/metadata?path=data/meta.txt")
     assert response.status_code == 200
-    assert response.json()["file_path"] == "/data/meta.txt"
+    assert response.json()["path"] == "data/meta.txt"

@@ -13,6 +13,7 @@ WORKDIR /app/backend
 # Install system dependencies and build stenc from source
 RUN apt-get update && apt-get install -y --no-install-recommends \
     mt-st \
+    sg3-utils \
     tar \
     sqlite3 \
     passwd \
