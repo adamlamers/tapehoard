@@ -562,7 +562,7 @@
                                         </div>
                                     </div>
 
-                                    <div class="p-8 flex flex-col md:flex-row gap-12">
+                                    <div class="p-8 flex flex-col lg:flex-row gap-12">
                                         <!-- Drive Info -->
                                         <div class="flex-1 space-y-6">
                                             <div>
@@ -580,22 +580,61 @@
                                                 </div>
                                             </div>
 
-                                            <div class="grid grid-cols-2 gap-8 pt-6 border-t border-border-color/30">
+                                            <!-- Live Performance / Health Dashboard -->
+                                            <div class="grid grid-cols-2 gap-4 pt-6 border-t border-border-color/30">
+                                                <div class="bg-bg-primary/50 p-4 rounded-xl border border-border-color/50">
+                                                    <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-2">Session Performance</span>
+                                                    <div class="space-y-3">
+                                                        <div class="flex justify-between items-center text-[10px]">
+                                                            <span class="text-text-secondary font-bold uppercase tracking-tighter flex items-center gap-1.5"><ArrowUp size={10} class="text-blue-400" /> WRITTEN</span>
+                                                            <span class="text-text-primary font-black mono">{(info.tape?.session_mib_written || 0).toLocaleString()} MiB</span>
+                                                        </div>
+                                                        <div class="flex justify-between items-center text-[10px]">
+                                                            <span class="text-text-secondary font-bold uppercase tracking-tighter flex items-center gap-1.5"><ArrowDown size={10} class="text-success-color" /> READ</span>
+                                                            <span class="text-text-primary font-black mono">{(info.tape?.session_mib_read || 0).toLocaleString()} MiB</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="bg-bg-primary/50 p-4 rounded-xl border border-border-color/50">
+                                                    <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-2">Hardware Health</span>
+                                                    {#if info.tape?.alerts && info.tape.alerts.length > 0}
+                                                        <div class="space-y-1">
+                                                            {#each info.tape.alerts as alert}
+                                                                <div class="flex items-center gap-2 text-[9px] font-black text-orange-400 uppercase tracking-tighter">
+                                                                    <ShieldAlert size={10} /> {alert}
+                                                                </div>
+                                                            {/each}
+                                                        </div>
+                                                    {:else}
+                                                        <div class="flex items-center gap-2 text-[10px] font-black text-success-color uppercase tracking-tighter">
+                                                            <ShieldCheck size={14} /> System Healthy
+                                                        </div>
+                                                        <span class="text-[8px] text-text-secondary opacity-40 uppercase font-bold block mt-1">No active TapeAlerts</span>
+                                                    {/if}
+                                                </div>
+                                            </div>
+
+                                            <div class="grid grid-cols-2 gap-8 pt-4">
                                                 <div>
                                                     <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Assigned ID</span>
                                                     <span class="text-lg font-black text-text-primary mono tracking-tighter">{media.identifier}</span>
                                                 </div>
                                                 <div>
-                                                    <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Reported MAM Barcode</span>
-                                                    <span class="text-lg font-black text-text-primary mono tracking-tighter">{info.tape?.barcode || 'NO BARCODE'}</span>
+                                                    <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Load Count</span>
+                                                    <span class="text-lg font-black text-text-primary mono tracking-tighter flex items-center gap-2">
+                                                        <RotateCw size={14} class="text-blue-500 opacity-50" />
+                                                        {info.tape?.load_count || '0'}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
 
                                         <!-- Media/MAM Info -->
                                         <div class="flex-1 bg-bg-primary/30 rounded-2xl p-6 border border-border-color/50 relative">
-                                            <div class="text-[9px] font-black uppercase tracking-[0.2em] text-text-secondary opacity-50 mb-6 flex items-center gap-2">
-                                                <Database size={12} /> Medium Auxiliary Memory (MAM)
+                                            <div class="text-[9px] font-black uppercase tracking-[0.2em] text-text-secondary opacity-50 mb-6 flex items-center justify-between">
+                                                <div class="flex items-center gap-2"><Database size={12} /> Medium Metadata (MAM)</div>
+                                                <span class="text-blue-400 font-black tracking-widest font-mono">{info.tape?.barcode || 'NO BARCODE'}</span>
                                             </div>
 
                                             <div class="grid grid-cols-2 gap-y-6 gap-x-12">
@@ -617,10 +656,32 @@
                                                     <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Manufacture Date</span>
                                                     <span class="text-xs font-bold text-text-primary mono">{info.tape?.manufacture_date || 'N/A'}</span>
                                                 </div>
-                                                <div class="col-span-2 pt-2">
-                                                    <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Medium Application Label</span>
-                                                    <div class="bg-bg-secondary p-3 rounded-lg border border-border-color font-mono text-xs text-text-primary italic shadow-inner">
-                                                        "{info.tape?.label || 'UNLABELED'}"
+
+                                                <div class="col-span-2 space-y-4 pt-2">
+                                                    <!-- Capacity Utilization -->
+                                                    {#if info.tape?.remaining_capacity_mib !== undefined && info.tape?.max_capacity_mib}
+                                                        {@const used_mib = info.tape.max_capacity_mib - info.tape.remaining_capacity_mib}
+                                                        {@const perc = Math.min(100, Math.round((used_mib / info.tape.max_capacity_mib) * 100))}
+                                                        <div>
+                                                            <div class="flex justify-between items-end mb-2">
+                                                                <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40">Physical Capacity Utilization</span>
+                                                                <span class="text-[10px] font-black text-blue-400 mono">{perc}%</span>
+                                                            </div>
+                                                            <div class="h-2 bg-bg-primary rounded-full overflow-hidden border border-border-color/30 flex">
+                                                                <div class="h-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] transition-all duration-1000" style="width: {perc}%"></div>
+                                                            </div>
+                                                            <div class="flex justify-between mt-1 text-[8px] font-bold text-text-secondary/50 mono uppercase">
+                                                                <span>Used: {(used_mib / 1024).toFixed(1)} GiB</span>
+                                                                <span>Free: {(info.tape.remaining_capacity_mib / 1024).toFixed(1)} GiB</span>
+                                                            </div>
+                                                        </div>
+                                                    {/if}
+
+                                                    <div>
+                                                        <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Medium Application Label</span>
+                                                        <div class="bg-bg-secondary p-3 rounded-lg border border-border-color font-mono text-xs text-text-primary italic shadow-inner">
+                                                            "{info.tape?.label || 'UNLABELED'}"
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>

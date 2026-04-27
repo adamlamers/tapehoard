@@ -6,27 +6,14 @@ from loguru import logger
 
 
 class LTOProvider(AbstractStorageProvider):
-    # Class-level caches to ensure UI stability during busy periods
-    # device_path -> { info }
-    _drive_cache: dict = {}
-    # device_path -> { info }
-    _mam_cache: dict = {}
-    # barcode/serial -> label_id
-    _id_cache: dict = {}
-
     def __init__(
         self, device_path: str = "/dev/nst0", encryption_key: Optional[str] = None
     ):
         self.device_path = device_path
         self.encryption_key = encryption_key
-        self.drive_busy = False
 
     def get_drive_info(self) -> dict:
         """Retrieves vendor, model, and firmware version of the tape drive using sg_inq."""
-        # Drive hardware info never changes, so cache it forever per device path
-        if self.device_path in self._drive_cache:
-            return self._drive_cache[self.device_path]
-
         try:
             # Use sg_inq for reliable SCSI inquiry
             result = subprocess.run(
@@ -44,8 +31,6 @@ class LTOProvider(AbstractStorageProvider):
                 elif "Product revision level:" in line:
                     info["firmware"] = line.split(":", 1)[1].strip()
 
-            if info:
-                self._drive_cache[self.device_path] = info
             return info
         except Exception as e:
             logger.debug(f"Failed to get drive info for {self.device_path}: {e}")
@@ -64,12 +49,11 @@ class LTOProvider(AbstractStorageProvider):
             )
 
             if result.returncode != 0 or not result.stdout:
-                # If busy, return the last known MAM for this drive
-                return self._mam_cache.get(self.device_path, {})
+                return {}
 
             data = result.stdout
             if len(data) < 4:
-                return self._mam_cache.get(self.device_path, {})
+                return {}
 
             # SCSI READ ATTRIBUTE parameter data starts with a 4-byte length field (Big Endian)
             available_len = struct.unpack(">I", data[:4])[0]
@@ -77,17 +61,25 @@ class LTOProvider(AbstractStorageProvider):
             end = min(pos + available_len, len(data))
 
             mam = {}
+            # Standard MAM Attribute IDs (SPC-3 / SSC-2 / LTO Specs)
             attr_map = {
-                0x0000: "barcode",
-                0x0002: "load_count",
+                0x0000: "remaining_capacity_mib",
+                0x0001: "max_capacity_mib",
+                0x0002: "tape_alert_flags",
+                0x0003: "load_count",
+                0x0220: "lifetime_mib_written",
+                0x0221: "lifetime_mib_read",
+                0x0222: "session_mib_written",
+                0x0223: "session_mib_read",
                 0x0400: "manufacturer",
                 0x0401: "serial",
-                0x0800: "density",
-                0x0805: "label",
-                0x0806: "manufacture_date",
+                0x0405: "density",
+                0x0406: "manufacture_date",
+                0x0806: "barcode",
             }
 
             while pos + 5 <= end:
+                # Each attribute header: ID (2), Flags (1), Length (2)
                 attr_id, flags, attr_len = struct.unpack(">HBH", data[pos : pos + 5])
                 pos += 5
                 if pos + attr_len > end:
@@ -97,12 +89,23 @@ class LTOProvider(AbstractStorageProvider):
 
                 if attr_id in attr_map:
                     key = attr_map[attr_id]
-                    if attr_id == 0x0800:
-                        mam[key] = hex(val_bytes[0]) if val_bytes else "0x00"
-                    elif attr_id == 0x0002:
+                    # Binary integers (1, 2, 4, or 8 bytes)
+                    if attr_id in [
+                        0x0000,
+                        0x0001,
+                        0x0002,
+                        0x0003,
+                        0x0220,
+                        0x0221,
+                        0x0222,
+                        0x0223,
+                    ]:
                         mam[key] = int.from_bytes(val_bytes, "big")
+                    elif attr_id == 0x0405:  # Density is a single byte
+                        mam[key] = hex(val_bytes[0]) if val_bytes else "0x00"
                     else:
                         try:
+                            # Most attributes are ASCII strings
                             val = (
                                 val_bytes.decode("ascii", errors="ignore")
                                 .split("\x00")[0]
@@ -113,39 +116,60 @@ class LTOProvider(AbstractStorageProvider):
                         except Exception:
                             continue
 
-            if "density" in mam:
-                gen_map = {
-                    "0x40": "LTO-1",
-                    "0x42": "LTO-2",
-                    "0x44": "LTO-3",
-                    "0x46": "LTO-4",
-                    "0x48": "LTO-5",
-                    "0x58": "LTO-6",
-                    "0x5a": "LTO-7",
-                    "0x5c": "LTO-8",
-                    "0x60": "LTO-9",
+            # 1. Decode TapeAlerts (Common flags)
+            if mam.get("tape_alert_flags"):
+                alerts = []
+                flags = mam["tape_alert_flags"]
+                # Bit indices for common LTO alerts
+                alert_map = {
+                    3: "Hard Error",
+                    4: "Media Error",
+                    5: "Read Failure",
+                    6: "Write Failure",
+                    12: "Media Broken",
+                    20: "Clean Now",
+                    21: "Clean Periodic",
+                    30: "Hardware Failure",
+                    31: "Interface Failure",
                 }
-                val = mam["density"].lower()
-                mam["generation_label"] = gen_map.get(val, f"Density {val}")
+                for bit, msg in alert_map.items():
+                    if (flags >> (64 - bit)) & 1:
+                        alerts.append(msg)
+                mam["alerts"] = alerts
 
-            # Update cache with new successful read
-            if mam:
-                self._mam_cache[self.device_path] = mam
-            return mam
+            # 2. Derive LTO generation from Capacity (the most reliable indicator)
+            if "max_capacity_mib" in mam:
+                cap = mam["max_capacity_mib"]
+                if cap < 150000:
+                    mam["generation_label"] = "LTO-1"
+                elif cap < 300000:
+                    mam["generation_label"] = "LTO-2"
+                elif cap < 600000:
+                    mam["generation_label"] = "LTO-3"
+                elif cap < 1200000:
+                    mam["generation_label"] = "LTO-4"
+                elif cap < 2000000:
+                    mam["generation_label"] = "LTO-5"
+                elif cap < 4000000:
+                    mam["generation_label"] = "LTO-6"
+                elif cap < 10000000:
+                    mam["generation_label"] = "LTO-7"
+                elif cap < 15000000:
+                    mam["generation_label"] = "LTO-8"
+                else:
+                    mam["generation_label"] = "LTO-9"
+
+            return {k: v for k, v in mam.items() if v}
         except Exception as e:
-            if "Device or resource busy" in str(e):
-                self.drive_busy = True
-            return self._mam_cache.get(self.device_path, {})
+            logger.debug(f"Failed to read/parse MAM for {self.device_path}: {e}")
+            return {}
 
     def get_name(self) -> str:
         return "LTO Tape"
 
     def check_online(self) -> bool:
-        """Checks if the tape drive is present and READY (or BUSY which implies online)"""
+        """Checks if the tape drive is present and READY (or BUSY)"""
         if not os.path.exists(self.device_path):
-            # If device node disappeared, clear caches for this path
-            self._drive_cache.pop(self.device_path, None)
-            self._mam_cache.pop(self.device_path, None)
             return False
         try:
             result = subprocess.run(
@@ -154,9 +178,8 @@ class LTOProvider(AbstractStorageProvider):
                 text=True,
                 timeout=5,
             )
-            # "Device or resource busy" is a SUCCESS for "is it online"
+            # "Device or resource busy" is a success for "is it online"
             if result.returncode != 0 and "Device or resource busy" in result.stderr:
-                self.drive_busy = True
                 return True
 
             is_ready = (
@@ -177,8 +200,6 @@ class LTOProvider(AbstractStorageProvider):
                 text=True,
                 timeout=5,
             )
-            # Common indicators of write protection in mt status
-            # WR_PROT is common on Linux, 'read-only' on others
             output = result.stdout.upper()
             return (
                 "WR_PROT" in output
@@ -196,14 +217,12 @@ class LTOProvider(AbstractStorageProvider):
             self._run_mt("rewind")
             # Skip the label file (file 0)
             self._run_mt("fsf 1")
-            # If we are not at EOT, there is probably data
             result = subprocess.run(
                 ["mt", "-f", self.device_path, "status"],
                 capture_output=True,
                 text=True,
                 timeout=5,
             )
-            # If file number > 0, it means we successfully skipped at least one file
             import re
 
             match = re.search(r"File number=(\d+)", result.stdout)
@@ -211,32 +230,18 @@ class LTOProvider(AbstractStorageProvider):
                 return True
             return False
         except Exception:
-            # If we fail to fsf 1, it usually means we hit EOD/EOT right after file 0
             return False
 
     def _run_mt(self, command: str):
         try:
-            result = subprocess.run(
-                ["mt", "-f", self.device_path, command], capture_output=True, text=True
-            )
-            if result.returncode != 0:
-                if "Device or resource busy" in result.stderr:
-                    self.drive_busy = True
-                raise subprocess.CalledProcessError(
-                    result.returncode,
-                    ["mt", "-f", self.device_path, command],
-                    output=result.stdout,
-                    stderr=result.stderr,
-                )
+            subprocess.run(["mt", "-f", self.device_path, command], check=True)
         except subprocess.CalledProcessError as e:
-            if not self.drive_busy:
-                logger.error(f"Tape command 'mt {command}' failed: {e}")
+            logger.error(f"Tape command 'mt {command}' failed: {e}")
             raise
 
     def _setup_encryption(self):
         """Configures hardware encryption on the drive using stenc"""
         if not self.encryption_key:
-            # Explicitly disable encryption if no key provided
             try:
                 subprocess.run(
                     ["stenc", "-f", self.device_path, "--off"], capture_output=True
@@ -247,8 +252,6 @@ class LTOProvider(AbstractStorageProvider):
 
         try:
             logger.info(f"Setting LTO hardware encryption key for {self.device_path}")
-            # stenc expects a 32-byte hex key (256-bit)
-            # We use a pipe to avoid leaving the key in the process list
             proc = subprocess.Popen(
                 ["stenc", "-f", self.device_path, "--import", "-k", "-"],
                 stdin=subprocess.PIPE,
@@ -262,85 +265,41 @@ class LTOProvider(AbstractStorageProvider):
                 raise RuntimeError(f"LTO Encryption Setup Failed: {stderr}")
 
             # Verify encryption is on
-            subprocess.run(
-                ["stenc", "-f", self.device_path, "--on"],
-                check=True,
-                capture_output=True,
-            )
+            subprocess.run(["stenc", "-f", self.device_path, "--on"], check=True)
             logger.info("LTO Hardware Encryption ENABLED and LOCKED")
 
         except Exception as e:
-            if "Device or resource busy" in str(e):
-                self.drive_busy = True
             logger.error(f"Hardware encryption error: {e}")
             raise
 
-    def identify_media(self, allow_intrusive=True) -> Optional[str]:
+    def identify_media(self) -> Optional[str]:
         """
-        Identifies the tape, using MAM barcode/serial and load_count as cache keys.
-        Set allow_intrusive=False to skip physical tape reads (rewind/tar) if not cached.
+        Identifies the tape, using MAM Barcode (0x0806) as primary identity
+        to avoid disruptive head movement (rewind).
         """
         if not self.check_online():
             return None
 
-        # 1. Try to get MAM info first (FAST and NON-INTRUSIVE)
+        # 1. Try non-intrusive MAM barcode first
         mam = self.get_mam_info()
         barcode = mam.get("barcode")
-        serial = mam.get("serial")
-        load_count = mam.get("load_count")
+        if barcode:
+            return barcode
 
-        # Unique key for this specific tape session
-        # (device_path, load_count) is globally unique for a "loaded" tape
-        session_key = None
-        if load_count is not None:
-            session_key = f"{self.device_path}:{load_count}"
-
-        # 2. Check caches
-        # First check barcode/serial cache
-        if barcode and barcode in self._id_cache:
-            return self._id_cache[barcode]
-        if serial and serial in self._id_cache:
-            return self._id_cache[serial]
-
-        # Then check session cache (handles tapes with no barcode/serial)
-        if session_key and session_key in self._id_cache:
-            return self._id_cache[session_key]
-
-        # 3. If not in cache and intrusive allowed, we MUST read the physical label
-        if not allow_intrusive:
-            return None
-
+        # 2. Fallback to physical tape label read (intrusive!)
         try:
-            # We must set up encryption BEFORE trying to read the label if it's an encrypted tape
             self._setup_encryption()
-
             self._run_mt("rewind")
-            # Try to read the label file
             result = subprocess.run(
                 ["tar", "-xf", self.device_path, "-O", ".tapehoard_label"],
                 capture_output=True,
                 text=True,
-                timeout=15,  # Shorter timeout for status polls
+                timeout=20,
             )
             if result.returncode == 0:
-                label_id = result.stdout.strip()
-                # Store in all relevant caches
-                if barcode:
-                    self._id_cache[barcode] = label_id
-                if serial:
-                    self._id_cache[serial] = label_id
-                if session_key:
-                    self._id_cache[session_key] = label_id
-                return label_id
-
+                return result.stdout.strip()
         except Exception as e:
-            if "Device or resource busy" in str(e):
-                self.drive_busy = True
-            # Only log if it's a real failure, not just a busy drive
-            if not self.drive_busy:
-                logger.debug(
-                    f"Identification skipped or failed for {self.device_path}: {e}"
-                )
+            logger.debug(f"Physical identification failed for {self.device_path}: {e}")
 
         return None
 
@@ -421,15 +380,12 @@ class LTOProvider(AbstractStorageProvider):
                 text=True,
                 check=True,
             )
-            # mt status output varies by OS/Driver, but usually contains 'File number=X'
-            # We look for a line like 'File number=2, block number=0'
             import re
 
             match = re.search(r"File number=(\d+)", result.stdout)
             if match:
                 return match.group(1)
 
-            # Alternative format
             match = re.search(r"file number (\d+)", result.stdout)
             if match:
                 return match.group(1)
@@ -463,10 +419,6 @@ class LTOProvider(AbstractStorageProvider):
             proc.stdin.close()
 
         proc.wait()
-
-        # After writing, we should be at the NEXT file mark.
-        # But tar/dd usually leaves us at the end of the written data.
-        # We'll return the position we started at as the 'location_id'
         return file_num
 
     def finalize_media(self, media_id: str):
