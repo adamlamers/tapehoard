@@ -38,10 +38,10 @@ class OfflineHDDProvider(AbstractStorageProvider):
     def get_name(self) -> str:
         return self.name
 
-    def get_live_info(self) -> dict:
+    def get_live_info(self, force: bool = False) -> dict:
         import psutil
 
-        info = {"online": self.check_online()}
+        info = {"online": self.check_online(force=force)}
         if info["online"]:
             try:
                 usage = psutil.disk_usage(self.mount_base)
@@ -55,7 +55,7 @@ class OfflineHDDProvider(AbstractStorageProvider):
                 pass
         return info
 
-    def check_online(self) -> bool:
+    def check_online(self, force: bool = False) -> bool:
         """Checks if the HDD mount point is physically accessible and matches UUID if provided."""
         is_accessible = os.path.exists(self.mount_base) and os.path.isdir(
             self.mount_base

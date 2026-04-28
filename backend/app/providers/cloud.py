@@ -83,12 +83,19 @@ class CloudStorageProvider(AbstractStorageProvider):
     def get_name(self) -> str:
         return f"Cloud ({self.provider_type})"
 
-    def check_online(self) -> bool:
+    def check_online(self, force: bool = False) -> bool:
         try:
             self.s3.head_bucket(Bucket=self.bucket_name)
             return True
         except Exception:
             return False
+
+    def get_live_info(self, force: bool = False) -> Dict[str, Any]:
+        return {
+            "online": self.check_online(force=force),
+            "provider": self.provider_type,
+            "bucket": self.bucket_name,
+        }
 
     def check_existing_data(self) -> bool:
         try:

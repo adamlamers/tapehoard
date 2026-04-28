@@ -78,7 +78,7 @@ def list_storage_providers():
 
 
 @router.get("/media", response_model=List[MediaSchema])
-def list_storage_fleet(db_session: Session = Depends(get_db)):
+def list_storage_fleet(refresh: bool = False, db_session: Session = Depends(get_db)):
     """Returns all registered media assets with real-time hardware status."""
     from app.services.archiver import archiver_manager
 
@@ -98,7 +98,7 @@ def list_storage_fleet(db_session: Session = Depends(get_db)):
         live_info = None
 
         if provider:
-            is_online = provider.check_online()
+            is_online = provider.check_online(force=refresh)
             try:
                 # Attempt to identify the media non-intrusively
                 # pass allow_intrusive=False if the provider supports it, otherwise default
@@ -115,7 +115,7 @@ def list_storage_fleet(db_session: Session = Depends(get_db)):
                 hardware_identified = detected_id == media.identifier
 
                 # Always populate live_info using the unified interface
-                live_info = provider.get_live_info()
+                live_info = provider.get_live_info(force=refresh)
 
                 # For HDD providers, also grab host-level capacity if possible
                 if is_online and media.media_type == "hdd":

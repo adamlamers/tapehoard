@@ -134,11 +134,11 @@
         })
     );
 
-    async function loadMedia(silent = false) {
+    async function loadMedia(silent = false, refresh = false) {
         if (!silent) loading = true;
         try {
             const [mediaRes, hardwareRes] = await Promise.all([
-                listStorageFleetInventoryMediaGet(),
+                listStorageFleetInventoryMediaGet({ query: { refresh } }),
                 discoverHardwareNodesSystemHardwareDiscoverGet()
             ]);
             if (mediaRes.data) {
@@ -181,6 +181,9 @@
     }
 
     onMount(async () => {
+        // Initial load (non-silent and forced refresh to show live hardware status immediately)
+        loadMedia(false, true);
+
         try {
             const res = await listStorageProvidersInventoryProvidersGet();
             if (res.data) providersList = res.data;
@@ -188,7 +191,6 @@
             console.error("Failed to load storage providers:", error);
         }
 
-        loadMedia();
         pollInterval = setInterval(() => loadMedia(true), 5000);
     });
 

@@ -1179,9 +1179,23 @@ export type ListStorageProvidersInventoryProvidersGetResponse = ListStorageProvi
 export type ListStorageFleetInventoryMediaGetData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Refresh
+         */
+        refresh?: boolean;
+    };
     url: '/inventory/media';
 };
+
+export type ListStorageFleetInventoryMediaGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListStorageFleetInventoryMediaGetError = ListStorageFleetInventoryMediaGetErrors[keyof ListStorageFleetInventoryMediaGetErrors];
 
 export type ListStorageFleetInventoryMediaGetResponses = {
     /**

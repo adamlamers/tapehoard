@@ -20,7 +20,7 @@ class AbstractStorageProvider(ABC):
         pass
 
     @abstractmethod
-    def check_online(self) -> bool:
+    def check_online(self, force: bool = False) -> bool:
         """Checks if the media is physically present and reachable"""
         pass
 
@@ -32,12 +32,12 @@ class AbstractStorageProvider(ABC):
         """
         pass
 
-    def get_live_info(self) -> Dict[str, Any]:
+    def get_live_info(self, force: bool = False) -> Dict[str, Any]:
         """
         Standardized method returning hardware telemetry.
         Should return a dict like {"drive": {...}, "media": {...}, "online": bool}
         """
-        return {"online": self.check_online()}
+        return {"online": self.check_online(force=force)}
 
     def get_health_status(self) -> Dict[str, Any]:
         """

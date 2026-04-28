@@ -231,11 +231,11 @@ class LTOProvider(AbstractStorageProvider):
         # Return LKG if direct read failed
         return LTOProvider._lkg_state[self.device_path]["mam"]
 
-    def get_live_info(self) -> Dict[str, Any]:
+    def get_live_info(self, force: bool = False) -> Dict[str, Any]:
         """Performs a single-pass discovery of all hardware metrics to ensure consistency."""
-        self.check_online()
+        self.check_online(force=force)
         # Since check_online throttles and sets online/last_check, we follow its lead
-        mam = self.get_mam_info()
+        mam = self.get_mam_info(force=force)
         drive = self.get_drive_info()
 
         identity = mam.get("barcode") or mam.get("serial")
@@ -250,7 +250,7 @@ class LTOProvider(AbstractStorageProvider):
     def get_name(self) -> str:
         return "LTO Tape"
 
-    def check_online(self) -> bool:
+    def check_online(self, force: bool = False) -> bool:
         """Checks if the tape drive is online. Throttled to 2 seconds."""
         if not os.path.exists(self.device_path):
             LTOProvider._lkg_state[self.device_path]["online"] = False
@@ -258,7 +258,11 @@ class LTOProvider(AbstractStorageProvider):
 
         # Return LKG if we checked very recently
         now = time.time()
-        if now - LTOProvider._lkg_state[self.device_path].get("last_check", 0) < 2.0:
+        if (
+            not force
+            and now - LTOProvider._lkg_state[self.device_path].get("last_check", 0)
+            < 2.0
+        ):
             return LTOProvider._lkg_state[self.device_path]["online"]
 
         try:
