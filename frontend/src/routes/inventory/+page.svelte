@@ -336,8 +336,8 @@
 </script>
 
 {#snippet ConfigIcon(type: string)}
-    {#if type === 'lto_tape'}<CassetteTape size={24} />
-    {:else if type === 'local_hdd'}<HardDrive size={24} />
+    {#if type === 'lto_tape' || type === 'tape'}<CassetteTape size={24} />
+    {:else if type === 'local_hdd' || type === 'hdd'}<HardDrive size={24} />
     {:else}<Cloud size={24} />{/if}
 {/snippet}
 
@@ -369,7 +369,7 @@
         <div class="flex flex-col min-w-0">
             <span class="text-xs font-black text-text-primary uppercase tracking-widest truncate">{media.identifier}</span>
             <div class="mt-1 flex flex-col gap-1">
-                {#if media.media_type === 'local_hdd' && media.config?.mount_path}
+                {#if (media.media_type === 'local_hdd' || media.media_type === 'hdd') && media.config?.mount_path}
                     <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
                         <Monitor size={10} /> {media.config.mount_path}
                     </div>
@@ -399,7 +399,7 @@
             <span class="text-[10px] font-bold uppercase text-text-secondary">{media.media_type}</span>
             <div class="flex items-center gap-2 mt-1">
                 <span class="text-[10px] font-medium text-text-secondary/40">{media.generation_tier || 'Generic'}</span>
-                {#if media.media_type === 'local_hdd' && media.config?.device_uuid}
+                {#if (media.media_type === 'local_hdd' || media.media_type === 'hdd') && media.config?.device_uuid}
                     <span class="text-[9px] font-mono text-text-secondary/30 truncate max-w-[80px]">{media.config.device_uuid}</span>
                 {/if}
             </div>
@@ -539,7 +539,7 @@
         <!-- INVENTORY SECTION -->
         <section class="space-y-12">
             <!-- Hardware Status -->
-            {#if mediaList.some(m => m.is_online && m.media_type === 'lto_tape')}
+            {#if mediaList.some(m => m.is_online && (m.media_type === 'lto_tape' || m.media_type === 'tape'))}
                 <div class="space-y-6">
                     <div class="flex items-center gap-3 px-2">
                         <div class="p-1.5 bg-blue-500/10 rounded-md text-blue-500"><Cpu size={16} /></div>
@@ -548,7 +548,7 @@
                     </div>
 
                     <div class="grid grid-cols-1 gap-6">
-                        {#each mediaList.filter(m => m.is_online && m.media_type === 'lto_tape') as media}
+                        {#each mediaList.filter(m => m.is_online && (m.media_type === 'lto_tape' || m.media_type === 'tape')) as media}
                             {#if media.live_info}
                                 {@const info = media.live_info as any}
                                 <Card class="bg-bg-secondary border-blue-500/30 shadow-2xl relative overflow-hidden">
