@@ -1,26 +1,25 @@
 import json
-import psutil
 import os
-from loguru import logger
 from datetime import datetime, timezone
 from typing import List, Optional
 
+import psutil
 from fastapi import APIRouter, Depends, HTTPException
+from loguru import logger
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.api.schemas import (
+    ItemMetadataSchema,
+    MediaCreateSchema,
+    MediaSchema,
+    MediaUpdateSchema,
+    StorageProviderSchema,
+    TreeNodeSchema,
+)
 from app.db import models
 from app.db.database import get_db
-
-from app.api.schemas import (
-    MediaSchema,
-    MediaCreateSchema,
-    MediaUpdateSchema,
-    TreeNodeSchema,
-    ItemMetadataSchema,
-    StorageProviderSchema,
-)
 
 router = APIRouter(prefix="/inventory", tags=["Inventory & Search"])
 
@@ -59,9 +58,9 @@ def get_source_roots(db_session: Session) -> List[str]:
 @router.get("/providers", response_model=List[StorageProviderSchema])
 def list_storage_providers():
     """Returns a registry of all available storage providers and their configurations."""
-    from app.providers.tape import LTOProvider
-    from app.providers.hdd import OfflineHDDProvider
     from app.providers.cloud import CloudStorageProvider
+    from app.providers.hdd import OfflineHDDProvider
+    from app.providers.tape import LTOProvider
 
     providers = [LTOProvider, OfflineHDDProvider, CloudStorageProvider]
 
