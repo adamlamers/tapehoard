@@ -67,6 +67,7 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
 *   **Temporal Standard:** Backend uses **UTC**. Frontend uses `parseUTCDate` to convert to browser **Local Time**.
 *   **Unsaved Changes Guard:** UI must use `beforeNavigate` and `beforeunload` listeners to warn users if they leave the Settings or Media registration forms with uncommitted changes.
 *   **Testing Protocol:** Use **Alembic-driven file-based SQLite** for tests to ensure 100% schema fidelity (including FTS5 and triggers) and reliable cross-thread data visibility. Atomic truncation must occur between tests.
+*  `just pytest` to run backend tests
 
 ### UI & UX Philosophy
 *   **Direct Terminology:** Use technical terms like "Backup Manager", "System Status", "Archive Index". Avoid marketing fluff.

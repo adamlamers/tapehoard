@@ -35,7 +35,7 @@ lint:
     cd frontend && npm run check
 
 # Run all backend tests
-test:
+pytest:
     @echo "Running backend tests..."
     cd backend && uv run pytest
 
