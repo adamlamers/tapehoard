@@ -56,7 +56,6 @@ class FileItemSchema(BaseModel):
     type: str
     size: Optional[int] = None
     mtime: Optional[float] = None
-    tracked: bool = False
     ignored: bool = False
     sha256_hash: Optional[str] = None
 
@@ -362,6 +361,7 @@ def browse_system_path(
             is_tracked, is_ignored = get_tracking_status(
                 root_path, tracking_map, exclusion_spec
             )
+            # Default to not ignored for source roots themselves
             results.append(
                 FileItemSchema(
                     name=root_path,
@@ -369,7 +369,6 @@ def browse_system_path(
                     type="directory",
                     size=stats.st_size,
                     mtime=stats.st_mtime,
-                    tracked=is_tracked,
                     ignored=is_ignored,
                 )
             )
@@ -427,7 +426,6 @@ def browse_system_path(
                         else "file",
                         size=file_stats.st_size,
                         mtime=file_stats.st_mtime,
-                        tracked=is_tracked,
                         ignored=is_ignored,
                         sha256_hash=indexed_files.get(entry.path),
                     )
@@ -479,7 +477,7 @@ def search_system_index(
     results = []
     for file_record in files:
         full_path = file_record[0]
-        is_tracked, _ = get_tracking_status(full_path, tracking_map, exclusion_spec)
+        _, is_ignored = get_tracking_status(full_path, tracking_map, exclusion_spec)
         results.append(
             FileItemSchema(
                 name=full_path.split("/")[-1],
@@ -487,8 +485,7 @@ def search_system_index(
                 type="file",
                 size=file_record[1],
                 mtime=file_record[2],
-                tracked=is_tracked,
-                ignored=bool(file_record[4]),
+                ignored=is_ignored or bool(file_record[4]),
                 sha256_hash=file_record[5],
             )
         )
@@ -501,7 +498,8 @@ def search_system_index(
 def batch_update_tracking(
     request_data: BatchTrackRequest, db_session: Session = Depends(get_db)
 ):
-    """Applies bulk inclusion and exclusion rules to the tracking policy."""
+    """Applies bulk inclusion and exclusion rules and synchronizes is_ignored flags."""
+    # 1. Update Tracking Rules and set is_ignored = 0 for inclusions
     for path_to_track in request_data.tracks:
         existing = (
             db_session.query(models.TrackedSource)
@@ -513,6 +511,15 @@ def batch_update_tracking(
         else:
             db_session.add(models.TrackedSource(path=path_to_track, action="include"))
 
+        # Mark files as NOT ignored (i.e., Tracked for Archival)
+        db_session.execute(
+            text(
+                "UPDATE filesystem_state SET is_ignored = 0 WHERE file_path = :p OR file_path LIKE :pp"
+            ),
+            {"p": path_to_track, "pp": f"{path_to_track}/%"},
+        )
+
+    # 2. Update Tracking Rules and set is_ignored = 1 for exclusions
     for path_to_untrack in request_data.untracks:
         existing = (
             db_session.query(models.TrackedSource)
@@ -524,8 +531,16 @@ def batch_update_tracking(
         else:
             db_session.add(models.TrackedSource(path=path_to_untrack, action="exclude"))
 
+        # Mark files as IGNORED (i.e., Untracked/Excluded from Archival)
+        db_session.execute(
+            text(
+                "UPDATE filesystem_state SET is_ignored = 1 WHERE file_path = :p OR file_path LIKE :pp"
+            ),
+            {"p": path_to_untrack, "pp": f"{path_to_untrack}/%"},
+        )
+
     db_session.commit()
-    return {"message": "Tracking policy synchronized."}
+    return {"message": "Tracking policy synchronized with filesystem index."}
 
 
 @router.get("/settings", response_model=Dict[str, str])

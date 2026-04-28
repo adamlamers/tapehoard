@@ -5,7 +5,7 @@ import psutil
 import threading
 import concurrent.futures
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 from loguru import logger
 from sqlalchemy.orm import Session
 from app.db import models
@@ -233,11 +233,12 @@ class ScannerService:
             tracking_rules = db_session.query(models.TrackedSource).all()
             tracking_map = {rule.path: rule.action for rule in tracking_rules}
 
-            def resolve_tracking(absolute_path: str) -> Tuple[bool, bool]:
-                ignored_by_policy = False
+            def resolve_tracking(absolute_path: str) -> bool:
+                # 1. Global Exclusions
                 if exclusion_spec and exclusion_spec.match_file(absolute_path):
-                    ignored_by_policy = True
+                    return True
 
+                # 2. User Tracking Policy
                 applicable_rules = []
                 for rule_path, action in tracking_map.items():
                     if absolute_path == rule_path or absolute_path.startswith(
@@ -246,10 +247,11 @@ class ScannerService:
                         applicable_rules.append((len(rule_path), action))
 
                 if not applicable_rules:
-                    return not ignored_by_policy, ignored_by_policy
+                    # Default to NOT ignored if in a source root and no rules match
+                    return False
 
                 applicable_rules.sort(key=lambda x: x[0], reverse=True)
-                return applicable_rules[0][1] == "include", ignored_by_policy
+                return applicable_rules[0][1] == "exclude"
 
             current_timestamp = datetime.now(timezone.utc)
             BATCH_SIZE = 1000
@@ -283,13 +285,12 @@ class ScannerService:
 
                         try:
                             file_stats = os.stat(full_file_path)
-                            is_tracked, is_ignored = resolve_tracking(full_file_path)
+                            is_ignored = resolve_tracking(full_file_path)
                             pending_metadata.append(
                                 {
                                     "path": full_file_path,
                                     "size": file_stats.st_size,
                                     "mtime": file_stats.st_mtime,
-                                    "tracked": is_tracked,
                                     "ignored": is_ignored,
                                 }
                             )

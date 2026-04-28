@@ -205,10 +205,6 @@ export type FileItemSchema = {
      */
     mtime?: number | null;
     /**
-     * Tracked
-     */
-    tracked?: boolean;
-    /**
      * Ignored
      */
     ignored?: boolean;

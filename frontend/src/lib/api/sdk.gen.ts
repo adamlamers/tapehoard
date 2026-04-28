@@ -98,7 +98,7 @@ export const searchSystemIndexSystemSearchGet = <ThrowOnError extends boolean = 
 /**
  * Batch Update Tracking
  *
- * Applies bulk inclusion and exclusion rules to the tracking policy.
+ * Applies bulk inclusion and exclusion rules and synchronizes is_ignored flags.
  */
 export const batchUpdateTrackingSystemTrackBatchPost = <ThrowOnError extends boolean = false>(options: Options<BatchUpdateTrackingSystemTrackBatchPostData, ThrowOnError>) => (options.client ?? client).post<BatchUpdateTrackingSystemTrackBatchPostResponses, BatchUpdateTrackingSystemTrackBatchPostErrors, ThrowOnError>({
     url: '/system/track/batch',

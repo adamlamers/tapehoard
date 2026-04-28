@@ -5,7 +5,6 @@ export interface FileItem {
     target?: string; // For links
     size?: number | null;
     mtime?: number | null;
-    tracked?: boolean | null;
     ignored?: boolean | null;
     media?: string[]; // Media it's on (for index browsing)
     selected?: boolean; // For restore cart

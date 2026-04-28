@@ -125,26 +125,21 @@
                 class="flex h-10 w-12 shrink-0 items-center justify-center border-r border-border-color/10"
                 onclick={(e) => {
                         e.stopPropagation();
-                        if (item.ignored) return;
                         onToggleTrack();
                 }}
                 onkeydown={(e) => e.key === " " && e.stopPropagation()}
                 role="none"
         >
-                {#if item.ignored}
-                        <div class="text-text-secondary/40">
-                                <EyeOff size={16} />
-                        </div>
-                {:else if mode === 'host' || mode === 'live'}
+                {#if mode === 'host' || mode === 'live'}
                         {#if isStaged}
                                 <div class="text-blue-500 bg-blue-500/10 p-1 rounded-md animate-pulse border border-blue-500/30">
-                                        {#if item.tracked}
-                                                <Square size={16} />
-                                        {:else}
+                                        {#if item.ignored}
                                                 <ShieldCheck size={16} />
+                                        {:else}
+                                                <Square size={16} />
                                         {/if}
                                 </div>
-                        {:else if item.tracked}
+                        {:else if !item.ignored}
                                 <div class="text-success-color bg-success-color/10 p-1 rounded-md">
                                         <ShieldCheck size={16} />
                                 </div>

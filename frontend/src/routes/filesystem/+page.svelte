@@ -151,13 +151,15 @@
 
     function handleToggleTrack(item: FileItem) {
         const path = item.path;
-        const currentTracked = item.tracked;
+        const currentIgnored = item.ignored;
         const staged = pendingChanges.get(path);
 
         if (staged !== undefined) {
             pendingChanges.delete(path);
         } else {
-            pendingChanges.set(path, !currentTracked);
+            // If currently ignored, stage it for UN-ignoring (tracking)
+            // If currently NOT ignored, stage it for ignoring (untracking)
+            pendingChanges.set(path, !currentIgnored);
         }
 
         // Trigger reactivity for Svelte 5 state
@@ -168,11 +170,13 @@
         if (pendingChanges.size === 0) return;
         committing = true;
         try {
+            // A staged value of FALSE means 'is_ignored = false' -> track it
+            // A staged value of TRUE means 'is_ignored = true' -> untrack it
             const tracks = Array.from(pendingChanges.entries())
-                .filter(([_, tracked]) => tracked)
+                .filter(([_, ignoredState]) => !ignoredState)
                 .map(([path, _]) => path);
             const untracks = Array.from(pendingChanges.entries())
-                .filter(([_, tracked]) => !tracked)
+                .filter(([_, ignoredState]) => ignoredState)
                 .map(([path, _]) => path);
 
             await batchUpdateTrackingSystemTrackBatchPost({
