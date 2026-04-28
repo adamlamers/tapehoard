@@ -37,6 +37,7 @@
         registerNewMediaInventoryMediaPost,
         deleteMediaAssetInventoryMediaMediaIdDelete,
         triggerBackupJobBackupsTriggerMediaIdPost,
+        triggerAutoBackupBackupsTriggerAutoPost,
         initializeStorageHardwareInventoryMediaMediaIdInitializePost,
         reorderArchivalPriorityInventoryMediaReorderPost,
         updateMediaAssetInventoryMediaMediaIdPatch,
@@ -200,13 +201,13 @@
 
     function handleDndConsider(e: CustomEvent) {
         const activeItems = e.detail.items;
-        const inactiveItems = mediaList.filter(m => m.status !== 'active');
+        const inactiveItems = mediaList.filter(m => m.status !== 'active' || (m.capacity > 0 && (m.bytes_used / m.capacity) >= 0.98));
         mediaList = [...activeItems, ...inactiveItems];
     }
 
     async function handleDndFinalize(e: CustomEvent) {
         const activeItems = e.detail.items;
-        const inactiveItems = mediaList.filter(m => m.status !== 'active');
+        const inactiveItems = mediaList.filter(m => m.status !== 'active' || (m.capacity > 0 && (m.bytes_used / m.capacity) >= 0.98));
         mediaList = [...activeItems, ...inactiveItems];
 
         try {
@@ -253,6 +254,17 @@
             toast.success(`Archival job initiated for ${identifier}`);
         } catch (error: any) {
             toast.error(error.body?.detail || "Failed to start archival");
+        }
+    }
+
+    async function handleAutoArchive() {
+        try {
+            await triggerAutoBackupBackupsTriggerAutoPost({
+                throwOnError: true
+            });
+            toast.success("Auto-archival job initiated for all active media");
+        } catch (error: any) {
+            toast.error(error.body?.detail || "Failed to start auto-archival");
         }
     }
 
@@ -458,6 +470,11 @@
         </div>
 
         <div class="flex items-center gap-4 relative z-10">
+            {#if mediaList.some(m => m.status === 'active' && (m.bytes_used / m.capacity) < 0.98)}
+                <Button variant="default" size="lg" class="px-8 h-12 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/10 bg-blue-600 hover:bg-blue-500" onclick={handleAutoArchive}>
+                    <PlayCircle size={18} class="mr-2" /> Auto Archive
+                </Button>
+            {/if}
             <Button variant="default" size="lg" class="px-8 h-12 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/10" onclick={() => showRegisterDialog = true}>
                 <Plus size={18} class="mr-2" /> Register New Media
             </Button>
@@ -726,12 +743,12 @@
                             </tr>
                         </thead>
                         <tbody
-                            use:dndzone={{items: mediaList.filter(m => m.status === 'active'), flipDurationMs: 200}}
+                            use:dndzone={{items: mediaList.filter(m => m.status === 'active' && (m.capacity === 0 || (m.bytes_used / m.capacity) < 0.98)), flipDurationMs: 200}}
                             onconsider={handleDndConsider}
                             onfinalize={handleDndFinalize}
                             class="divide-y divide-border-color/30"
                         >
-                            {#each mediaList.filter(m => m.status === 'active') as media (media.id)}
+                            {#each mediaList.filter(m => m.status === 'active' && (m.capacity === 0 || (m.bytes_used / m.capacity) < 0.98)) as media (media.id)}
                                 <tr class="hover:bg-bg-primary/30 transition-colors group">
                                     <td class="px-6 py-4 text-center">
                                         <div class="cursor-grab active:cursor-grabbing text-text-secondary opacity-20 group-hover:opacity-100 transition-opacity">
@@ -747,6 +764,44 @@
                     </table>
                 </Card>
             </div>
+
+            <!-- Fully Utilized Media -->
+            {#if mediaList.some(m => m.status === 'active' && m.capacity > 0 && (m.bytes_used / m.capacity) >= 0.98)}
+                <div class="space-y-6">
+                    <div class="flex items-center gap-3 px-2">
+                        <div class="p-1.5 bg-success-color/10 rounded-md text-success-color"><ShieldCheck size={16} /></div>
+                        <h2 class="text-[11px] font-black uppercase tracking-[0.2em] text-text-primary opacity-80">Fully Utilized Media</h2>
+                        <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent opacity-50"></div>
+                    </div>
+
+                    <Card class="bg-bg-secondary/80 border border-border-color/80 rounded-xl overflow-hidden shadow-xl">
+                        <table class="w-full border-collapse">
+                            <thead>
+                                <tr class="bg-bg-tertiary/30 border-b border-border-color/50">
+                                    <th class="px-6 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-60">SORT</th>
+                                    <th class="px-6 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-60">#</th>
+                                    <th class="px-2 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-60">Stat</th>
+                                    <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-60">Identity</th>
+                                    <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-60">Type & Tier</th>
+                                    <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-60">Location</th>
+                                    <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-60">Utilization</th>
+                                    <th class="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-60">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border-color/30">
+                                {#each mediaList.filter(m => m.status === 'active' && m.capacity > 0 && (m.bytes_used / m.capacity) >= 0.98) as media (media.id)}
+                                    <tr class="hover:bg-bg-primary/20 transition-colors">
+                                        <td class="px-6 py-4 text-center opacity-30">
+                                            <Minus size={16} />
+                                        </td>
+                                        {@render mediaRow(media)}
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </Card>
+                </div>
+            {/if}
 
             <!-- Retired & Failed Media -->
             {#if mediaList.some(m => m.status !== 'active')}

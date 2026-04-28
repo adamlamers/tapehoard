@@ -1483,6 +1483,20 @@ export type GetArchiveItemMetadataInventoryMetadataGetResponses = {
 
 export type GetArchiveItemMetadataInventoryMetadataGetResponse = GetArchiveItemMetadataInventoryMetadataGetResponses[keyof GetArchiveItemMetadataInventoryMetadataGetResponses];
 
+export type TriggerAutoBackupBackupsTriggerAutoPostData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/backups/trigger/auto';
+};
+
+export type TriggerAutoBackupBackupsTriggerAutoPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type TriggerBackupJobBackupsTriggerMediaIdPostData = {
     body?: never;
     path: {
