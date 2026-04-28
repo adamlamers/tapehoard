@@ -102,6 +102,24 @@
 
     let pollInterval: any;
 
+    const onlineDevicePaths = $derived(
+        new Set(
+            mediaList
+                .filter(m => m.is_online && m.config?.device_path)
+                .map(m => m.config.device_path)
+        )
+    );
+
+    const filteredDiscoveredAssets = $derived(
+        discoveredAssets.filter(asset => {
+            // Hide if backend already thinks it's registered
+            if (asset.is_registered) return false;
+            // Hide if its device_path is currently claimed by an online registered tape
+            if (asset.type === 'tape' && onlineDevicePaths.has(asset.device_path)) return false;
+            return true;
+        })
+    );
+
     async function loadMedia(silent = false) {
         if (!silent) loading = true;
         try {
@@ -503,7 +521,7 @@
 
     <div class="space-y-16">
         <!-- DISCOVERED HARDWARE SECTION -->
-        {#if discoveredAssets.filter(a => !a.is_registered).length > 0}
+        {#if filteredDiscoveredAssets.length > 0}
             <section class="space-y-6">
                 <div class="flex items-center gap-3 px-2">
                     <div class="p-1.5 bg-action-color/10 rounded-md text-action-color"><Cpu size={16} /></div>
@@ -512,61 +530,61 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {#each discoveredAssets as asset}
-                        {#if !asset.is_registered}
-                            <Card class="p-5 bg-bg-secondary border-dashed border-2 border-border-color hover:border-action-color/50 transition-all group">
-                                <div class="flex items-start gap-4">
-                                    <div class="p-3 bg-action-color/10 rounded-xl text-action-color border border-action-color/20">
-                                        {#if asset.type === 'tape'}<CassetteTape size={24} />{:else}<HardDrive size={24} />{/if}
+                    {#each filteredDiscoveredAssets as asset}
+                        <Card class="p-5 bg-bg-secondary border-dashed border-2 border-border-color hover:border-action-color/50 transition-all group">
+                            <div class="flex items-start gap-4">
+                                <div class="p-3 bg-action-color/10 rounded-xl text-action-color border border-action-color/20">
+                                    {#if asset.type === 'tape'}<CassetteTape size={24} />{:else}<HardDrive size={24} />{/if}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="text-sm font-black text-text-primary uppercase tracking-tight truncate">{asset.identifier}</h3>
+                                    <div class="flex items-center gap-1.5 mt-0.5 opacity-60">
+                                        <Cpu size={10} class="text-action-color" />
+                                        <span class="text-[9px] text-text-secondary font-black uppercase tracking-widest truncate mono">
+                                            {#if asset.type === 'tape'}
+                                                {asset.device_path}
+                                            {:else}
+                                                {asset.mount_path}
+                                            {/if}
+                                        </span>
                                     </div>
-                                    <div class="flex-1 min-w-0">
-                                        <h3 class="text-sm font-black text-text-primary uppercase tracking-tight truncate">{asset.identifier}</h3>
-                                        <div class="flex items-center gap-1.5 mt-0.5 opacity-60">
-                                            <Cpu size={10} class="text-action-color" />
-                                            <span class="text-[9px] text-text-secondary font-black uppercase tracking-widest truncate mono">
-                                                {#if asset.type === 'tape'}
-                                                    {asset.device_path}
-                                                {:else}
-                                                    {asset.mount_path}
-                                                {/if}
-                                            </span>
+
+                                    {#if asset.type === 'tape' && asset.hardware_info}
+                                        <div class="mt-3 space-y-2 border-t border-border-color/30 pt-3">
+                                            {#if asset.hardware_info.drive}
+                                                <div class="text-[8px] font-bold text-blue-400/80 uppercase">
+                                                    Drive: {asset.hardware_info.drive.vendor} {asset.hardware_info.drive.model} ({asset.hardware_info.drive.firmware})
+                                                </div>
+                                            {/if}
+                                            {#if asset.hardware_info.tape}
+                                                <div class="flex flex-wrap gap-1">
+                                                    <span class="text-[7px] font-black bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary uppercase">MFR: {asset.hardware_info.tape.manufacturer}</span>
+                                                    <span class="text-[7px] font-black bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 text-blue-400 uppercase">{asset.hardware_info.tape.generation_label || asset.hardware_info.tape.generation}</span>
+                                                </div>
+                                            {/if}
                                         </div>
+                                    {/if}
 
-                                        {#if asset.type === 'tape' && asset.hardware_info}
-                                            <div class="mt-3 space-y-2 border-t border-border-color/30 pt-3">
-                                                {#if asset.hardware_info.drive}
-                                                    <div class="text-[8px] font-bold text-blue-400/80 uppercase">
-                                                        Drive: {asset.hardware_info.drive.vendor} {asset.hardware_info.drive.model} ({asset.hardware_info.drive.firmware})
-                                                    </div>
-                                                {/if}
-                                                {#if asset.hardware_info.tape}
-                                                    <div class="flex flex-wrap gap-1">
-                                                        <span class="text-[7px] font-black bg-white/5 px-1 rounded border border-white/10 text-text-secondary uppercase">MFR: {asset.hardware_info.tape.manufacturer}</span>
-                                                        <span class="text-[7px] font-black bg-blue-500/10 px-1 rounded border border-blue-500/20 text-blue-400 uppercase">{asset.hardware_info.tape.generation_label || asset.hardware_info.tape.generation}</span>
-                                                    </div>
-                                                {/if}
-                                            </div>
-                                        {/if}
-
-                                        <div class="mt-4 flex gap-2">
-                                            <Button variant="default" size="sm" class="h-8 text-[9px] font-black uppercase tracking-widest flex-1" onclick={() => {
-                                                newMedia.media_type = asset.type;
-                                                newMedia.identifier = asset.identifier === 'Unrecognized Disk' ? '' : asset.identifier;
-                                                if (asset.type === 'hdd') {
-                                                    newMedia.mount_path = asset.mount_path;
-                                                    newMedia.device_uuid = asset.device_uuid || '';
-                                                    if (asset.capacity_bytes) {
-                                                        newMedia.capacity_gb = Math.floor(asset.capacity_bytes / (1024 * 1024 * 1024));
-                                                    }
+                                    <div class="mt-4 flex gap-2">
+                                        <Button variant="default" size="sm" class="h-8 text-[9px] font-black uppercase tracking-widest flex-1" onclick={() => {
+                                            newMedia.media_type = asset.type;
+                                            newMedia.identifier = asset.identifier === 'Unrecognized Disk' ? '' : asset.identifier;
+                                            if (asset.type === 'hdd') {
+                                                newMedia.mount_path = asset.mount_path;
+                                                newMedia.device_uuid = asset.device_uuid || '';
+                                                if (asset.capacity_bytes) {
+                                                    newMedia.capacity_gb = Math.floor(asset.capacity_bytes / (1024 * 1024 * 1024));
                                                 }
-                                                showRegisterDialog = true;
-                                            }}>Add Media</Button>
-                                            <Button variant="outline" size="sm" class="h-8 text-[9px] font-black uppercase tracking-widest border-border-color/60 text-text-secondary hover:bg-white/5" onclick={() => handleIgnore(asset.type === 'tape' ? asset.identifier : asset.mount_path)}>Ignore</Button>
-                                        </div>
+                                            } else if (asset.type === 'tape') {
+                                                // Pre-fill Tape details if we can
+                                            }
+                                            showRegisterDialog = true;
+                                        }}>Add Media</Button>
+                                        <Button variant="outline" size="sm" class="h-8 text-[9px] font-black uppercase tracking-widest border-border-color/60 text-text-secondary hover:bg-white/5" onclick={() => handleIgnore(asset.type === 'tape' ? asset.identifier : asset.mount_path)}>Ignore</Button>
                                     </div>
                                 </div>
-                            </Card>
-                        {/if}
+                            </div>
+                        </Card>
                     {/each}
                 </div>
             </section>

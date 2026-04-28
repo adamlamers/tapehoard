@@ -228,8 +228,12 @@ class LTOProvider(AbstractStorageProvider):
 
     def _run_mt(self, command: str):
         try:
+            # Split command string to handle arguments correctly (e.g. "fsf 1" -> ["fsf", "1"])
+            cmd_parts = command.split()
             subprocess.run(
-                ["mt", "-f", self.device_path, command], check=True, capture_output=True
+                ["mt", "-f", self.device_path] + cmd_parts,
+                check=True,
+                capture_output=True,
             )
         except subprocess.CalledProcessError as e:
             logger.error(f"Tape command 'mt {command}' failed: {e.stderr.decode()}")

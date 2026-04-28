@@ -626,17 +626,33 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
                     if barcode in ignore_list:
                         continue
 
-                    is_known = (
-                        db_session.query(models.StorageMedia)
-                        .filter(models.StorageMedia.identifier == barcode)
-                        .first()
-                        is not None
-                    )
+                    # Check if this tape is already known by barcode OR serial number
+                    is_known = False
+                    if barcode:
+                        is_known = (
+                            db_session.query(models.StorageMedia)
+                            .filter(models.StorageMedia.identifier == barcode)
+                            .first()
+                            is not None
+                        )
+
+                    if not is_known and mam_info.get("serial"):
+                        is_known = (
+                            db_session.query(models.StorageMedia)
+                            .filter(
+                                models.StorageMedia.identifier == mam_info["serial"]
+                            )
+                            .first()
+                            is not None
+                        )
+
                     discovered_nodes.append(
                         {
                             "type": "tape",
                             "device_path": dev_path,
-                            "identifier": barcode or "NEW TAPE",
+                            "identifier": barcode
+                            or mam_info.get("serial")
+                            or "NEW TAPE",
                             "is_registered": is_known,
                             "status": "ready" if not is_known else "active",
                             "hardware_info": {"drive": drive_info, "tape": mam_info},
