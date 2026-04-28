@@ -513,15 +513,18 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
     else:
         query_path = path if path.endswith("/") else path + "/"
 
-    # Find directories (immediate children)
+    # Find directories and their protection stats (Optimized: Single Pass)
     dir_sql = text("""
-        SELECT DISTINCT
-            SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) as dir_name
+        SELECT
+            SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) as dir_name,
+            COUNT(*) as total,
+            SUM(CASE WHEN EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = filesystem_state.id) THEN 1 ELSE 0 END) as protected
         FROM filesystem_state
         WHERE file_path LIKE :prefix_wildcard
         AND file_path != :prefix
         AND INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') > 0
         AND is_ignored = 0
+        GROUP BY dir_name
     """)
     dirs = db_session.execute(
         dir_sql, {"prefix": query_path, "prefix_wildcard": f"{query_path}%"}
@@ -548,23 +551,8 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
         if not d[0] or d[0] == "/":
             continue
         full_dir_path = query_path + d[0]
-        # Calculate protection for this directory
-        prot_sql = text("""
-            SELECT
-                COUNT(*) as total,
-                SUM(CASE WHEN has_version = 1 THEN 1 ELSE 0 END) as protected
-            FROM (
-                SELECT EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) as has_version
-                FROM filesystem_state fs
-                WHERE fs.file_path LIKE :prefix
-                AND fs.is_ignored = 0
-            )
-        """)
-        stats = db_session.execute(
-            prot_sql, {"prefix": f"{full_dir_path}/%"}
-        ).fetchone()
-        total = stats[0] or 0
-        protected = stats[1] or 0
+        total = d[1] or 0
+        protected = d[2] or 0
 
         results.append(
             {

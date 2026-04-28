@@ -375,48 +375,62 @@ def browse_system_path(
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Path not found")
 
-    # Fetch existing indexed files for this path to check for hashes
-    indexed_files = {
-        f.file_path: f.sha256_hash
-        for f in db_session.query(models.FilesystemState)
-        .filter(models.FilesystemState.file_path.like(f"{path}/%"))
-        .all()
-    }
-
     results = []
     try:
+        entries = []
+        immediate_file_paths = []
         with os.scandir(path) as directory_iterator:
             for entry in directory_iterator:
-                try:
-                    # Explicitly don't follow symlinks during browsing to show raw state
-                    file_stats = entry.stat(follow_symlinks=False)
-                    is_tracked, is_ignored = get_tracking_status(
-                        entry.path, tracking_map, exclusion_spec
-                    )
+                entries.append(entry)
+                if not entry.is_dir(follow_symlinks=False):
+                    immediate_file_paths.append(entry.path)
 
-                    # Only show files that have a hash (archivable)
-                    # Directories are always shown
-                    if not entry.is_dir():
-                        if (
-                            entry.path not in indexed_files
-                            or not indexed_files[entry.path]
-                        ):
-                            continue
-
-                    results.append(
-                        FileItemSchema(
-                            name=entry.name,
-                            path=entry.path,
-                            type="directory" if entry.is_dir() else "file",
-                            size=file_stats.st_size,
-                            mtime=file_stats.st_mtime,
-                            tracked=is_tracked,
-                            ignored=is_ignored,
-                            sha256_hash=indexed_files.get(entry.path),
-                        )
+        # Fetch existing indexed files for ONLY the immediate files in this directory
+        indexed_files = {}
+        if immediate_file_paths:
+            # Chunk the IN clause to avoid SQLite limits (typically 999)
+            for i in range(0, len(immediate_file_paths), 900):
+                chunk = immediate_file_paths[i : i + 900]
+                for file_path, sha256_hash in (
+                    db_session.query(
+                        models.FilesystemState.file_path,
+                        models.FilesystemState.sha256_hash,
                     )
-                except (OSError, FileNotFoundError):
-                    continue
+                    .filter(models.FilesystemState.file_path.in_(chunk))
+                    .all()
+                ):
+                    indexed_files[file_path] = sha256_hash
+
+        for entry in entries:
+            try:
+                # Explicitly don't follow symlinks during browsing to show raw state
+                file_stats = entry.stat(follow_symlinks=False)
+                is_tracked, is_ignored = get_tracking_status(
+                    entry.path, tracking_map, exclusion_spec
+                )
+
+                # Only show files that have a hash (archivable)
+                # Directories are always shown
+                if not entry.is_dir(follow_symlinks=False):
+                    if entry.path not in indexed_files or not indexed_files[entry.path]:
+                        continue
+
+                results.append(
+                    FileItemSchema(
+                        name=entry.name,
+                        path=entry.path,
+                        type="directory"
+                        if entry.is_dir(follow_symlinks=False)
+                        else "file",
+                        size=file_stats.st_size,
+                        mtime=file_stats.st_mtime,
+                        tracked=is_tracked,
+                        ignored=is_ignored,
+                        sha256_hash=indexed_files.get(entry.path),
+                    )
+                )
+            except (OSError, FileNotFoundError):
+                continue
     except PermissionError:
         raise HTTPException(status_code=403, detail="Permission denied")
 

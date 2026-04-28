@@ -69,3 +69,14 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
 *   **Direct Terminology:** Use technical terms like "Backup Manager", "System Status", "Archive Index". Avoid marketing fluff.
 *   **Layout:** Natural page scrolling only. No sticky headers.
 *   **Navigation:** The FileBrowser must maintain internal back/forward history separate from browser page navigation.
+
+### API & Type Safety
+*   **Explicit Response Models:** All FastAPI endpoints MUST explicitly declare a `response_model`. This is critical for generating accurate OpenAPI specs and strictly typed TypeScript SDKs for the frontend.
+*   **Centralized Schemas:** Define shared Pydantic models in `app.api.schemas` to avoid circular dependencies when importing across different routers.
+
+### Hardware Polling & Stability
+*   **Non-Intrusive Polling:** Hardware status checks (e.g., tape drive identity) must prioritize non-intrusive methods like reading the MAM (Media Auxiliary Memory) Barcode (`sg_read_attr`). Intrusive operations (like `mt rewind`) should only be used as fallbacks and never during periodic status polling when the drive is busy.
+*   **Last Known Good (LKG) Caching:** Implement LKG caching in hardware providers to persist the last successful hardware read. If a status poll fails because a device is temporarily busy with an archival job, return the LKG state instead of empty data to prevent UI flickering.
+
+### Frontend Reactivity
+*   **Svelte 5 State:** When mutating complex data structures like `Map` or `Set` in Svelte 5 `$state`, always explicitly reassign the variable (e.g., `myMap = new Map(myMap)`) after mutation to trigger the reactivity engine.
