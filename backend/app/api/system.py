@@ -23,9 +23,10 @@ router = APIRouter(prefix="/system", tags=["System"])
 
 
 class DashboardStatsSchema(BaseModel):
-    total_files_indexed: int
+    monitored_files_count: int
     hashed_files_count: int
     total_data_size: int
+    archived_data_size: int
     ignored_files_count: int
     ignored_data_size: int
     unprotected_files_count: int
@@ -172,7 +173,8 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
             SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN 1 ELSE 0 END) as unprotected_count,
             SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN size ELSE 0 END) as unprotected_size,
             SUM(CASE WHEN is_indexed = 1 AND is_ignored = 0 THEN 1 ELSE 0 END) as hashed_count,
-            SUM(CASE WHEN is_ignored = 0 THEN 1 ELSE 0 END) as eligible_count
+            SUM(CASE WHEN is_ignored = 0 THEN 1 ELSE 0 END) as eligible_count,
+            SUM(CASE WHEN id IN (SELECT filesystem_state_id FROM file_versions) THEN size ELSE 0 END) as archived_size
         FROM filesystem_state
     """)
 
@@ -183,10 +185,11 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
         unprotected_count, unprotected_size = res[4] or 0, res[5] or 0
         hashed_count = res[6] or 0
         eligible_count = res[7] or 0
+        archived_size = res[8] or 0
     else:
         total_count = total_size = ignored_count = ignored_size = unprotected_count = (
             unprotected_size
-        ) = hashed_count = eligible_count = 0
+        ) = hashed_count = eligible_count = archived_size = 0
 
     media_counts = {
         "LTO": db_session.query(models.StorageMedia)
@@ -212,9 +215,10 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
     redundancy_percentage = (total_versions / eligible_redundancy_count) * 100
 
     return DashboardStatsSchema(
-        total_files_indexed=eligible_count,
+        monitored_files_count=eligible_count,
         hashed_files_count=hashed_count,
         total_data_size=total_size,
+        archived_data_size=archived_size,
         ignored_files_count=ignored_count,
         ignored_data_size=ignored_size,
         unprotected_files_count=unprotected_count,

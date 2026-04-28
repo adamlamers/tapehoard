@@ -140,9 +140,9 @@
                     <div class="grid grid-cols-2 gap-x-12 gap-y-10 relative z-10">
                         <div class="space-y-4">
                             <div>
-                                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-50 block mb-1">Discovered Files</span>
-                                <h4 class="text-4xl font-black text-text-primary mono tracking-tighter">{stats.total_files_indexed.toLocaleString()}</h4>
-                                <p class="text-[9px] font-bold text-text-secondary uppercase mt-2">TOTAL OBJECTS IN INDEX</p>
+                                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-50 block mb-1">Monitored Files</span>
+                                <h4 class="text-4xl font-black text-text-primary mono tracking-tighter">{stats.monitored_files_count.toLocaleString()}</h4>
+                                <p class="text-[9px] font-bold text-text-secondary uppercase mt-2">OBJECTS TRACKED FOR ARCHIVAL</p>
                             </div>
                         </div>
 
@@ -151,11 +151,27 @@
                                 <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-50 block mb-1">Hashed File Count</span>
                                 <h4 class="text-4xl font-black text-text-primary mono tracking-tighter">
                                     {stats.hashed_files_count.toLocaleString()}
-                                    <span class="text-sm font-bold text-text-secondary opacity-30">/ {stats.total_files_indexed.toLocaleString()}</span>
+                                    <span class="text-sm font-bold text-text-secondary opacity-30">/ {stats.monitored_files_count.toLocaleString()}</span>
                                 </h4>
                                 <div class="w-full bg-bg-primary h-1.5 mt-3 rounded-full border border-border-color overflow-hidden">
-                                    <div class="bg-blue-500 h-full transition-all duration-1000" style="width: {(stats.hashed_files_count / (stats.total_files_indexed || 1)) * 100}%"></div>
+                                    <div class="bg-blue-500 h-full transition-all duration-1000" style="width: {(stats.hashed_files_count / (stats.monitored_files_count || 1)) * 100}%"></div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-50 block mb-1">Ignored Objects</span>
+                                <h4 class="text-4xl font-black text-text-secondary mono tracking-tighter">{stats.ignored_files_count.toLocaleString()}</h4>
+                                <p class="text-[9px] font-bold text-text-secondary uppercase mt-2">OBJECTS EXCLUDED FROM POLICY</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-50 block mb-1">Archived Data</span>
+                                <h4 class="text-4xl font-black text-success-color mono tracking-tighter">{formatSize(stats.archived_data_size)}</h4>
+                                <p class="text-[9px] font-bold text-text-secondary uppercase mt-2">TOTAL UNIQUE BYTES ON MEDIA</p>
                             </div>
                         </div>
 
@@ -164,14 +180,6 @@
                                 <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-50 block mb-1">Vulnerable Data</span>
                                 <h4 class="text-4xl font-black text-error-color mono tracking-tighter">{formatSize(stats.unprotected_data_size)}</h4>
                                 <p class="text-[9px] font-bold text-text-secondary uppercase mt-2">BYTES PENDING ARCHIVAL</p>
-                            </div>
-                        </div>
-
-                        <div class="space-y-4">
-                            <div>
-                                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-50 block mb-1">Vulnerable Objects</span>
-                                <h4 class="text-4xl font-black text-error-color mono tracking-tighter">{stats.unprotected_files_count.toLocaleString()}</h4>
-                                <p class="text-[9px] font-bold text-text-secondary uppercase mt-2">OBJECTS PENDING ARCHIVAL</p>
                             </div>
                         </div>
                     </div>
