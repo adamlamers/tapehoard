@@ -390,6 +390,16 @@ class ScannerService:
             self.bytes_hashed = 0
             self.files_hashed = 0
 
+            # Count total work pending for progress reporting
+            total_pending = (
+                db_session.query(models.FilesystemState)
+                .filter(
+                    models.FilesystemState.is_indexed.is_(False),
+                    models.FilesystemState.is_ignored.is_(False),
+                )
+                .count()
+            )
+
             try:
                 while True:
                     # Find unindexed work
@@ -406,6 +416,16 @@ class ScannerService:
                     if not hashing_targets:
                         if self.is_running:
                             time.sleep(2)
+                            # Recount if more work appeared during sleep
+                            total_pending = (
+                                db_session.query(models.FilesystemState)
+                                .filter(
+                                    models.FilesystemState.is_indexed.is_(False),
+                                    models.FilesystemState.is_ignored.is_(False),
+                                )
+                                .count()
+                                + self.files_hashed
+                            )
                             continue
                         break
 
@@ -433,10 +453,16 @@ class ScannerService:
                                 self.files_hashed += 1
 
                             if self.files_hashed % 5 == 0:
-                                status_msg = f"Hashing Fleet: {self.files_hashed} objects processed [{self._format_throughput()}]"
+                                progress = min(
+                                    99.9,
+                                    (self.files_hashed / max(total_pending, 1)) * 100,
+                                )
+                                status_msg = f"Hashing Fleet: {self.files_hashed}/{total_pending} objects processed [{self._format_throughput()}]"
                                 if self.is_throttled:
                                     status_msg += " (THROTTLED)"
-                                JobManager.update_job(hashing_job.id, 50.0, status_msg)
+                                JobManager.update_job(
+                                    hashing_job.id, progress, status_msg
+                                )
 
                     db_session.commit()
 

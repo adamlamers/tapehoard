@@ -313,7 +313,11 @@ class ArchiverService:
 
             # Packaging
             if remaining_to_write:
-                with tarfile.open(staging_full_path, "w") as tar_bundle:
+                batch_uuid = str(uuid.uuid4())
+
+                if storage_provider.capabilities.get("supports_random_access"):
+                    import io
+
                     for item in remaining_to_write:
                         if JobManager.is_cancelled(job_id):
                             break
@@ -328,43 +332,102 @@ class ArchiverService:
                         if item["is_split"]:
                             internal_name += f".part_{start}_{end}"
 
+                        archive_location_id = None
                         if os.path.lexists(file_state.file_path):
-                            # Manual TarInfo to ensure strict alignment and bitstream independence
-                            tar_info = tar_bundle.gettarinfo(
-                                file_state.file_path, arcname=internal_name
-                            )
-
                             if os.path.islink(file_state.file_path):
-                                # Preserve Symlinks with their relative targets
-                                tar_info.type = tarfile.SYMTYPE
-                                tar_info.linkname = os.readlink(file_state.file_path)
-                                tar_bundle.addfile(
-                                    tar_info
-                                )  # Links have no data payload
+                                target_path = os.readlink(file_state.file_path)
+                                with io.BytesIO(
+                                    target_path.encode("utf-8")
+                                ) as link_stub:
+                                    archive_location_id = (
+                                        storage_provider.write_file_direct(
+                                            media_record.identifier,
+                                            internal_name + ".symlink",
+                                            link_stub,
+                                        )
+                                    )
                             else:
-                                # FORCE regular file for everything else (destroys hard-links for reliability)
-                                tar_info.type = tarfile.REGTYPE
-                                tar_info.linkname = ""
-                                tar_info.size = chunk_size
-
                                 with RangeFile(
                                     file_state.file_path, start, chunk_size
                                 ) as rh:
-                                    tar_bundle.addfile(tar_info, rh)
+                                    archive_location_id = (
+                                        storage_provider.write_file_direct(
+                                            media_record.identifier, internal_name, rh
+                                        )
+                                    )
 
-                        processed_bytes += chunk_size
-                        JobManager.update_job(
-                            job_id,
-                            15.0 + (70.0 * (processed_bytes / safe_divisor)),
-                            f"Archiving: {os.path.basename(file_state.file_path)}",
-                        )
+                        if archive_location_id:
+                            processed_bytes += chunk_size
+                            media_record.bytes_used += chunk_size
+                            JobManager.update_job(
+                                job_id,
+                                15.0 + (70.0 * (processed_bytes / safe_divisor)),
+                                f"Uploading natively: {os.path.basename(file_state.file_path)}",
+                            )
+
+                            db_session.add(
+                                models.FileVersion(
+                                    filesystem_state_id=file_state.id,
+                                    media_id=media_record.id,
+                                    file_number=archive_location_id,
+                                    is_split=item["is_split"],
+                                    split_id=batch_uuid if item["is_split"] else None,
+                                    offset_start=item["offset_start"],
+                                    offset_end=item["offset_end"],
+                                )
+                            )
+                else:
+                    # Sequential Media (Tape): Tar Stream
+                    with tarfile.open(staging_full_path, "w") as tar_bundle:
+                        for item in remaining_to_write:
+                            if JobManager.is_cancelled(job_id):
+                                break
+
+                            file_state, start, end = (
+                                item["file_state"],
+                                item["offset_start"],
+                                item["offset_end"],
+                            )
+                            chunk_size = end - start
+                            internal_name = self.normalize_path(file_state.file_path)
+                            if item["is_split"]:
+                                internal_name += f".part_{start}_{end}"
+
+                            if os.path.lexists(file_state.file_path):
+                                tar_info = tar_bundle.gettarinfo(
+                                    file_state.file_path, arcname=internal_name
+                                )
+
+                                if os.path.islink(file_state.file_path):
+                                    tar_info.type = tarfile.SYMTYPE
+                                    tar_info.linkname = os.readlink(
+                                        file_state.file_path
+                                    )
+                                    tar_bundle.addfile(tar_info)
+                                else:
+                                    tar_info.type = tarfile.REGTYPE
+                                    tar_info.linkname = ""
+                                    tar_info.size = chunk_size
+
+                                    with RangeFile(
+                                        file_state.file_path, start, chunk_size
+                                    ) as rh:
+                                        tar_bundle.addfile(tar_info, rh)
+
+                            processed_bytes += chunk_size
+                            JobManager.update_job(
+                                job_id,
+                                15.0 + (70.0 * (processed_bytes / safe_divisor)),
+                                f"Archiving: {os.path.basename(file_state.file_path)}",
+                            )
 
             if JobManager.is_cancelled(job_id):
                 return
 
-            # Finalize Staging
-            if remaining_to_write:
-                # Sync staging file to disk
+            # Finalize Staging for Sequential
+            if remaining_to_write and not storage_provider.capabilities.get(
+                "supports_random_access"
+            ):
                 with open(staging_full_path, "a") as f:
                     f.flush()
                     os.fsync(f.fileno())
@@ -378,7 +441,6 @@ class ArchiverService:
                     )
                 media_record.bytes_used += os.path.getsize(staging_full_path)
 
-                batch_uuid = str(uuid.uuid4())
                 for item in remaining_to_write:
                     db_session.add(
                         models.FileVersion(
@@ -498,6 +560,62 @@ class ArchiverService:
                     bitstream = provider.read_archive(
                         media_record.identifier, archive_id
                     )
+
+                    is_tar = (
+                        not provider.capabilities.get("supports_random_access")
+                        or str(archive_id).endswith(".tar")
+                        or str(archive_id).isdigit()
+                    )
+
+                    if not is_tar:
+                        # Format Negotiation: Direct file recovery
+                        for v in target_versions:
+                            if JobManager.is_cancelled(job_id):
+                                break
+                            final_path = self._sanitize_recovery_path(
+                                destination_root, v.file_state.file_path
+                            )
+                            os.makedirs(os.path.dirname(final_path), exist_ok=True)
+
+                            # Handle symlink stubs
+                            if str(archive_id).endswith(".symlink"):
+                                target_link_path = bitstream.read().decode("utf-8")
+                                if os.path.lexists(final_path):
+                                    os.remove(final_path)
+                                os.symlink(target_link_path, final_path)
+                            else:
+                                mode = "r+b" if os.path.exists(final_path) else "wb"
+                                with open(final_path, mode) as dst:
+                                    if v.is_split:
+                                        if mode == "wb":
+                                            dst.truncate(v.file_state.size)
+                                        dst.seek(v.offset_start)
+                                    shutil.copyfileobj(bitstream, dst)
+
+                                # Attempt to restore basic metadata (mtime) from index
+                                try:
+                                    os.utime(
+                                        final_path,
+                                        (v.file_state.mtime, v.file_state.mtime),
+                                    )
+                                except Exception:
+                                    pass
+
+                            processed_bytes += v.offset_end - v.offset_start
+                            JobManager.update_job(
+                                job_id,
+                                min(
+                                    99.0,
+                                    5.0
+                                    + (
+                                        90.0
+                                        * (processed_bytes / max(v.file_state.size, 1))
+                                    ),
+                                ),
+                                f"Restoring natively: {os.path.basename(v.file_state.file_path)}",
+                            )
+                        continue
+
                     tar_mode = "r|*" if media_record.media_type == "tape" else "r:*"
 
                     with tarfile.open(fileobj=bitstream, mode=tar_mode) as tar_bundle:

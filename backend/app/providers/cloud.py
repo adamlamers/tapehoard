@@ -189,6 +189,53 @@ class CloudStorageProvider(AbstractStorageProvider):
                 logger.error(f"Cloud upload failed: {e}")
                 raise
 
+    def write_file_direct(
+        self, media_id: str, relative_path: str, stream: BinaryIO
+    ) -> str:
+        """
+        Uploads a single file directly to the cloud, maintaining structure.
+        """
+        clean_path = relative_path.lstrip("./")
+        object_key = f"objects/{clean_path}"
+
+        if self.passphrase:
+            logger.info(
+                f"Uploading AES-256-GCM object to {self.bucket_name}/{object_key}"
+            )
+
+            # 1. Setup crypto artifacts
+            salt = os.urandom(16)
+            nonce = os.urandom(12)
+            key = self._derive_key(salt)
+
+            # 2. Encrypt
+            cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+            data = stream.read()
+            ciphertext, tag = cipher.encrypt_and_digest(data)
+
+            # 3. Concatenate and upload
+            payload = salt + nonce + tag + ciphertext
+
+            try:
+                self.s3.put_object(
+                    Bucket=self.bucket_name,
+                    Key=object_key,
+                    Body=payload,
+                    Metadata={"x-amz-meta-tapehoard-encrypted": "v2-gcm"},
+                )
+                return object_key
+            except Exception as e:
+                logger.error(f"GCM cloud object upload failed: {e}")
+                raise
+        else:
+            logger.info(f"Uploading plain object to {self.bucket_name}/{object_key}")
+            try:
+                self.s3.upload_fileobj(stream, self.bucket_name, object_key)
+                return object_key
+            except Exception as e:
+                logger.error(f"Cloud object upload failed: {e}")
+                raise
+
     def read_archive(self, media_id: str, location_id: str) -> BinaryIO:
         """Retrieves and decrypts an AES-GCM archive"""
         response = self.s3.get_object(Bucket=self.bucket_name, Key=location_id)

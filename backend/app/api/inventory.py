@@ -571,9 +571,14 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
             stats = db_session.execute(
                 prot_check, {"r": root, "prefix": f"{root}/%"}
             ).fetchone()
-            total = stats[0] or 0
-            protected = stats[1] or 0
-            media_list = stats[2].split(",") if stats[2] else []
+
+            total = 0
+            protected = 0
+            media_list = []
+            if stats:
+                total = stats[0] or 0
+                protected = stats[1] or 0
+                media_list = stats[2].split(",") if stats[2] else []
 
             if protected > 0:
                 results.append(

@@ -37,28 +37,31 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
 
 ## 3. Core Architectural Rules
 
-### Hardware & Media Lifecycle
-*   **Hardware Decoupling:** Hardware configuration (tape drive paths, mount roots) is global. Media objects represent only identity and capacity.
-*   **Identification:** Tapes use barcodes/IDs via `mtx`/SCSI. HDDs use **Filesystem UUIDs** as a hardware fingerprint to remain path-agnostic if mount points change.
-*   **S3-Compatible targets:** Standardized on `s3` media type using `boto3`. Collects Endpoint URL, Bucket, and HMAC credentials during ingestion.
+### Storage Providers & Media Lifecycle
+*   **Plugin Architecture:** All storage destinations are treated as plugins implementing `AbstractStorageProvider`. Avoid hardcoding hardware logic (`tape`, `hdd`) in the API or UI.
+*   **Dynamic UI:** The frontend dynamically renders registration and edit forms based on a provider's `config_schema` (fetched from `GET /inventory/providers`).
+*   **Standardized Telemetry:** Providers must implement `get_live_info(force: bool)` to return unified telemetry (e.g., drive status, capacity).
 *   **Sanitization:** Initializing media performs a full purge of existing TapeHoard data if the `force` flag is set.
 *   **Hardware Failure:** Marking media as "Failed" triggers an automatic atomic purge of all associated `file_versions` to surface those files as "Pending" on the dashboard.
 
 ### Database & Performance
 *   **High Concurrency:** SQLite must always run in **WAL (Write-Ahead Logging)** mode with a 30s busy timeout and larger page cache.
+*   **Archival Intent:** `is_ignored` in `filesystem_state` is the single source of truth. The scanner indexes all files but lazily marks excluded ones as `is_ignored = 1`. Explicit user tracking policies override global exclusions.
 *   **Aggregate Intelligence:** Use Raw SQL Aggregates for dashboard stats and directory protection status to avoid N+1 query patterns.
-*   **FTS5 Search:** Full-text search is managed via triggers. Ensure searches filter for `has_version = 1` when browsing the Archive Index.
+*   **FTS5 Search:** Full-text search is managed via triggers. Ensure searches filter for `has_version = 1` when browsing the Archive Index, regardless of current `is_ignored` state on disk.
 
 ### Scanning & Hashing Architecture
 *   **Concurrent Phasing:** Decoupled into `SCAN` (Metadata, Normal priority) and `HASH` (Content, Idle priority with dynamic `iowait` throttling).
 *   **Thread-Safe Metrics:** All counters (files processed, bytes hashed) must be protected by a `threading.Lock`.
+*   **Hashing Progress:** Hashing jobs calculate progress against a dynamically updating snapshot of total `is_indexed = 0 AND is_ignored = 0` files.
 
 ### Archival & Recovery
-*   **Bitstream Integrity:** `RangeFile` must guarantee exact byte counts. If a file is truncated on disk during backup, it must be padded with null bytes to prevent corrupting the tar alignment.
-*   **Metadata Fidelity:** The restorer must preserve original **permissions (chmod)**, **timestamps (utime)**, and **ownership (chown)** when recovering files.
-*   **Seekable Restoration:** Non-tape media (HDD/S3) must use `mode="r:*"` (Seekable) for robust partial restores, while Tapes use `mode="r|*"` (Pipe).
-*   **Path Normalization:** Aggressively strip leading slashes and `./` prefixes from both DB keys and tar members to ensure matches across different environments.
-*   **Independence:** Force all archive members to be **Regular Files** to break fragile hard-link dependencies. Symlinks are preserved as `SYMTYPE` with relative targets.
+*   **Format Negotiation:** The Archiver adapts formats based on provider capabilities (`supports_random_access`).
+    *   *Sequential (Tape):* Uses `.tar` streams to maintain drive streaming.
+    *   *Random Access (HDD/Cloud):* Uses native direct file copying/objects to enable instant seekless restores without unpacking gigabytes of data.
+*   **Bitstream Integrity:** `RangeFile` must guarantee exact byte counts for tar alignment.
+*   **Metadata Fidelity:** The restorer must preserve original **permissions (chmod)**, **timestamps (utime)**, and **ownership (chown)** when recovering files natively or via tar.
+*   **Independence:** Force all tar archive members to be **Regular Files** to break fragile hard-link dependencies. Symlinks are preserved as `SYMTYPE` (or `.symlink` stub objects for native format).
 
 ### Deployment & Testing
 *   **Temporal Standard:** Backend uses **UTC**. Frontend uses `parseUTCDate` to convert to browser **Local Time**.
@@ -75,8 +78,9 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
 *   **Centralized Schemas:** Define shared Pydantic models in `app.api.schemas` to avoid circular dependencies when importing across different routers.
 
 ### Hardware Polling & Stability
-*   **Non-Intrusive Polling:** Hardware status checks (e.g., tape drive identity) must prioritize non-intrusive methods like reading the MAM (Media Auxiliary Memory) Barcode (`sg_read_attr`). Intrusive operations (like `mt rewind`) should only be used as fallbacks and never during periodic status polling when the drive is busy.
-*   **Last Known Good (LKG) Caching:** Implement LKG caching in hardware providers to persist the last successful hardware read. If a status poll fails because a device is temporarily busy with an archival job, return the LKG state instead of empty data to prevent UI flickering.
+*   **Non-Intrusive Polling:** Hardware status checks must prioritize non-intrusive methods (e.g., reading MAM via `sg_read_attr`). Intrusive operations (`mt rewind`) are strictly fallbacks. Always verify device path existence (`os.path.exists`) before issuing SCSI/CLI commands to prevent log spam on disconnected drives.
+*   **Last Known Good (LKG) Caching:** Implement LKG caching in both backend hardware providers and frontend UI state. If a status poll fails or returns empty because a device is temporarily busy with an archival job, preserve and return the LKG state to prevent UI flickering.
+*   **Forced Refreshes:** Hardware polling defaults to throttled (e.g., 2 seconds) intervals. Use `force=True` on provider calls and `?refresh=true` on API endpoints to bypass throttling when the user explicitly requests a live update or upon initial page loads.
 
 ### Frontend Reactivity
 *   **Svelte 5 State:** When mutating complex data structures like `Map` or `Set` in Svelte 5 `$state`, always explicitly reassign the variable (e.g., `myMap = new Map(myMap)`) after mutation to trigger the reactivity engine.

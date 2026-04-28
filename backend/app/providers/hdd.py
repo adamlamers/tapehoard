@@ -1,6 +1,6 @@
 import os
 import shutil
-from typing import Optional, BinaryIO
+from typing import Optional, BinaryIO, Dict, Any
 from .base import AbstractStorageProvider
 from loguru import logger
 
@@ -38,10 +38,10 @@ class OfflineHDDProvider(AbstractStorageProvider):
     def get_name(self) -> str:
         return self.name
 
-    def get_live_info(self, force: bool = False) -> dict:
+    def get_live_info(self, force: bool = False) -> Dict[str, Any]:
         import psutil
 
-        info = {"online": self.check_online(force=force)}
+        info: Dict[str, Any] = {"online": self.check_online(force=force)}
         if info["online"]:
             try:
                 usage = psutil.disk_usage(self.mount_base)
@@ -158,28 +158,75 @@ class OfflineHDDProvider(AbstractStorageProvider):
 
         return location_id
 
-    def read_archive(self, media_id: str, location_id: str) -> BinaryIO:
-        """Locates and opens a numbered archive volume."""
-        # Standardize on the 6-digit padded format
-        file_name = f"{int(location_id):06d}.tar"
+    def write_file_direct(
+        self, media_id: str, relative_path: str, stream: BinaryIO
+    ) -> str:
+        """Writes a single file directly, maintaining its original directory structure under an 'objects/' folder."""
+        # Sanitize path to prevent breakout
+        clean_path = relative_path.lstrip("./")
         target_path = os.path.join(
-            self.mount_base, "tapehoard_backups", "archives", file_name
+            self.mount_base, "tapehoard_backups", "objects", clean_path
         )
 
-        if not os.path.exists(target_path):
-            # Fallback for older non-padded files if they exist
-            legacy_path = os.path.join(
-                self.mount_base, "tapehoard_backups", "archives", f"{location_id}.tar"
-            )
-            if os.path.exists(legacy_path):
-                target_path = legacy_path
-            else:
-                raise FileNotFoundError(
-                    f"Archive {location_id} not found on media {media_id} (Checked {target_path})"
-                )
+        # Ensure path is strictly within the objects directory
+        base_objects_dir = os.path.join(self.mount_base, "tapehoard_backups", "objects")
+        if not os.path.abspath(target_path).startswith(
+            os.path.abspath(base_objects_dir)
+        ):
+            raise ValueError(f"Invalid relative path for direct write: {relative_path}")
 
-        logger.info(f"Opening bitstream from HDD: {target_path}")
-        return open(target_path, "rb")
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+
+        logger.info(f"Direct copy to HDD: {target_path}")
+        with open(target_path, "wb") as f:
+            shutil.copyfileobj(stream, f)
+
+        # Return the clean path as the location_id so it can be restored later
+        return clean_path
+
+    def read_archive(self, media_id: str, location_id: str) -> BinaryIO:
+        """Locates and opens a numbered archive volume or a direct object."""
+        # Try direct object path first (Format Negotiation)
+        clean_path = location_id.lstrip("./")
+        object_target_path = os.path.join(
+            self.mount_base, "tapehoard_backups", "objects", clean_path
+        )
+        base_objects_dir = os.path.join(self.mount_base, "tapehoard_backups", "objects")
+
+        if os.path.abspath(object_target_path).startswith(
+            os.path.abspath(base_objects_dir)
+        ) and os.path.exists(object_target_path):
+            logger.info(f"Opening direct object from HDD: {object_target_path}")
+            return open(object_target_path, "rb")
+
+        # Fallback to sequential tar archive format
+        try:
+            file_name = f"{int(location_id):06d}.tar"
+            target_path = os.path.join(
+                self.mount_base, "tapehoard_backups", "archives", file_name
+            )
+
+            if not os.path.exists(target_path):
+                # Fallback for older non-padded files if they exist
+                legacy_path = os.path.join(
+                    self.mount_base,
+                    "tapehoard_backups",
+                    "archives",
+                    f"{location_id}.tar",
+                )
+                if os.path.exists(legacy_path):
+                    target_path = legacy_path
+                else:
+                    raise FileNotFoundError(
+                        f"Archive {location_id} not found on media {media_id} (Checked {target_path})"
+                    )
+
+            logger.info(f"Opening bitstream from HDD: {target_path}")
+            return open(target_path, "rb")
+        except ValueError:
+            raise FileNotFoundError(
+                f"Direct object not found and location ID '{location_id}' is not a valid archive number."
+            )
 
     def finalize_media(self, media_id: str):
         """No special finalization needed for HDD."""

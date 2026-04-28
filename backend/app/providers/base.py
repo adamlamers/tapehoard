@@ -77,6 +77,16 @@ class AbstractStorageProvider(ABC):
         """
         pass
 
+    def write_file_direct(
+        self, media_id: str, relative_path: str, stream: BinaryIO
+    ) -> str:
+        """
+        Writes a single file directly to the media using its relative path.
+        Only supported if capabilities['supports_random_access'] is True.
+        Returns the location_id (e.g. the path itself or an object key).
+        """
+        raise NotImplementedError("This provider does not support random access.")
+
     @abstractmethod
     def finalize_media(self, media_id: str):
         """Finalizes the media (e.g., writing index, ejecting)"""
