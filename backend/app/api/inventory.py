@@ -313,10 +313,10 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
     """)
     stats_res = db_session.execute(overall_stats_sql).fetchone()
 
-    total_files = stats_res[0] or 0
-    total_size = stats_res[1] or 0
-    total_hashed_size = stats_res[2] or 0
-    unique_hashed_size = stats_res[3] or 0
+    total_files = stats_res[0] if stats_res and stats_res[0] is not None else 0
+    total_size = stats_res[1] if stats_res and stats_res[1] is not None else 0
+    total_hashed_size = stats_res[2] if stats_res and stats_res[2] is not None else 0
+    unique_hashed_size = stats_res[3] if stats_res and stats_res[3] is not None else 0
     dedupe_savings = total_hashed_size - unique_hashed_size
 
     # 2. Vulnerability by Root
@@ -340,8 +340,16 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
         root_level_stats.append(
             {
                 "root": root_path,
-                "protected": protection_stats[0] or 0,
-                "vulnerable": protection_stats[1] or 0,
+                "protected": (
+                    protection_stats[0]
+                    if protection_stats and protection_stats[0] is not None
+                    else 0
+                ),
+                "vulnerable": (
+                    protection_stats[1]
+                    if protection_stats and protection_stats[1] is not None
+                    else 0
+                ),
             }
         )
 

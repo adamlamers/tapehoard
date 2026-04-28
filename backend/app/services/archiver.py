@@ -457,8 +457,10 @@ class ArchiverService:
                 if JobManager.is_cancelled(job_id):
                     break
                 media_record = db_session.get(models.StorageMedia, media_id)
+                if not media_record:
+                    continue
                 provider = self._get_storage_provider(media_record)
-                if not media_record or not provider:
+                if not provider:
                     continue
 
                 while not provider.check_online():

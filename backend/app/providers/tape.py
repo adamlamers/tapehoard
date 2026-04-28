@@ -1,23 +1,46 @@
 import subprocess
 import os
-from typing import Optional, BinaryIO, cast
+import time
+from typing import Optional, BinaryIO, cast, Dict, Any, List
+import struct
+import re
 from .base import AbstractStorageProvider
 from loguru import logger
 
 
 class LTOProvider(AbstractStorageProvider):
+    # Class-level store for Last Known Good (LKG) hardware state
+    # device_path -> { "drive": {}, "mam": {}, "online": bool }
+    _lkg_state: dict = {}
+
     def __init__(
         self, device_path: str = "/dev/nst0", encryption_key: Optional[str] = None
     ):
         self.device_path = device_path
         self.encryption_key = encryption_key
 
+        # Initialize LKG entry if not exists
+        if self.device_path not in LTOProvider._lkg_state:
+            LTOProvider._lkg_state[self.device_path] = {
+                "drive": {},
+                "mam": {},
+                "online": False,
+            }
+
+    def _log_command(self, cmd: List[str]):
+        """Logs the exact command being sent to the hardware."""
+        logger.debug(f"HARDWARE CMD: {' '.join(cmd)}")
+
     def get_drive_info(self) -> dict:
-        """Retrieves vendor, model, and firmware version of the tape drive using sg_inq."""
+        """Retrieves vendor, model, and firmware version of the tape drive."""
+        # Return LKG if already populated (drive hardware never changes)
+        if LTOProvider._lkg_state[self.device_path]["drive"]:
+            return LTOProvider._lkg_state[self.device_path]["drive"]
+
         try:
-            result = subprocess.run(
-                ["sg_inq", self.device_path], capture_output=True, text=True, timeout=5
-            )
+            cmd = ["sg_inq", self.device_path]
+            self._log_command(cmd)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             if result.returncode == 0:
                 info = {}
                 for line in result.stdout.splitlines():
@@ -28,26 +51,29 @@ class LTOProvider(AbstractStorageProvider):
                     elif "Product revision level:" in line:
                         info["firmware"] = line.split(":", 1)[1].strip()
 
-                return info
+                if info:
+                    LTOProvider._lkg_state[self.device_path]["drive"] = info
+                    return info
         except Exception as e:
             logger.debug(f"Direct drive inquiry failed for {self.device_path}: {e}")
 
-        return {}
+        return LTOProvider._lkg_state[self.device_path]["drive"]
 
     def get_mam_info(self) -> dict:
         """Reads Media Auxiliary Memory (MAM) attributes using sg_read_attr --raw."""
-        import struct
 
-        try:
-            result = subprocess.run(
-                ["sg_read_attr", "--raw", self.device_path],
-                capture_output=True,
-                timeout=10,
-            )
+        # Try up to 3 times with a small backoff if the drive is busy
+        for attempt in range(3):
+            try:
+                cmd = ["sg_read_attr", "--raw", self.device_path]
+                self._log_command(cmd)
+                result = subprocess.run(cmd, capture_output=True, timeout=10)
 
-            if result.returncode == 0 and result.stdout:
-                data = result.stdout
-                if len(data) >= 4:
+                if result.returncode == 0 and result.stdout:
+                    data = result.stdout
+                    if len(data) < 4:
+                        continue
+
                     available_len = struct.unpack(">I", data[:4])[0]
                     pos = 4
                     end = min(pos + available_len, len(data))
@@ -147,27 +173,62 @@ class LTOProvider(AbstractStorageProvider):
                     if not mam.get("barcode") and mam.get("serial"):
                         mam["barcode"] = mam["serial"]
 
+                    # SUCCESS! Update LKG MAM state
+                    LTOProvider._lkg_state[self.device_path]["mam"] = mam
                     return mam
-        except Exception as e:
-            logger.debug(f"Direct MAM read failed for {self.device_path}: {e}")
 
-        return {}
+                # If we get "Device or resource busy", wait a bit and retry
+                stderr_text = (
+                    (result.stderr or b"").decode().lower()
+                    if isinstance(result.stderr, bytes)
+                    else (result.stderr or "").lower()
+                )
+                if result.returncode != 0 and "busy" in stderr_text:
+                    time.sleep(0.2)
+                    continue
+
+            except Exception as e:
+                logger.debug(
+                    f"MAM read attempt {attempt} failed for {self.device_path}: {e}"
+                )
+                time.sleep(0.1)
+
+        # Return LKG if direct read failed
+        return LTOProvider._lkg_state[self.device_path]["mam"]
+
+    def get_live_state(self) -> Dict[str, Any]:
+        """Performs a single-pass discovery of all hardware metrics to ensure consistency."""
+        online = self.check_online()
+        if not online:
+            return {
+                "online": False,
+                "drive": self.get_drive_info(),
+                "mam": {},
+                "identity": None,
+            }
+
+        # Fetch both in sequence
+        mam = self.get_mam_info()
+        drive = self.get_drive_info()
+
+        # Primary identity is Barcode, fallback to Serial
+        identity = mam.get("barcode") or mam.get("serial")
+
+        return {"online": True, "drive": drive, "mam": mam, "identity": identity}
 
     def get_name(self) -> str:
         return "LTO Tape"
 
     def check_online(self) -> bool:
-        """Checks if the tape drive is online."""
+        """Checks if the tape drive is online. Uses LKG as a fallback when busy."""
         if not os.path.exists(self.device_path):
+            LTOProvider._lkg_state[self.device_path]["online"] = False
             return False
 
         try:
-            result = subprocess.run(
-                ["mt", "-f", self.device_path, "status"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
+            cmd = ["mt", "-f", self.device_path, "status"]
+            self._log_command(cmd)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
 
             stderr = result.stderr or ""
             stdout = result.stdout or ""
@@ -177,25 +238,28 @@ class LTOProvider(AbstractStorageProvider):
                 "Device or resource busy" in stderr
                 or "Device or resource busy" in stdout
             ):
+                LTOProvider._lkg_state[self.device_path]["online"] = True
                 return True
 
             is_online = (
                 "ONLINE" in stdout or "READY" in stdout or result.returncode == 0
             )
 
+            # If we transitioned from online -> offline, clear the LKG MAM (tape was likely ejected)
+            if LTOProvider._lkg_state[self.device_path]["online"] and not is_online:
+                LTOProvider._lkg_state[self.device_path]["mam"] = {}
+
+            LTOProvider._lkg_state[self.device_path]["online"] = is_online
             return is_online
         except Exception:
-            return False
+            return LTOProvider._lkg_state[self.device_path]["online"]
 
     def is_write_protected(self) -> bool:
         """Checks if the tape is write-protected (read-only)"""
         try:
-            result = subprocess.run(
-                ["mt", "-f", self.device_path, "status"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
+            cmd = ["mt", "-f", self.device_path, "status"]
+            self._log_command(cmd)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             output = result.stdout.upper()
             return (
                 "WR_PROT" in output
@@ -213,28 +277,20 @@ class LTOProvider(AbstractStorageProvider):
             self._run_mt("rewind")
             # Skip the label file (file 0)
             self._run_mt("fsf 1")
-            result = subprocess.run(
-                ["mt", "-f", self.device_path, "status"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            import re
-
+            cmd = ["mt", "-f", self.device_path, "status"]
+            self._log_command(cmd)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             match = re.search(r"File number=(\d+)", result.stdout)
-            return match and int(match.group(1)) > 0
+            return bool(match and int(match.group(1)) > 0)
         except Exception:
             return False
 
     def _run_mt(self, command: str):
         try:
-            # Split command string to handle arguments correctly (e.g. "fsf 1" -> ["fsf", "1"])
             cmd_parts = command.split()
-            subprocess.run(
-                ["mt", "-f", self.device_path] + cmd_parts,
-                check=True,
-                capture_output=True,
-            )
+            full_cmd = ["mt", "-f", self.device_path] + cmd_parts
+            self._log_command(full_cmd)
+            subprocess.run(full_cmd, check=True, capture_output=True)
         except subprocess.CalledProcessError as e:
             logger.error(f"Tape command 'mt {command}' failed: {e.stderr.decode()}")
             raise
@@ -243,17 +299,21 @@ class LTOProvider(AbstractStorageProvider):
         """Configures hardware encryption on the drive using stenc"""
         if not self.encryption_key:
             try:
-                subprocess.run(
-                    ["stenc", "-f", self.device_path, "--off"], capture_output=True
-                )
+                cmd = ["stenc", "-f", self.device_path, "--off"]
+                self._log_command(cmd)
+                subprocess.run(cmd, capture_output=True)
             except Exception:
                 pass
             return
 
         try:
             logger.info(f"Setting LTO hardware encryption key for {self.device_path}")
+            # stenc expects a 32-byte hex key (256-bit)
+            # We use a pipe to avoid leaving the key in the process list
+            cmd_import = ["stenc", "-f", self.device_path, "--import", "-k", "-"]
+            self._log_command(cmd_import)
             proc = subprocess.Popen(
-                ["stenc", "-f", self.device_path, "--import", "-k", "-"],
+                cmd_import,
                 stdin=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -262,41 +322,39 @@ class LTOProvider(AbstractStorageProvider):
             if proc.returncode != 0:
                 raise RuntimeError(f"LTO Encryption Setup Failed: {stderr}")
 
-            subprocess.run(
-                ["stenc", "-f", self.device_path, "--on"],
-                check=True,
-                capture_output=True,
-            )
+            cmd_on = ["stenc", "-f", self.device_path, "--on"]
+            self._log_command(cmd_on)
+            subprocess.run(cmd_on, check=True, capture_output=True)
             logger.info("LTO Hardware Encryption ENABLED and LOCKED")
         except Exception as e:
             logger.error(f"Hardware encryption error: {e}")
             raise
 
     def identify_media(self, allow_intrusive=True) -> Optional[str]:
-        """Identifies the tape."""
-        if not self.check_online():
+        """Identifies the tape, prioritizing non-intrusive LKG MAM identity."""
+        state = self.get_live_state()
+        if not state["online"]:
             return None
+        if state["identity"]:
+            return state["identity"]
 
-        # 1. Check MAM first (Silent, no head movement)
-        mam = self.get_mam_info()
-        if mam.get("barcode"):
-            return mam["barcode"]
-
-        # 2. Fallback to physical tape label read (Intrusive!)
         if not allow_intrusive:
             return None
 
         try:
             self._setup_encryption()
             self._run_mt("rewind")
-            result = subprocess.run(
-                ["tar", "-xf", self.device_path, "-O", ".tapehoard_label"],
-                capture_output=True,
-                text=True,
-                timeout=20,
-            )
+            cmd = ["tar", "-xf", self.device_path, "-O", ".tapehoard_label"]
+            self._log_command(cmd)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
             if result.returncode == 0:
-                return result.stdout.strip()
+                label_id = result.stdout.strip()
+                # Update LKG with the new barcode so we don't rewind again
+                if "barcode" not in LTOProvider._lkg_state[self.device_path]["mam"]:
+                    LTOProvider._lkg_state[self.device_path]["mam"]["barcode"] = (
+                        label_id
+                    )
+                return label_id
         except Exception as e:
             logger.debug(f"Physical identification failed for {self.device_path}: {e}")
 
@@ -322,8 +380,10 @@ class LTOProvider(AbstractStorageProvider):
                     with tarfile.open(tmp_tar.name, "w") as tar:
                         tar.add(tmp_lbl.name, arcname=".tapehoard_label")
                     with open(tmp_tar.name, "rb") as f:
+                        cmd_dd = ["dd", f"of={self.device_path}", "bs=256k"]
+                        self._log_command(cmd_dd)
                         proc = subprocess.Popen(
-                            ["dd", f"of={self.device_path}", "bs=256k"],
+                            cmd_dd,
                             stdin=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                         )
@@ -338,11 +398,12 @@ class LTOProvider(AbstractStorageProvider):
             self._run_mt("rewind")
 
             # Update MAM 0x0806 (Barcode)
-            subprocess.run(
-                ["sg_write_attr", "-w", f"0x0806={media_id}", self.device_path],
-                capture_output=True,
-            )
+            cmd_mam = ["sg_write_attr", "-w", f"0x0806={media_id}", self.device_path]
+            self._log_command(cmd_mam)
+            subprocess.run(cmd_mam, capture_output=True)
 
+            # Clear LKG so it re-polls fresh next time
+            LTOProvider._lkg_state[self.device_path]["mam"] = {}
             logger.info(f"Initialized LTO tape with label {media_id}")
             return True
         except Exception as e:
@@ -361,14 +422,9 @@ class LTOProvider(AbstractStorageProvider):
     def _get_current_file_number(self) -> str:
         """Parses 'mt status' to get the current tape file position"""
         try:
-            result = subprocess.run(
-                ["mt", "-f", self.device_path, "status"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            import re
-
+            cmd = ["mt", "-f", self.device_path, "status"]
+            self._log_command(cmd)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             match = re.search(r"(?:File number=|file number )(\d+)", result.stdout)
             if match:
                 return match.group(1)
@@ -379,9 +435,9 @@ class LTOProvider(AbstractStorageProvider):
     def write_archive(self, media_id: str, stream: BinaryIO) -> str:
         """Writes the stream to tape and returns the file number index"""
         file_num = self._get_current_file_number()
-        proc = subprocess.Popen(
-            ["dd", f"of={self.device_path}", "bs=256k"], stdin=subprocess.PIPE
-        )
+        cmd_dd = ["dd", f"of={self.device_path}", "bs=256k"]
+        self._log_command(cmd_dd)
+        proc = subprocess.Popen(cmd_dd, stdin=subprocess.PIPE)
         if proc.stdin:
             while True:
                 chunk = stream.read(1024 * 1024)
@@ -403,9 +459,9 @@ class LTOProvider(AbstractStorageProvider):
                 self._run_mt(f"fsf {loc_int}")
         except ValueError:
             pass
-        proc = subprocess.Popen(
-            ["dd", f"if={self.device_path}", "bs=256k"], stdout=subprocess.PIPE
-        )
+        cmd_dd = ["dd", f"if={self.device_path}", "bs=256k"]
+        self._log_command(cmd_dd)
+        proc = subprocess.Popen(cmd_dd, stdout=subprocess.PIPE)
         if proc.stdout is None:
             raise RuntimeError("Failed to open dd pipe")
         return cast(BinaryIO, proc.stdout)

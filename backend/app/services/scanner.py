@@ -134,12 +134,16 @@ class ScannerService:
         try:
             if level == "background":
                 os.nice(19)
-                if hasattr(psutil.Process(), "ionice"):
+                if hasattr(psutil.Process(), "ionice") and hasattr(
+                    psutil, "IOPRIO_CLASS_IDLE"
+                ):
                     process_handle = psutil.Process()
                     process_handle.ionice(psutil.IOPRIO_CLASS_IDLE)
             else:
                 os.nice(0)
-                if hasattr(psutil.Process(), "ionice"):
+                if hasattr(psutil.Process(), "ionice") and hasattr(
+                    psutil, "IOPRIO_CLASS_BE"
+                ):
                     process_handle = psutil.Process()
                     process_handle.ionice(psutil.IOPRIO_CLASS_BE, value=4)
         except Exception as priority_error:

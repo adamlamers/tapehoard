@@ -284,8 +284,11 @@ async def stream_jobs():
                         "created_at": job.created_at,
                     }
                     for date_field in ["started_at", "created_at"]:
-                        if job_dict[date_field]:
-                            job_dict[date_field] = job_dict[date_field].isoformat()
+                        from datetime import datetime
+
+                        val = job_dict[date_field]
+                        if isinstance(val, datetime):
+                            job_dict[date_field] = val.isoformat()
                     serialized_data.append(job_dict)
 
                 yield f"data: {json.dumps(serialized_data)}\n\n"
@@ -618,11 +621,10 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
                 from app.providers.tape import LTOProvider
 
                 tape_provider = LTOProvider(device_path=dev_path)
-                if tape_provider.check_online():
-                    barcode = tape_provider.identify_media(allow_intrusive=False)
-                    mam_info = tape_provider.get_mam_info()
-                    drive_info = tape_provider.get_drive_info()
+                state = tape_provider.get_live_state()
 
+                if state["online"]:
+                    barcode = state["identity"]
                     if barcode in ignore_list:
                         continue
 
@@ -636,6 +638,7 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
                             is not None
                         )
 
+                    mam_info = state["mam"]
                     if not is_known and mam_info.get("serial"):
                         is_known = (
                             db_session.query(models.StorageMedia)
@@ -650,12 +653,13 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
                         {
                             "type": "tape",
                             "device_path": dev_path,
-                            "identifier": barcode
-                            or mam_info.get("serial")
-                            or "NEW TAPE",
+                            "identifier": state["identity"] or "NEW TAPE",
                             "is_registered": is_known,
                             "status": "ready" if not is_known else "active",
-                            "hardware_info": {"drive": drive_info, "tape": mam_info},
+                            "hardware_info": {
+                                "drive": state["drive"],
+                                "tape": state["mam"],
+                            },
                         }
                     )
         except Exception as tape_error:
