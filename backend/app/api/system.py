@@ -639,7 +639,7 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
             for dev_path in device_paths:
                 from app.providers.tape import LTOProvider
 
-                tape_provider = LTOProvider(device_path=dev_path)
+                tape_provider = LTOProvider(config={"device_path": dev_path})
                 state = tape_provider.get_live_info()
 
                 if state["online"]:
@@ -677,7 +677,7 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
                             "status": "ready" if not is_known else "active",
                             "hardware_info": {
                                 "drive": state["drive"],
-                                "tape": state["mam"],
+                                "tape": state["tape"],
                             },
                         }
                     )
@@ -685,7 +685,7 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
             logger.error(f"Tape discovery failed: {tape_error}")
 
     # 2. Probe Potential Mount Points
-    potential_mounts = ["/mnt", "/media", "/Volumes"]
+    potential_mounts = ["/mnt", "/media", "/Volumes", os.path.expanduser("~")]
     try:
         root_device_id = os.stat("/").st_dev
     except Exception:
@@ -707,26 +707,28 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
                     if not entry.is_dir():
                         continue
 
-                    # Security & System Filtering
-                    try:
-                        entry_stats = os.stat(entry.path)
-                        if (
-                            root_device_id is not None
-                            and entry_stats.st_dev == root_device_id
-                        ):
-                            continue
-                    except Exception:
-                        continue
-
                     if entry.path in restricted_paths or entry.path in ignore_list:
                         continue
 
                     # Check for TapeHoard signature
                     id_file_path = os.path.join(entry.path, ".tapehoard_id")
                     disk_barcode = None
-                    if os.path.exists(id_file_path):
+                    has_signature = os.path.exists(id_file_path)
+
+                    if has_signature:
                         with open(id_file_path, "r") as f:
                             disk_barcode = f.read().strip()
+                    else:
+                        # Security & System Filtering (only for uninitialized disks to prevent scanning /)
+                        try:
+                            entry_stats = os.stat(entry.path)
+                            if (
+                                root_device_id is not None
+                                and entry_stats.st_dev == root_device_id
+                            ):
+                                continue
+                        except Exception:
+                            continue
 
                     if disk_barcode in ignore_list:
                         continue

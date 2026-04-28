@@ -87,6 +87,22 @@ class ArchiverService:
 
     def _get_storage_provider(self, media_record: models.StorageMedia):
         """Initializes the appropriate hardware provider based on media type."""
+
+        provider_map = {
+            LTOProvider.provider_id: LTOProvider,
+            OfflineHDDProvider.provider_id: OfflineHDDProvider,
+            CloudStorageProvider.provider_id: CloudStorageProvider,
+            # Backwards compatibility for legacy DB records
+            "tape": LTOProvider,
+            "hdd": OfflineHDDProvider,
+            "cloud": CloudStorageProvider,
+            "s3": CloudStorageProvider,
+        }
+
+        provider_cls = provider_map.get(media_record.media_type)
+        if not provider_cls:
+            return None
+
         provider_config: Dict[str, Any] = {}
         if media_record.extra_config:
             try:
@@ -96,20 +112,12 @@ class ArchiverService:
                     f"Failed to decode config for media {media_record.identifier}"
                 )
 
-        if media_record.media_type == "tape":
-            return LTOProvider(
-                device_path=provider_config.get("device_path", "/dev/nst0"),
-                encryption_key=provider_config.get("encryption_key"),
-            )
-        elif media_record.media_type == "hdd":
-            return OfflineHDDProvider(
-                mount_base=provider_config.get("mount_path", "/mnt/backup"),
-                device_uuid=provider_config.get("device_uuid"),
-            )
-        elif media_record.media_type == "s3" or media_record.media_type == "cloud":
-            return CloudStorageProvider(config=provider_config)
+        # Standards fallback for legacy config keys
+        if provider_cls == OfflineHDDProvider and "mount_path" not in provider_config:
+            # Older DBs might have used mount_base in some contexts, though hdd used mount_path in code
+            pass
 
-        return None
+        return provider_cls(config=provider_config)
 
     def get_unbacked_files(self, db_session: Session):
         """Identifies files that are indexed but lack full version coverage on media."""

@@ -34,11 +34,9 @@ class LTOProvider(AbstractStorageProvider):
     # device_path -> { "drive": {}, "mam": {}, "online": bool, "last_check": float }
     _lkg_state: dict = {}
 
-    def __init__(
-        self, device_path: str = "/dev/nst0", encryption_key: Optional[str] = None
-    ):
-        self.device_path = device_path
-        self.encryption_key = encryption_key
+    def __init__(self, config: Dict[str, Any]):
+        self.device_path = config.get("device_path", "/dev/nst0")
+        self.encryption_key = config.get("encryption_key")
 
         # Initialize LKG entry if not exists
         if self.device_path not in LTOProvider._lkg_state:

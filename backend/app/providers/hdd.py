@@ -29,11 +29,9 @@ class OfflineHDDProvider(AbstractStorageProvider):
         },
     }
 
-    def __init__(
-        self, mount_base: str = "/mnt/backup_disk", device_uuid: Optional[str] = None
-    ):
-        self.mount_base = mount_base
-        self.device_uuid = device_uuid
+    def __init__(self, config: Dict[str, Any]):
+        self.mount_base = config.get("mount_path", "/mnt/backup_disk")
+        self.device_uuid = config.get("device_uuid")
 
     def get_name(self) -> str:
         return self.name
