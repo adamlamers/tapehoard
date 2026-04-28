@@ -2,7 +2,7 @@ import json
 import os
 import sqlite3
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 import pathspec
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -12,10 +12,10 @@ from pydantic import BaseModel
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
+from app.api.schemas import TreeNodeSchema
 from app.db import models
 from app.db.database import SessionLocal, get_db
 from app.services.scanner import JobManager, scanner_manager
-from app.api.schemas import TreeNodeSchema
 
 router = APIRouter(prefix="/system", tags=["System"])
 
@@ -657,7 +657,7 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
                             is not None
                         )
 
-                    mam_info = state["mam"]
+                    mam_info = state["tape"]
                     if not is_known and mam_info.get("serial"):
                         is_known = (
                             db_session.query(models.StorageMedia)
@@ -817,9 +817,11 @@ def export_database_index():
             export_temporary_path,
             filename=f"tapehoard_index_{datetime.now(timezone.utc).strftime('%Y%m%d')}.db",
             background=BackgroundTasks().add_task(
-                lambda: os.remove(export_temporary_path)
-                if os.path.exists(export_temporary_path)
-                else None
+                lambda: (
+                    os.remove(export_temporary_path)
+                    if os.path.exists(export_temporary_path)
+                    else None
+                )
             ),
         )
     except Exception as export_error:
