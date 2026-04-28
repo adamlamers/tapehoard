@@ -234,11 +234,7 @@ class ScannerService:
             tracking_map = {rule.path: rule.action for rule in tracking_rules}
 
             def resolve_tracking(absolute_path: str) -> bool:
-                # 1. Global Exclusions
-                if exclusion_spec and exclusion_spec.match_file(absolute_path):
-                    return True
-
-                # 2. User Tracking Policy
+                # 1. User Tracking Policy (Explicit overrides)
                 applicable_rules = []
                 for rule_path, action in tracking_map.items():
                     if absolute_path == rule_path or absolute_path.startswith(
@@ -246,12 +242,16 @@ class ScannerService:
                     ):
                         applicable_rules.append((len(rule_path), action))
 
-                if not applicable_rules:
-                    # Default to NOT ignored if in a source root and no rules match
-                    return False
+                if applicable_rules:
+                    # Most specific rule wins
+                    applicable_rules.sort(key=lambda x: x[0], reverse=True)
+                    return applicable_rules[0][1] == "exclude"
 
-                applicable_rules.sort(key=lambda x: x[0], reverse=True)
-                return applicable_rules[0][1] == "exclude"
+                # 2. Global Exclusions (Default automatic behavior)
+                if exclusion_spec and exclusion_spec.match_file(absolute_path):
+                    return True
+
+                return False
 
             current_timestamp = datetime.now(timezone.utc)
             BATCH_SIZE = 1000
@@ -269,13 +269,6 @@ class ScannerService:
                 for current_dir, sub_dirs, file_names in os.walk(root_base):
                     if job_id is not None and JobManager.is_cancelled(job_id):
                         break
-
-                    # Prune directories early to save syscalls
-                    if exclusion_spec:
-                        for directory_name in list(sub_dirs):
-                            full_dir_path = os.path.join(current_dir, directory_name)
-                            if exclusion_spec.match_file(full_dir_path + "/"):
-                                sub_dirs.remove(directory_name)
 
                     for name in file_names:
                         full_file_path = os.path.join(current_dir, name)

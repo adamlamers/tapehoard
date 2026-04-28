@@ -2,7 +2,7 @@ import json
 import os
 import sqlite3
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 
 import pathspec
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -133,27 +133,28 @@ def get_exclusion_spec(db_session: Session) -> Optional[pathspec.PathSpec]:
     return pathspec.PathSpec.from_lines("gitwildmatch", exclusion_patterns)
 
 
-def get_tracking_status(
+def get_ignored_status(
     absolute_path: str,
     tracking_map: Dict[str, str],
     exclusion_spec: Optional[pathspec.PathSpec],
-) -> Tuple[bool, bool]:
-    """Determines if a path is tracked and if it is explicitly ignored."""
-    is_ignored = False
-    if exclusion_spec and exclusion_spec.match_file(absolute_path):
-        is_ignored = True
-
+) -> bool:
+    """Determines if a path should be ignored based on user policy (overrides) and global exclusions."""
+    # 1. Check user-defined tracking policy (Explicit overrides)
     applicable_rules = []
     for rule_path, action in tracking_map.items():
         if absolute_path == rule_path or absolute_path.startswith(rule_path + "/"):
             applicable_rules.append((len(rule_path), action))
 
-    if not applicable_rules:
-        return not is_ignored, is_ignored
+    if applicable_rules:
+        # Most specific rule wins
+        applicable_rules.sort(key=lambda x: x[0], reverse=True)
+        return applicable_rules[0][1] == "exclude"
 
-    applicable_rules.sort(key=lambda x: x[0], reverse=True)
-    is_tracked = applicable_rules[0][1] == "include"
-    return is_tracked, is_ignored
+    # 2. Check global exclusions (Default automatic behavior)
+    if exclusion_spec and exclusion_spec.match_file(absolute_path):
+        return True
+
+    return False
 
 
 # --- Endpoints ---
@@ -358,10 +359,8 @@ def browse_system_path(
             if not os.path.exists(root_path):
                 continue
             stats = os.stat(root_path)
-            is_tracked, is_ignored = get_tracking_status(
-                root_path, tracking_map, exclusion_spec
-            )
-            # Default to not ignored for source roots themselves
+            # Source roots themselves follow policy
+            is_ignored = get_ignored_status(root_path, tracking_map, exclusion_spec)
             results.append(
                 FileItemSchema(
                     name=root_path,
@@ -388,34 +387,36 @@ def browse_system_path(
                     immediate_file_paths.append(entry.path)
 
         # Fetch existing indexed files for ONLY the immediate files in this directory
-        indexed_files = {}
+        indexed_info = {}  # path -> (sha256_hash, is_ignored)
         if immediate_file_paths:
-            # Chunk the IN clause to avoid SQLite limits (typically 999)
             for i in range(0, len(immediate_file_paths), 900):
                 chunk = immediate_file_paths[i : i + 900]
-                for file_path, sha256_hash in (
+                for f_path, sha256_hash, db_ignored in (
                     db_session.query(
                         models.FilesystemState.file_path,
                         models.FilesystemState.sha256_hash,
+                        models.FilesystemState.is_ignored,
                     )
                     .filter(models.FilesystemState.file_path.in_(chunk))
                     .all()
                 ):
-                    indexed_files[file_path] = sha256_hash
+                    indexed_info[f_path] = (sha256_hash, db_ignored)
 
         for entry in entries:
             try:
                 # Explicitly don't follow symlinks during browsing to show raw state
                 file_stats = entry.stat(follow_symlinks=False)
-                is_tracked, is_ignored = get_tracking_status(
-                    entry.path, tracking_map, exclusion_spec
-                )
 
-                # Only show files that have a hash (archivable)
-                # Directories are always shown
-                if not entry.is_dir(follow_symlinks=False):
-                    if entry.path not in indexed_files or not indexed_files[entry.path]:
-                        continue
+                if entry.path in indexed_info:
+                    # If in DB, the DB flag is the source of truth for archival intent
+                    is_ignored = indexed_info[entry.path][1]
+                    item_hash = indexed_info[entry.path][0]
+                else:
+                    # If not in DB, calculate intended state based on policy
+                    is_ignored = get_ignored_status(
+                        entry.path, tracking_map, exclusion_spec
+                    )
+                    item_hash = None
 
                 results.append(
                     FileItemSchema(
@@ -427,7 +428,7 @@ def browse_system_path(
                         size=file_stats.st_size,
                         mtime=file_stats.st_mtime,
                         ignored=is_ignored,
-                        sha256_hash=indexed_files.get(entry.path),
+                        sha256_hash=item_hash,
                     )
                 )
             except (OSError, FileNotFoundError):
@@ -470,14 +471,13 @@ def search_system_index(
     )
 
     files = db_session.execute(search_sql, query_params).fetchall()
-    tracking_rules = db_session.query(models.TrackedSource).all()
-    tracking_map = {rule.path: rule.action for rule in tracking_rules}
-    exclusion_spec = get_exclusion_spec(db_session)
 
     results = []
     for file_record in files:
         full_path = file_record[0]
-        _, is_ignored = get_tracking_status(full_path, tracking_map, exclusion_spec)
+        # Trust the indexed ignore state from the DB
+        db_ignored = bool(file_record[4])
+
         results.append(
             FileItemSchema(
                 name=full_path.split("/")[-1],
@@ -485,7 +485,7 @@ def search_system_index(
                 type="file",
                 size=file_record[1],
                 mtime=file_record[2],
-                ignored=is_ignored or bool(file_record[4]),
+                ignored=db_ignored,
                 sha256_hash=file_record[5],
             )
         )

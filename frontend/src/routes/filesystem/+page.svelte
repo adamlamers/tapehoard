@@ -47,9 +47,8 @@
                     type: f.type as 'file' | 'directory' | 'link',
                     size: f.size ?? null,
                     mtime: f.mtime ?? null,
-                    tracked: f.tracked ?? false,
                     ignored: f.ignored ?? false,
-                    sha256_hash: null // Not returned in browse but kept for state consistency
+                    sha256_hash: f.sha256_hash ?? null
                 }));
             }
         } catch (error) {
@@ -73,9 +72,8 @@
                     type: f.type as 'file' | 'directory' | 'link',
                     size: f.size ?? null,
                     mtime: f.mtime ?? null,
-                    tracked: f.tracked ?? false,
                     ignored: f.ignored ?? false,
-                    sha256_hash: null
+                    sha256_hash: f.sha256_hash ?? null
                 }));
             }
         } catch (error) {

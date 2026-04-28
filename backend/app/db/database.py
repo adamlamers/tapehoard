@@ -2,12 +2,16 @@ import os
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
+from typing import Dict, Any
+
 # Dependency mapping for FastAPI
 # Using standard relative path, but easily overridden with env vars later
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///tapehoard.db")
 
 # connect_args={"check_same_thread": False} is required for SQLite in FastAPI
-engine_kwargs = {"connect_args": {"check_same_thread": False, "timeout": 30}}
+engine_kwargs: Dict[str, Any] = {
+    "connect_args": {"check_same_thread": False, "timeout": 30}
+}
 
 # For testing environment, we want immediate visibility across sessions
 if (

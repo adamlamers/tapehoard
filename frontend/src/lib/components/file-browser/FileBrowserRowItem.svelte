@@ -181,7 +181,7 @@
                                 <span
                                         class={cn(
                                                 "truncate text-[13px] transition-colors",
-                                                !item.ignored && item.tracked
+                                                !item.ignored
                                                         ? "text-success-color font-bold"
                                                         : isSelected
                                                                 ? "text-text-primary font-medium"
