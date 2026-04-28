@@ -553,13 +553,6 @@
                             {#if media.live_info}
                                 {@const info = media.live_info as any}
                                 <Card class="bg-bg-secondary border-blue-500/30 shadow-2xl relative overflow-hidden">
-                                    <div class="absolute top-0 right-0 p-4">
-                                        <div class="flex items-center gap-2 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20">
-                                            <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse"></div>
-                                            <span class="text-[9px] font-black uppercase tracking-widest text-blue-400">Drive Online</span>
-                                        </div>
-                                    </div>
-
                                     <div class="p-8 flex flex-col lg:flex-row gap-12">
                                         <!-- Drive Info -->
                                         <div class="flex-1 space-y-6">
@@ -567,9 +560,15 @@
                                                 <div class="text-[9px] font-black uppercase tracking-[0.2em] text-text-secondary opacity-50 mb-3 flex items-center gap-2">
                                                     <Cpu size={12} /> Physical Tape Drive
                                                 </div>
-                                                <div class="flex items-baseline gap-3">
-                                                    <h3 class="text-3xl font-black text-text-primary tracking-tighter uppercase">{info.drive?.vendor || 'Unknown'}</h3>
-                                                    <span class="text-xl font-bold text-text-secondary opacity-40">{info.drive?.model || 'Generic LTO'}</span>
+                                                <div class="flex items-center gap-4">
+                                                    <div class="flex items-baseline gap-3">
+                                                        <h3 class="text-3xl font-black text-text-primary tracking-tighter uppercase">{info.drive?.vendor || 'Unknown'}</h3>
+                                                        <span class="text-xl font-bold text-text-secondary opacity-40">{info.drive?.model || 'Generic LTO'}</span>
+                                                    </div>
+                                                    <div class="flex items-center gap-2 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20">
+                                                        <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse"></div>
+                                                        <span class="text-[9px] font-black uppercase tracking-widest text-blue-400">Drive Online</span>
+                                                    </div>
                                                 </div>
                                                 <div class="mt-2 flex items-center gap-4 text-[10px] font-mono text-text-secondary/60">
                                                     <span>FIRMWARE: <span class="text-text-primary font-bold">{info.drive?.firmware || 'N/A'}</span></span>
@@ -676,9 +675,9 @@
                                                     {/if}
 
                                                     <div>
-                                                        <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Medium Application Label</span>
+                                                        <span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Inserted Tape Identifier</span>
                                                         <div class="bg-bg-secondary p-3 rounded-lg border border-border-color font-mono text-xs text-text-primary italic shadow-inner">
-                                                            "{info.tape?.label || 'UNLABELED'}"
+                                                            "{info.tape?.barcode || 'NO BARCODE'}"
                                                         </div>
                                                     </div>
                                                 </div>
