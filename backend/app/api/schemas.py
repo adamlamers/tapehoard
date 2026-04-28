@@ -61,3 +61,11 @@ class MediaUpdateSchema(BaseModel):
     location: Optional[str] = None
     capacity: Optional[int] = None
     config: Optional[Dict[str, Any]] = None
+
+
+class StorageProviderSchema(BaseModel):
+    provider_id: str
+    name: str
+    description: str
+    capabilities: Dict[str, bool]
+    config_schema: Dict[str, Any]

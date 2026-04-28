@@ -8,6 +8,27 @@ from loguru import logger
 class OfflineHDDProvider(AbstractStorageProvider):
     """Storage provider for removable hard drives with UUID and signature verification."""
 
+    provider_id = "local_hdd"
+    name = "Offline HDD"
+    description = "Local or USB-attached block storage devices."
+    capabilities = {
+        "supports_random_access": True,
+        "is_offline_capable": True,
+        "supports_hardware_encryption": False,
+    }
+    config_schema = {
+        "mount_path": {
+            "type": "string",
+            "title": "System Mount Point",
+            "description": "The path where the drive is mounted.",
+        },
+        "device_uuid": {
+            "type": "string",
+            "title": "Device UUID",
+            "description": "Optional UUID to verify the correct drive is mounted.",
+        },
+    }
+
     def __init__(
         self, mount_base: str = "/mnt/backup_disk", device_uuid: Optional[str] = None
     ):
@@ -15,7 +36,24 @@ class OfflineHDDProvider(AbstractStorageProvider):
         self.device_uuid = device_uuid
 
     def get_name(self) -> str:
-        return "Offline HDD"
+        return self.name
+
+    def get_live_info(self) -> dict:
+        import psutil
+
+        info = {"online": self.check_online()}
+        if info["online"]:
+            try:
+                usage = psutil.disk_usage(self.mount_base)
+                info["media"] = {
+                    "free_bytes": usage.free,
+                    "total_bytes": usage.total,
+                    "used_bytes": usage.used,
+                    "mount_point": self.mount_base,
+                }
+            except Exception:
+                pass
+        return info
 
     def check_online(self) -> bool:
         """Checks if the HDD mount point is physically accessible and matches UUID if provided."""

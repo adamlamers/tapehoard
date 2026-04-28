@@ -9,6 +9,27 @@ from loguru import logger
 
 
 class LTOProvider(AbstractStorageProvider):
+    provider_id = "lto_tape"
+    name = "LTO Tape Drive"
+    description = "Hardware Linear Tape-Open (LTO) drives."
+    capabilities = {
+        "supports_random_access": False,
+        "is_offline_capable": True,
+        "supports_hardware_encryption": True,
+    }
+    config_schema = {
+        "device_path": {
+            "type": "string",
+            "title": "Device Path",
+            "description": "e.g., /dev/nst0",
+        },
+        "encryption_key": {
+            "type": "string",
+            "title": "Hardware Encryption Key",
+            "description": "Optional 256-bit hex key for LTO hardware encryption.",
+        },
+    }
+
     # Class-level store for Last Known Good (LKG) hardware state
     # device_path -> { "drive": {}, "mam": {}, "online": bool, "last_check": float }
     _lkg_state: dict = {}
@@ -210,7 +231,7 @@ class LTOProvider(AbstractStorageProvider):
         # Return LKG if direct read failed
         return LTOProvider._lkg_state[self.device_path]["mam"]
 
-    def get_live_state(self) -> Dict[str, Any]:
+    def get_live_info(self) -> Dict[str, Any]:
         """Performs a single-pass discovery of all hardware metrics to ensure consistency."""
         self.check_online()
         # Since check_online throttles and sets online/last_check, we follow its lead
@@ -351,7 +372,7 @@ class LTOProvider(AbstractStorageProvider):
 
     def identify_media(self, allow_intrusive=True) -> Optional[str]:
         """Identifies the tape, prioritizing non-intrusive LKG MAM identity."""
-        state = self.get_live_state()
+        state = self.get_live_info()
         if not state["online"]:
             return None
         if state["identity"]:
@@ -435,6 +456,9 @@ class LTOProvider(AbstractStorageProvider):
         if current_id != media_id:
             logger.error(f"Tape mismatch. Expected {media_id}, found {current_id}")
             return False
+
+        # Ensure encryption key is loaded before appending
+        self._setup_encryption()
         self._run_mt("eod")
         return True
 
@@ -471,6 +495,8 @@ class LTOProvider(AbstractStorageProvider):
         self._run_mt("offline")
 
     def read_archive(self, media_id: str, location_id: str) -> BinaryIO:
+        # Ensure encryption key is loaded before reading
+        self._setup_encryption()
         self._run_mt("rewind")
         try:
             loc_int = int(location_id)

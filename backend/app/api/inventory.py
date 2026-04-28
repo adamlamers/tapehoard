@@ -19,6 +19,7 @@ from app.api.schemas import (
     MediaUpdateSchema,
     TreeNodeSchema,
     ItemMetadataSchema,
+    StorageProviderSchema,
 )
 
 router = APIRouter(prefix="/inventory", tags=["Inventory & Search"])
@@ -55,6 +56,27 @@ def get_source_roots(db_session: Session) -> List[str]:
         return [setting.value] if setting.value else []
 
 
+@router.get("/providers", response_model=List[StorageProviderSchema])
+def list_storage_providers():
+    """Returns a registry of all available storage providers and their configurations."""
+    from app.providers.tape import LTOProvider
+    from app.providers.hdd import OfflineHDDProvider
+    from app.providers.cloud import CloudStorageProvider
+
+    providers = [LTOProvider, OfflineHDDProvider, CloudStorageProvider]
+
+    return [
+        StorageProviderSchema(
+            provider_id=p.provider_id,
+            name=p.name,
+            description=p.description,
+            capabilities=p.capabilities,
+            config_schema=p.config_schema,
+        )
+        for p in providers
+    ]
+
+
 @router.get("/media", response_model=List[MediaSchema])
 def list_storage_fleet(db_session: Session = Depends(get_db)):
     """Returns all registered media assets with real-time hardware status."""
@@ -78,20 +100,22 @@ def list_storage_fleet(db_session: Session = Depends(get_db)):
         if provider:
             is_online = provider.check_online()
             try:
-                # Attempt to identify the tape non-intrusively
-                detected_id = provider.identify_media(allow_intrusive=False)
+                # Attempt to identify the media non-intrusively
+                # pass allow_intrusive=False if the provider supports it, otherwise default
+                import inspect
+
+                if (
+                    "allow_intrusive"
+                    in inspect.signature(provider.identify_media).parameters
+                ):
+                    detected_id = provider.identify_media(allow_intrusive=False)
+                else:
+                    detected_id = provider.identify_media()
+
                 hardware_identified = detected_id == media.identifier
 
-                # Always populate live_info for tape drives if the provider exists
-                # LTOProvider now returns LKG (Last Known Good) state if direct read fails
-                if media.media_type == "tape":
-                    from app.providers.tape import LTOProvider
-
-                    if isinstance(provider, LTOProvider):
-                        live_info = {
-                            "drive": provider.get_drive_info(),
-                            "tape": provider.get_mam_info(),
-                        }
+                # Always populate live_info using the unified interface
+                live_info = provider.get_live_info()
 
                 # For HDD providers, also grab host-level capacity if possible
                 if is_online and media.media_type == "hdd":

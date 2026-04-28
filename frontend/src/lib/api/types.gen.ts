@@ -127,9 +127,9 @@ export type CartTreeNodeSchema = {
  */
 export type DashboardStatsSchema = {
     /**
-     * Total Files Indexed
+     * Monitored Files Count
      */
-    total_files_indexed: number;
+    monitored_files_count: number;
     /**
      * Hashed Files Count
      */
@@ -138,6 +138,10 @@ export type DashboardStatsSchema = {
      * Total Data Size
      */
     total_data_size: number;
+    /**
+     * Archived Data Size
+     */
+    archived_data_size: number;
     /**
      * Ignored Files Count
      */
@@ -584,6 +588,36 @@ export type SettingSchema = {
      * Value
      */
     value: string;
+};
+
+/**
+ * StorageProviderSchema
+ */
+export type StorageProviderSchema = {
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Capabilities
+     */
+    capabilities: {
+        [key: string]: boolean;
+    };
+    /**
+     * Config Schema
+     */
+    config_schema: {
+        [key: string]: unknown;
+    };
 };
 
 /**
@@ -1123,6 +1157,24 @@ export type GetSystemTreeSystemTreeGetResponses = {
 };
 
 export type GetSystemTreeSystemTreeGetResponse = GetSystemTreeSystemTreeGetResponses[keyof GetSystemTreeSystemTreeGetResponses];
+
+export type ListStorageProvidersInventoryProvidersGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/inventory/providers';
+};
+
+export type ListStorageProvidersInventoryProvidersGetResponses = {
+    /**
+     * Response List Storage Providers Inventory Providers Get
+     *
+     * Successful Response
+     */
+    200: Array<StorageProviderSchema>;
+};
+
+export type ListStorageProvidersInventoryProvidersGetResponse = ListStorageProvidersInventoryProvidersGetResponses[keyof ListStorageProvidersInventoryProvidersGetResponses];
 
 export type ListStorageFleetInventoryMediaGetData = {
     body?: never;

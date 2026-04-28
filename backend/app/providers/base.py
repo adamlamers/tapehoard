@@ -1,8 +1,19 @@
 from abc import ABC, abstractmethod
-from typing import Optional, BinaryIO
+from typing import Optional, BinaryIO, Dict, Any
 
 
 class AbstractStorageProvider(ABC):
+    # --- Plugin Registration Metadata ---
+    provider_id: str = "unknown"
+    name: str = "Unknown Provider"
+    description: str = ""
+    capabilities: Dict[str, bool] = {
+        "supports_random_access": False,
+        "is_offline_capable": False,
+        "supports_hardware_encryption": False,
+    }
+    config_schema: Dict[str, Any] = {}
+
     @abstractmethod
     def get_name(self) -> str:
         """Returns the human-readable name of the provider (e.g., 'LTO Tape')"""
@@ -20,6 +31,20 @@ class AbstractStorageProvider(ABC):
         Used to warn users before re-initialization.
         """
         pass
+
+    def get_live_info(self) -> Dict[str, Any]:
+        """
+        Standardized method returning hardware telemetry.
+        Should return a dict like {"drive": {...}, "media": {...}, "online": bool}
+        """
+        return {"online": self.check_online()}
+
+    def get_health_status(self) -> Dict[str, Any]:
+        """
+        Standardized method returning health status.
+        Should return {"status": "HEALTHY"|"WARNING"|"CRITICAL", "alerts": []}
+        """
+        return {"status": "HEALTHY", "alerts": []}
 
     @abstractmethod
     def identify_media(self) -> Optional[str]:

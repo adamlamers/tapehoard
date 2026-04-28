@@ -12,6 +12,44 @@ from Crypto.Hash import SHA256
 
 
 class CloudStorageProvider(AbstractStorageProvider):
+    provider_id = "s3_compat"
+    name = "S3-Compatible Cloud Storage"
+    description = "Object storage via the S3 protocol (AWS, Wasabi, Backblaze, etc)."
+    capabilities = {
+        "supports_random_access": True,
+        "is_offline_capable": False,
+        "supports_hardware_encryption": True,
+    }
+    config_schema = {
+        "endpoint_url": {
+            "type": "string",
+            "title": "Endpoint URL",
+            "description": "e.g., https://s3.us-west-004.backblazeb2.com",
+        },
+        "bucket_name": {
+            "type": "string",
+            "title": "Bucket Name",
+        },
+        "region": {
+            "type": "string",
+            "title": "Region",
+            "description": "Optional region",
+        },
+        "access_key": {
+            "type": "string",
+            "title": "Access Key ID",
+        },
+        "secret_key": {
+            "type": "string",
+            "title": "Secret Access Key",
+        },
+        "encryption_passphrase": {
+            "type": "string",
+            "title": "Client-Side Encryption Passphrase",
+            "description": "Used to encrypt data locally before uploading via AES-256-GCM.",
+        },
+    }
+
     def __init__(self, config: Dict[str, Any]):
         self.provider_type = config.get("provider", "S3")
         self.bucket_name = config.get("bucket_name")

@@ -1,20 +1,16 @@
 <script lang="ts">
-    import { onMount, onDestroy } from 'svelte';
+    import { onMount, onDestroy, untrack } from 'svelte';
     import {
         Plus,
         CassetteTape,
         HardDrive,
         Cloud,
-        MapPin,
-        Edit3,
-        Database,
-        ShieldCheck,
-        RotateCw,
         Trash2,
         X,
         Save,
         Globe,
         Monitor,
+        RotateCw,
         PlayCircle,
         Star,
         GripVertical,
@@ -25,7 +21,12 @@
         Minus,
         ArrowUp,
         ArrowDown,
-        ArrowRight
+        ArrowRight,
+        MapPin,
+        ShieldCheck,
+        Edit3,
+        Database,
+        EyeOff
     } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import { Card } from '$lib/components/ui/card';
@@ -41,43 +42,56 @@
         updateMediaAssetInventoryMediaMediaIdPatch,
         discoverHardwareNodesSystemHardwareDiscoverGet,
         ignoreHardwareNodeSystemHardwareIgnorePost,
-        type MediaSchema
+        listStorageProvidersInventoryProvidersGet,
+        type MediaSchema,
+        type StorageProviderSchema
     } from '$lib/api';
     import { dndzone } from 'svelte-dnd-action';
     import { toast } from 'svelte-sonner';
     import { beforeNavigate } from '$app/navigation';
 
     let mediaList = $state<MediaSchema[]>([]);
+    let providersList = $state<StorageProviderSchema[]>([]);
     let discoveredAssets = $state<any[]>([]);
     let loading = $state(true);
     let showRegisterDialog = $state(false);
-    let showAdvancedCloud = $state(false);
     let editingMedia = $state<MediaSchema | null>(null);
 
     // New Media Form State
     let newMedia = $state({
-        media_type: 'tape',
+        media_type: 'lto_tape',
         identifier: '',
         generation_tier: 'LTO-6',
         capacity_gb: 2500,
-        location: 'Storage Shelf',
-        // Type-specific config
-        encryption_key: '', // 256-bit Hex Key
-        enable_encryption: false,
-        mount_path: '', // For HDD
-        bucket_name: '', // For S3
-        cloud_provider: 'S3-Compatible',
-        cloud_region: 'us-east-1',
-        endpoint_url: '',
-        access_key: '',
-        secret_key: '',
-        encryption_passphrase: '',
-        device_uuid: ''
+        location: 'Storage Shelf'
+    });
+
+    let dynamicConfig = $state<Record<string, any>>({});
+
+    const activeProvider = $derived(
+        providersList.find(p => p.provider_id === newMedia.media_type)
+    );
+
+    // Initialize dynamicConfig when media_type changes
+    $effect(() => {
+        // Track provider identity changes
+        const _id = activeProvider?.provider_id;
+
+        if (activeProvider) {
+            untrack(() => {
+                const newConfig: Record<string, any> = {};
+                Object.keys(activeProvider.config_schema).forEach(key => {
+                    // Preserve existing value if key is the same, otherwise default empty
+                    newConfig[key] = dynamicConfig[key] || '';
+                });
+                dynamicConfig = newConfig;
+            });
+        }
     });
 
     // Track "dirty" state for dialogs
     const isFormDirty = $derived(
-        (showRegisterDialog && (newMedia.identifier !== '' || newMedia.mount_path !== '')) ||
+        (showRegisterDialog && (newMedia.identifier !== '')) ||
         (editingMedia !== null)
     );
 
@@ -166,7 +180,14 @@
         }
     }
 
-    onMount(() => {
+    onMount(async () => {
+        try {
+            const res = await listStorageProvidersInventoryProvidersGet();
+            if (res.data) providersList = res.data;
+        } catch (error) {
+            console.error("Failed to load storage providers:", error);
+        }
+
         loadMedia();
         pollInterval = setInterval(() => loadMedia(true), 5000);
     });
@@ -176,7 +197,6 @@
     });
 
     function handleDndConsider(e: CustomEvent) {
-        // Only allow reordering within the active list visually
         const activeItems = e.detail.items;
         const inactiveItems = mediaList.filter(m => m.status !== 'active');
         mediaList = [...activeItems, ...inactiveItems];
@@ -240,32 +260,6 @@
             return;
         }
 
-        const config: Record<string, any> = {};
-        if (newMedia.media_type === 'tape') {
-            if (newMedia.enable_encryption && newMedia.encryption_key) {
-                config.encryption_key = newMedia.encryption_key;
-            }
-        } else if (newMedia.media_type === 'hdd') {
-            if (!newMedia.mount_path) {
-                toast.error("Mount path required");
-                return;
-            }
-            config.mount_path = newMedia.mount_path;
-            config.device_uuid = newMedia.device_uuid;
-        } else if (newMedia.media_type === 's3') {
-            if (!newMedia.bucket_name) { toast.error("Bucket name required"); return; }
-            if (!newMedia.endpoint_url) { toast.error("Endpoint URL required"); return; }
-            if (!newMedia.access_key || !newMedia.secret_key) { toast.error("S3 Credentials required"); return; }
-
-            config.bucket_name = newMedia.bucket_name;
-            config.endpoint_url = newMedia.endpoint_url;
-            config.region = newMedia.cloud_region;
-            config.access_key = newMedia.access_key;
-            config.secret_key = newMedia.secret_key;
-            config.encryption_passphrase = newMedia.encryption_passphrase;
-            config.provider = 'S3-Compatible';
-        }
-
         try {
             await registerNewMediaInventoryMediaPost({
                 body: {
@@ -274,7 +268,7 @@
                     generation_tier: newMedia.generation_tier,
                     capacity: newMedia.capacity_gb * 1024 * 1024 * 1024,
                     location: newMedia.location,
-                    config: config
+                    config: dynamicConfig
                 },
                 throwOnError: true
             });
@@ -310,30 +304,27 @@
         }
     }
 
-    async function handleIgnore(identifier: string) {
+    async function handleIgnoreAsset(identifier: string) {
         try {
             await ignoreHardwareNodeSystemHardwareIgnorePost({
-                body: { identifier },
-                throwOnError: true
+                body: { identifier }
             });
-            toast.info("Hardware ignored");
             loadMedia();
         } catch (error) {
-            toast.error("Failed to ignore hardware");
+            toast.error("Failed to ignore asset");
         }
     }
 
     async function handleDelete(mediaId: number) {
-        if (!confirm("Are you sure? This will remove the media and its entire version history from the system index.")) return;
+        if (!confirm("Remove this media from inventory? Data on the physical media will remain, but TapeHoard will lose its index association.")) return;
         try {
             await deleteMediaAssetInventoryMediaMediaIdDelete({
-                path: { media_id: mediaId },
-                throwOnError: true
+                path: { media_id: mediaId }
             });
             toast.success("Media removed from inventory");
             loadMedia();
-        } catch (error: any) {
-            toast.error(error.body?.detail || "Failed to delete media");
+        } catch (error) {
+            toast.error("Failed to delete media");
         }
     }
 
@@ -342,81 +333,63 @@
         if (gb >= 1000) return `${(gb / 1024).toFixed(2)} TB`;
         return `${gb.toFixed(0)} GB`;
     }
-
-    onMount(loadMedia);
 </script>
 
-<svelte:head>
-    <title>Media Inventory - TapeHoard</title>
-</svelte:head>
+{#snippet ConfigIcon(type: string)}
+    {#if type === 'lto_tape'}<CassetteTape size={24} />
+    {:else if type === 'local_hdd'}<HardDrive size={24} />
+    {:else}<Cloud size={24} />{/if}
+{/snippet}
 
 {#snippet mediaRow(media: MediaSchema)}
-    <td class="px-2 py-4 text-center">
+    <td class="px-6 py-4">
+        {#if media.status === 'active' && mediaList.filter(m => m.status === 'active')[0]?.id === media.id}
+             <div class="flex items-center gap-2">
+                <Star size={12} class="text-yellow-500" fill="currentColor" />
+                <span class="text-[10px] font-black text-yellow-500/80 uppercase tracking-tighter">Priority 1</span>
+            </div>
+        {:else}
+            <span class="text-[10px] font-bold text-text-secondary opacity-20 mono">#{media.priority_index}</span>
+        {/if}
+    </td>
+    <td class="px-2 py-4">
         <div class="flex justify-center">
             {#if media.is_online}
                 {#if media.is_identified}
-                    <div class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)] animate-pulse" title="Online & Verified"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]" title="Hardware Verified & Online"></div>
                 {:else}
                     <div class="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.6)] animate-pulse" title="Hardware Present but Uninitialized"></div>
                 {/if}
             {:else}
-                <div class="w-2.5 h-2.5 rounded-full bg-white/5 border border-white/10" title="Offline"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-text-secondary/10 border border-text-secondary/20" title="Offline"></div>
             {/if}
         </div>
     </td>
     <td class="px-6 py-4">
-        <div class="flex items-center gap-3">
-            <div
-                class={cn(
-                    "p-1.5 rounded border transition-all shrink-0",
-                    mediaList.indexOf(mediaList.find(m => m.id === media.id)!) === 0 && media.status === 'active'
-                        ? "bg-yellow-500/10 border-yellow-500/40 text-yellow-500"
-                        : "bg-transparent border-transparent text-text-secondary opacity-0"
-                )}
-            >
-                <Star size={14} fill={mediaList.indexOf(mediaList.find(m => m.id === media.id)!) === 0 ? "currentColor" : "none"} />
-            </div>
-            <div class={cn("p-2 rounded-lg shrink-0", media.status === 'failed' ? "bg-error-color/10 text-error-color" : "bg-blue-500/10 text-blue-500")}>
-                {#if media.media_type === 'tape'}<CassetteTape size={18} />{/if}
-                {#if media.media_type === 'hdd'}<HardDrive size={18} />{/if}
-                {#if media.media_type === 's3'}<Cloud size={18} />{/if}
-            </div>
-            <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                    <span class="text-sm font-black text-text-primary mono tracking-tight truncate">{media.identifier}</span>
-                    {#if mediaList.indexOf(mediaList.find(m => m.id === media.id)!) === 0 && media.status === 'active'}
-                        <span class="text-[8px] font-black uppercase bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20">Next Target</span>
-                    {/if}
-                    {#if media.status === 'failed'}
-                        <span class="text-[8px] font-black uppercase bg-error-color/10 text-error-color px-1.5 py-0.5 rounded border border-error-color/20 flex items-center gap-1">
-                            <ShieldAlert size={10} /> CRITICAL FAILURE
-                        </span>
-                    {:else if media.status === 'retired'}
-                        <span class="text-[8px] font-black uppercase bg-bg-tertiary text-text-secondary px-1.5 py-0.5 rounded border border-border-color">RETIRED</span>
-                    {/if}
-                </div>
-                <div class="mt-1 flex flex-col gap-1">
-                    {#if media.media_type === 'hdd' && media.config?.mount_path}
-                        <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
-                            <Monitor size={10} /> {media.config.mount_path}
-                        </div>
-                    {:else if media.media_type === 's3' && media.config?.bucket_name}
-                        <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
-                            <Globe size={10} /> {media.config.bucket_name}
-                        </div>
-                    {/if}
-                    <div class="flex gap-2 mt-0.5">
-                        {#if media.config?.encryption_key || media.config?.encryption_passphrase}
-                            <span class="text-[8px] font-black uppercase tracking-tighter text-blue-400 bg-blue-500/10 px-1 rounded flex items-center gap-1 border border-blue-500/20">
-                                <ShieldCheck size={8} /> ENCRYPTED
-                            </span>
-                        {/if}
-                        {#if media.is_online && !media.is_identified && media.status === 'active'}
-                            <span class="text-[8px] font-black uppercase tracking-tighter text-orange-400 bg-orange-500/10 px-1 rounded flex items-center gap-1 border border-orange-500/20">
-                                <AlertCircle size={8} /> UNINITIALIZED
-                            </span>
-                        {/if}
+        <div class="flex flex-col min-w-0">
+            <span class="text-xs font-black text-text-primary uppercase tracking-widest truncate">{media.identifier}</span>
+            <div class="mt-1 flex flex-col gap-1">
+                {#if media.media_type === 'local_hdd' && media.config?.mount_path}
+                    <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
+                        <Monitor size={10} /> {media.config.mount_path}
                     </div>
+                {:else if media.media_type === 's3_compat' && media.config?.bucket_name}
+                    <div class="flex items-center gap-1.5 text-text-secondary/50 text-[9px] font-mono truncate">
+                        <Globe size={10} /> {media.config.bucket_name}
+                    </div>
+                {/if}
+                <div class="flex gap-2 mt-0.5">
+                    {#if media.status === 'failed'}
+                        <span class="text-[8px] font-black uppercase tracking-tighter text-error-color bg-error-color/10 px-1 rounded border border-error-color/20">HARDWARE FAILURE</span>
+                    {:else if media.status === 'retired'}
+                        <span class="text-[8px] font-black uppercase tracking-tighter text-text-secondary bg-bg-primary px-1 rounded border border-border-color">RETIRED</span>
+                    {/if}
+
+                    {#if media.config?.encryption_key || media.config?.encryption_passphrase}
+                        <span class="text-[8px] font-black uppercase tracking-tighter text-blue-400 bg-blue-500/10 px-1 rounded flex items-center gap-1 border border-blue-500/20">
+                            <ShieldCheck size={8} /> ENCRYPTED
+                        </span>
+                    {/if}
                 </div>
             </div>
         </div>
@@ -426,14 +399,8 @@
             <span class="text-[10px] font-bold uppercase text-text-secondary">{media.media_type}</span>
             <div class="flex items-center gap-2 mt-1">
                 <span class="text-[10px] font-medium text-text-secondary/40">{media.generation_tier || 'Generic'}</span>
-                {#if media.media_type === 'hdd' && media.config?.device_uuid}
-                    <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2 truncate max-w-[100px]" title={String(media.config.device_uuid)}>
-                        UUID: {String(media.config.device_uuid).split('-')[0]}...
-                    </span>
-                {:else if media.media_type === 's3' && media.config?.provider}
-                    <span class="text-[8px] font-mono text-text-secondary/30 border-l border-border-color pl-2">
-                        {media.config.provider} / {media.config.region}
-                    </span>
+                {#if media.media_type === 'local_hdd' && media.config?.device_uuid}
+                    <span class="text-[9px] font-mono text-text-secondary/30 truncate max-w-[80px]">{media.config.device_uuid}</span>
                 {/if}
             </div>
         </div>
@@ -445,74 +412,51 @@
         </div>
     </td>
     <td class="px-6 py-4">
-        <div class="w-48 space-y-1.5">
-            <div class="flex justify-between text-[9px] font-black mono text-text-secondary uppercase">
-                <span>{formatSize(media.bytes_used)}</span>
-                <span class="opacity-40">/ {formatSize(media.capacity)}</span>
+        <div class="flex flex-col w-32 gap-1.5">
+            <div class="flex justify-between items-end text-[10px]">
+                <span class="font-black text-text-primary mono">{formatSize(media.bytes_used)}</span>
+                <span class="text-text-secondary opacity-40 font-bold tracking-tighter uppercase">{Math.round((media.bytes_used / media.capacity) * 100)}%</span>
             </div>
-            <div class="w-full bg-bg-primary h-1.5 rounded-full border border-border-color overflow-hidden">
-                <div class={cn("h-full transition-all duration-1000", media.status === 'failed' ? "bg-error-color" : "bg-blue-500")} style="width: {(media.bytes_used / media.capacity) * 100}%"></div>
+            <div class="h-1.5 bg-bg-primary rounded-full overflow-hidden border border-border-color/30 flex">
+                <div class="h-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]" style="width: {(media.bytes_used / media.capacity) * 100}%"></div>
             </div>
-            {#if media.media_type === 'hdd' && media.host_total_bytes}
-                <div class="pt-1">
-                    <div class="flex justify-between text-[8px] font-bold text-text-secondary/40 uppercase tracking-tighter">
-                        <span>System Total</span>
-                        <span>{Math.round(((media.host_total_bytes - (media.host_free_bytes ?? 0)) / media.host_total_bytes) * 100)}% Used</span>
-                    </div>
-                    <div class="w-full bg-bg-primary/30 h-1 mt-0.5 rounded-full overflow-hidden flex">
-                        <div class="bg-blue-500/20 h-full" style="width: {(media.bytes_used / media.host_total_bytes) * 100}%" title="TapeHoard Data"></div>
-                        <div class="bg-text-secondary/10 h-full" style="width: {((media.host_total_bytes - (media.host_free_bytes ?? 0) - media.bytes_used) / media.host_total_bytes) * 100}%" title="Other Data"></div>
-                    </div>
-                </div>
-            {/if}
+            <span class="text-[8px] text-text-secondary opacity-30 font-bold uppercase tracking-widest text-right">CAP: {formatSize(media.capacity)}</span>
         </div>
     </td>
     <td class="px-6 py-4 text-right">
-        <div class="flex items-center justify-end gap-2">
-            {#if media.status === 'active'}
-                <Button
-                    variant="secondary"
-                    size="sm"
-                    class="h-9 px-4 font-black uppercase tracking-widest text-[9px] border-action-color/30 text-action-color hover:bg-action-color/10"
-                    onclick={() => handleInitialize(media.id, media.identifier)}
-                    disabled={!media.is_online}
-                >
-                    <RotateCw size={14} class="mr-1.5" /> Initialize
-                </Button>
-                <Button
-                    variant="secondary"
-                    size="sm"
-                    class="h-9 px-4 font-black uppercase tracking-widest text-[9px] border-success-color/30 text-success-color hover:bg-success-color/10"
-                    onclick={() => handleStartBackup(media.id, media.identifier)}
-                    disabled={!media.is_online || !media.is_identified}
-                >
-                    <PlayCircle size={14} class="mr-1.5" /> Archive
-                </Button>
+        <div class="flex justify-end gap-1">
+            {#if media.is_online}
+                {#if !media.is_identified}
+                    <Button variant="outline" size="sm" class="h-8 text-[9px] font-black uppercase tracking-widest border-orange-500/30 text-orange-400 hover:bg-orange-500/10" onclick={() => handleInitialize(media.id, media.identifier)}>Initialize</Button>
+                {:else if media.status === 'active'}
+                    <Button variant="default" size="sm" class="h-8 text-[9px] font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-500" onclick={() => handleStartBackup(media.id, media.identifier)}>Archive</Button>
+                {/if}
             {/if}
-            <Button variant="ghost" size="icon" class="h-9 w-9 hover:bg-white/10" onclick={() => openEdit(media)} title="Edit Configuration"><Edit3 size={16} /></Button>
-            <Button variant="ghost" size="icon" class="h-9 w-9 hover:bg-error-color/10 hover:text-error-color" onclick={() => handleDelete(media.id)} title="Delete Media"><Trash2 size={16} /></Button>
+            <Button variant="ghost" size="icon" class="h-8 w-8 text-text-secondary hover:text-text-primary hover:bg-white/5" onclick={() => openEdit(media)}><Edit3 size={14} /></Button>
+            <Button variant="ghost" size="icon" class="h-8 w-8 text-text-secondary hover:text-error-color hover:bg-error-color/10" onclick={() => handleDelete(media.id)}><Trash2 size={14} /></Button>
         </div>
     </td>
 {/snippet}
 
-<div class="flex flex-col gap-8 animate-in fade-in duration-700">
-    <!-- Header -->
-    <header class="flex justify-between items-center bg-bg-secondary px-8 py-5 rounded-xl border border-border-color shadow-2xl relative overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent pointer-events-none"></div>
-        <div class="relative z-10">
-            <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
-                <CassetteTape class="text-blue-500" size={28} />
-                Media Inventory
-            </h1>
-            <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
-                Physical Asset Management & Archival Targets
-            </p>
+<svelte:head>
+    <title>Media Inventory - TapeHoard</title>
+</svelte:head>
+
+<div class="flex flex-col h-full space-y-12 p-10 animate-in fade-in duration-500 overflow-y-auto">
+    <header class="flex justify-between items-end">
+        <div>
+            <div class="flex items-center gap-3 mb-1">
+                <div class="p-3 bg-action-color/10 rounded-xl text-action-color border border-action-color/20 shadow-inner">
+                    <Library size={32} />
+                </div>
+                <div>
+                    <h1 class="text-4xl font-black text-text-primary uppercase tracking-tighter">Physical Inventory</h1>
+                    <p class="text-[11px] font-bold text-text-secondary uppercase tracking-[0.25em] opacity-60">Fleet Management & Hardware Status</p>
+                </div>
+            </div>
         </div>
 
-        <div class="flex items-center gap-3 z-10">
-            <Button variant="outline" size="icon" class="h-12 w-12 border-border-color" onclick={loadMedia} disabled={loading}>
-                <RotateCw size={20} class={loading ? 'animate-spin' : ''} />
-            </Button>
+        <div class="flex gap-4">
             <Button variant="default" size="lg" class="px-8 h-12 font-black uppercase tracking-widest text-[11px]" onclick={() => showRegisterDialog = true}>
                 <Plus size={18} class="mr-2" /> Register New Media
             </Button>
@@ -534,7 +478,7 @@
                         <Card class="p-5 bg-bg-secondary border-dashed border-2 border-border-color hover:border-action-color/50 transition-all group">
                             <div class="flex items-start gap-4">
                                 <div class="p-3 bg-action-color/10 rounded-xl text-action-color border border-action-color/20">
-                                    {#if asset.type === 'tape'}<CassetteTape size={24} />{:else}<HardDrive size={24} />{/if}
+                                    {@render ConfigIcon(asset.type === 'tape' ? 'lto_tape' : 'local_hdd')}
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <h3 class="text-sm font-black text-text-primary uppercase tracking-tight truncate">{asset.identifier}</h3>
@@ -559,7 +503,7 @@
                                             {#if asset.hardware_info.tape}
                                                 <div class="flex flex-wrap gap-1">
                                                     <span class="text-[7px] font-black bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary uppercase">MFR: {asset.hardware_info.tape.manufacturer}</span>
-                                                    <span class="text-[7px] font-black bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 text-blue-400 uppercase">{asset.hardware_info.tape.generation_label || asset.hardware_info.tape.generation}</span>
+                                                    <span class="text-[7px] font-black bg-blue-500/10 px-1 rounded border border-blue-500/20 text-blue-400 uppercase">{asset.hardware_info.tape.generation_label || asset.hardware_info.tape.generation}</span>
                                                 </div>
                                             {/if}
                                         </div>
@@ -567,20 +511,22 @@
 
                                     <div class="mt-4 flex gap-2">
                                         <Button variant="default" size="sm" class="h-8 text-[9px] font-black uppercase tracking-widest flex-1" onclick={() => {
-                                            newMedia.media_type = asset.type;
+                                            newMedia.media_type = asset.type === 'tape' ? 'lto_tape' : 'local_hdd';
                                             newMedia.identifier = asset.identifier === 'Unrecognized Disk' ? '' : asset.identifier;
+
+                                            // Pre-fill dynamic config
                                             if (asset.type === 'hdd') {
-                                                newMedia.mount_path = asset.mount_path;
-                                                newMedia.device_uuid = asset.device_uuid || '';
+                                                dynamicConfig.mount_path = asset.mount_path;
+                                                dynamicConfig.device_uuid = asset.device_uuid || '';
                                                 if (asset.capacity_bytes) {
                                                     newMedia.capacity_gb = Math.floor(asset.capacity_bytes / (1024 * 1024 * 1024));
                                                 }
                                             } else if (asset.type === 'tape') {
-                                                // Pre-fill Tape details if we can
+                                                dynamicConfig.device_path = asset.device_path;
                                             }
                                             showRegisterDialog = true;
                                         }}>Add Media</Button>
-                                        <Button variant="outline" size="sm" class="h-8 text-[9px] font-black uppercase tracking-widest border-border-color/60 text-text-secondary hover:bg-white/5" onclick={() => handleIgnore(asset.type === 'tape' ? asset.identifier : asset.mount_path)}>Ignore</Button>
+                                        <Button variant="outline" size="sm" class="h-8 text-[9px] font-black uppercase tracking-widest border-border-color/60 text-text-secondary hover:bg-white/5" onclick={() => handleIgnoreAsset(asset.identifier)}>Ignore</Button>
                                     </div>
                                 </div>
                             </div>
@@ -593,7 +539,7 @@
         <!-- INVENTORY SECTION -->
         <section class="space-y-12">
             <!-- Hardware Status -->
-            {#if mediaList.some(m => m.is_online && m.media_type === 'tape')}
+            {#if mediaList.some(m => m.is_online && m.media_type === 'lto_tape')}
                 <div class="space-y-6">
                     <div class="flex items-center gap-3 px-2">
                         <div class="p-1.5 bg-blue-500/10 rounded-md text-blue-500"><Cpu size={16} /></div>
@@ -602,7 +548,7 @@
                     </div>
 
                     <div class="grid grid-cols-1 gap-6">
-                        {#each mediaList.filter(m => m.is_online && m.media_type === 'tape') as media}
+                        {#each mediaList.filter(m => m.is_online && m.media_type === 'lto_tape') as media}
                             {#if media.live_info}
                                 {@const info = media.live_info as any}
                                 <Card class="bg-bg-secondary border-blue-500/30 shadow-2xl relative overflow-hidden">
@@ -769,6 +715,7 @@
                     <table class="w-full border-collapse">
                         <thead>
                             <tr class="bg-bg-tertiary/50 border-b border-border-color">
+                                <th class="px-6 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary">DRAG</th>
                                 <th class="px-6 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary">#</th>
                                 <th class="px-2 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary">Stat</th>
                                 <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary">Identity</th>
@@ -814,6 +761,7 @@
                         <table class="w-full border-collapse">
                             <thead>
                                 <tr class="bg-bg-tertiary/20 border-b border-border-color/40">
+                                    <th class="px-6 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">SORT</th>
                                     <th class="px-6 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">#</th>
                                     <th class="px-2 py-4 w-12 text-center text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Stat</th>
                                     <th class="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Identity</th>
@@ -853,19 +801,17 @@
                 </header>
 
                 <div class="grid grid-cols-3 gap-4">
-                    {#each ['tape', 'hdd', 's3'] as type}
-                        <button class={cn("flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all", newMedia.media_type === type ? "bg-blue-500/10 border-blue-500 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.15)]" : "bg-bg-primary/50 border-border-color text-text-secondary hover:border-text-secondary/30")}
+                    {#each providersList as provider}
+                        <button class={cn("flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all", newMedia.media_type === provider.provider_id ? "bg-blue-500/10 border-blue-500 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.15)]" : "bg-bg-primary/50 border-border-color text-text-secondary hover:border-text-secondary/30")}
                             onclick={() => {
-                                newMedia.media_type = type;
-                                if (type === 'tape') newMedia.location = 'Storage Shelf';
-                                else if (type === 'hdd') newMedia.location = 'Offsite Safe';
-                                else if (type === 's3') newMedia.location = 'Cloud';
+                                newMedia.media_type = provider.provider_id;
+                                if (provider.provider_id === 'lto_tape') newMedia.location = 'Storage Shelf';
+                                else if (provider.provider_id === 'local_hdd') newMedia.location = 'Offsite Safe';
+                                else newMedia.location = 'Cloud';
                             }}
                         >
-                            {#if type === 'tape'}<CassetteTape size={24} />{/if}
-                            {#if type === 'hdd'}<HardDrive size={24} />{/if}
-                            {#if type === 's3'}<Cloud size={24} />{/if}
-                            <span class="text-[10px] font-black uppercase tracking-widest">{type === 's3' ? 'S3-Compatible' : type}</span>
+                            {@render ConfigIcon(provider.provider_id)}
+                            <span class="text-[10px] font-black uppercase tracking-widest">{provider.name}</span>
                         </button>
                     {/each}
                 </div>
@@ -883,108 +829,30 @@
                         </div>
                     </div>
 
-                    {#if newMedia.media_type !== 's3'}
-                        <div class="space-y-2 animate-in fade-in duration-300">
-                            <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="location">Physical Location</label>
-                            <div class="relative">
-                                <MapPin size={16} class="absolute left-4 top-3.5 text-text-secondary opacity-50" />
-                                <Input id="location" bind:value={newMedia.location} placeholder="Cabinet A, Shelf 2" class="h-12 bg-bg-primary/50 pl-12 border-border-color font-mono text-sm" />
-                            </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="location">Physical Location</label>
+                        <div class="relative">
+                            <MapPin size={16} class="absolute left-4 top-3.5 text-text-secondary opacity-50" />
+                            <Input id="location" bind:value={newMedia.location} placeholder="Cabinet A, Shelf 2" class="h-12 bg-bg-primary/50 pl-12 border-border-color font-mono text-sm" />
                         </div>
-                    {/if}
+                    </div>
 
-                    <!-- Type Specific Fields -->
-                    {#if newMedia.media_type === 'tape'}
-                        <div class="space-y-6 animate-in slide-in-from-top-2">
-                            <div class="grid grid-cols-1">
+                    <!-- Dynamic Provider Config Fields -->
+                    {#if activeProvider}
+                        <div class="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
+                            {#each Object.entries(activeProvider.config_schema) as [key, schema]}
+                                {@const field = schema as any}
                                 <div class="space-y-2">
-                                    <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="tier">Generation (LTO-6...)</label>
-                                    <Input id="tier" bind:value={newMedia.generation_tier} class="h-12 bg-bg-primary/50 border-border-color" />
+                                    <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="config-{key}">{field.title || key}</label>
+                                    <Input
+                                        id="config-{key}"
+                                        bind:value={dynamicConfig[key]}
+                                        placeholder={field.description || ""}
+                                        type={key.includes("key") || key.includes("passphrase") ? "password" : "text"}
+                                        class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm"
+                                    />
                                 </div>
-                            </div>
-
-                            <div class="p-5 bg-bg-tertiary/50 border border-border-color rounded-xl space-y-4">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
-                                        <ShieldCheck size={18} class="text-blue-400" />
-                                        <div class="flex flex-col">
-                                            <span class="text-[11px] font-black uppercase tracking-widest text-text-primary">Hardware LTO Encryption</span>
-                                            <span class="text-[9px] text-text-secondary font-medium uppercase tracking-tighter opacity-50 italic">FIPS 140-2 Level 4 COMPLIANT</span>
-                                        </div>
-                                    </div>
-                                    <input type="checkbox" bind:checked={newMedia.enable_encryption} class="w-5 h-5 rounded-md border-border-color bg-bg-primary text-blue-500 focus:ring-blue-500/20" />
-                                </div>
-
-                                {#if newMedia.enable_encryption}
-                                    <div class="space-y-2 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <label for="enc_key" class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1">256-bit HEX Encryption Key (32 Bytes)</label>
-                                        <Input
-                                            id="enc_key"
-                                            type="password"
-                                            bind:value={newMedia.encryption_key}
-                                            placeholder="00112233445566778899aabbccddeeff..."
-                                            class="h-11 bg-bg-primary/80 border-blue-500/30 font-mono text-xs focus:border-blue-500/60"
-                                        />
-                                        <p class="text-[9px] text-text-secondary leading-relaxed opacity-60">WARNING: If you lose this key, the data on this tape is permanently unrecoverable. TapeHoard does not store keys in plain-text.</p>
-                                    </div>
-                                {/if}
-                            </div>
-                        </div>
-                    {:else if newMedia.media_type === 'hdd'}
-                        <div class="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2">
-                            <div class="space-y-2">
-                                <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="mount">System Mount Point</label>
-                                <Input id="mount" bind:value={newMedia.mount_path} placeholder="/mnt/backup" class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
-                            </div>
-                            <div class="space-y-2">
-                                <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="tier">Drive Tier (SATA...)</label>
-                                <Input id="tier" bind:value={newMedia.generation_tier} class="h-12 bg-bg-primary/50 border-border-color" />
-                            </div>
-                        </div>
-                    {:else if newMedia.media_type === 's3'}
-                        <div class="space-y-6 animate-in slide-in-from-top-2">
-                            <div class="grid grid-cols-2 gap-6">
-                                <div class="space-y-2">
-                                    <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="endpoint">Endpoint URL</label>
-                                    <Input id="endpoint" bind:value={newMedia.endpoint_url} placeholder="https://s3.amazonaws.com" class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
-                                </div>
-                                <div class="space-y-2">
-                                    <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="bucket">Bucket Name</label>
-                                    <Input id="bucket" bind:value={newMedia.bucket_name} placeholder="my-backups" class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
-                                </div>
-                            </div>
-
-                            <div class="p-5 bg-bg-tertiary/50 border border-border-color rounded-xl space-y-4">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <ShieldCheck size={18} class="text-blue-400" />
-                                    <div class="flex flex-col">
-                                        <span class="text-[11px] font-black uppercase tracking-widest text-text-primary">S3 Security Configuration</span>
-                                        <span class="text-[9px] text-text-secondary font-medium uppercase tracking-tighter opacity-50 italic">HMAC Credentials & Client-Side GCM Encryption</span>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div class="space-y-2">
-                                        <label for="acc_key" class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1">Access Key</label>
-                                        <Input id="acc_key" type="password" bind:value={newMedia.access_key} class="h-10 bg-bg-primary/80 border-border-color/50 font-mono text-xs" />
-                                    </div>
-                                    <div class="space-y-2">
-                                        <label for="sec_key" class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1">Secret Key</label>
-                                        <Input id="sec_key" type="password" bind:value={newMedia.secret_key} class="h-10 bg-bg-primary/80 border-border-color/50 font-mono text-xs" />
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-4 pt-2 border-t border-border-color/30">
-                                    <div class="space-y-2">
-                                        <label for="cloud_region" class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1">Region (Optional)</label>
-                                        <Input id="cloud_region" bind:value={newMedia.cloud_region} placeholder="us-east-1" class="h-10 bg-bg-primary/80 border-border-color/50 font-mono text-xs" />
-                                    </div>
-                                    <div class="space-y-2">
-                                        <label for="cloud_pass" class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1">Encryption Passphrase</label>
-                                        <Input id="cloud_pass" type="password" bind:value={newMedia.encryption_passphrase} placeholder="Keep this safe!" class="h-10 bg-bg-primary/80 border-blue-500/30 font-mono text-xs focus:border-blue-500/60" />
-                                    </div>
-                                </div>
-                            </div>
+                            {/each}
                         </div>
                     {/if}
                 </div>
@@ -1015,9 +883,7 @@
                 <div class="space-y-6">
                     <div class="p-4 bg-bg-primary/50 border border-border-color rounded-xl flex items-center gap-4">
                         <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500 shrink-0">
-                            {#if editingMedia.media_type === 'tape'}<CassetteTape size={20} />{/if}
-                            {#if editingMedia.media_type === 'hdd'}<HardDrive size={20} />{/if}
-                            {#if editingMedia.media_type === 's3'}<Cloud size={20} />{/if}
+                            {@render ConfigIcon(editingMedia.media_type)}
                         </div>
                         <div>
                             <span class="text-xs font-black text-text-primary uppercase tracking-widest">{editingMedia.identifier}</span>
@@ -1025,29 +891,27 @@
                         </div>
                     </div>
 
-                    {#if editingMedia.media_type !== 's3'}
-                        <div class="space-y-2 animate-in fade-in duration-300">
-                            <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="edit-location">Physical Location</label>
-                            <Input id="edit-location" bind:value={editingMedia.location} class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
-                        </div>
-                    {/if}
+                    <div class="space-y-2 animate-in fade-in duration-300">
+                        <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="edit-location">Physical Location</label>
+                        <Input id="edit-location" bind:value={editingMedia.location} class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                    </div>
 
-                    {#if editingMedia.media_type === 'tape'}
-                        <div class="space-y-2 opacity-50">
-                            <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="edit-hardware">LTO Hardware</label>
-                            <div id="edit-hardware" class="h-12 bg-bg-primary/30 border border-border-color rounded-xl px-4 flex items-center text-xs font-mono text-text-secondary italic">
-                                Using globally configured drive(s)
-                            </div>
-                        </div>
-                    {:else if editingMedia.media_type === 'hdd'}
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="edit-mount">System Mount Point</label>
-                            <Input id="edit-mount" bind:value={editingMedia.config.mount_path} class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
-                        </div>
-                    {:else if editingMedia.media_type === 's3'}
-                         <div class="space-y-2">
-                            <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="edit-endpoint">Endpoint URL</label>
-                            <Input id="edit-endpoint" bind:value={editingMedia.config.endpoint_url} class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                    <!-- Dynamic Config for Edit -->
+                    {#if providersList.find(p => p.provider_id === editingMedia?.media_type)}
+                        {@const schema = providersList.find(p => p.provider_id === editingMedia?.media_type)?.config_schema || {}}
+                        <div class="grid grid-cols-1 gap-4">
+                            {#each Object.entries(schema) as [key, entry]}
+                                {@const field = entry as any}
+                                <div class="space-y-2">
+                                    <label class="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1" for="edit-config-{key}">{field.title || key}</label>
+                                    <Input
+                                        id="edit-config-{key}"
+                                        bind:value={editingMedia.config[key]}
+                                        type={key.includes("key") || key.includes("passphrase") ? "password" : "text"}
+                                        class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm"
+                                    />
+                                </div>
+                            {/each}
                         </div>
                     {/if}
 

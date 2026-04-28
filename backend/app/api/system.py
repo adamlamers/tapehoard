@@ -640,7 +640,7 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
                 from app.providers.tape import LTOProvider
 
                 tape_provider = LTOProvider(device_path=dev_path)
-                state = tape_provider.get_live_state()
+                state = tape_provider.get_live_info()
 
                 if state["online"]:
                     barcode = state["identity"]
