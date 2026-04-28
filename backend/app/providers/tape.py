@@ -243,7 +243,7 @@ class LTOProvider(AbstractStorageProvider):
         return {
             "online": LTOProvider._lkg_state[self.device_path]["online"],
             "drive": drive,
-            "mam": mam,
+            "tape": mam,
             "identity": identity,
         }
 

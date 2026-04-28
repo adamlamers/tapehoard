@@ -444,28 +444,27 @@
     <title>Media Inventory - TapeHoard</title>
 </svelte:head>
 
-<div class="flex flex-col h-full space-y-12 p-10 animate-in fade-in duration-500 overflow-y-auto">
-    <header class="flex justify-between items-end">
-        <div>
-            <div class="flex items-center gap-3 mb-1">
-                <div class="p-3 bg-action-color/10 rounded-xl text-action-color border border-action-color/20 shadow-inner">
-                    <Library size={32} />
-                </div>
-                <div>
-                    <h1 class="text-4xl font-black text-text-primary uppercase tracking-tighter">Physical Inventory</h1>
-                    <p class="text-[11px] font-bold text-text-secondary uppercase tracking-[0.25em] opacity-60">Fleet Management & Hardware Status</p>
-                </div>
-            </div>
+<div class="flex flex-col h-full gap-8 animate-in fade-in duration-700 overflow-y-auto p-1">
+    <header class="flex justify-between items-center bg-bg-secondary px-8 py-6 rounded-xl border border-border-color shadow-2xl relative overflow-hidden shrink-0">
+        <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent pointer-events-none"></div>
+        <div class="relative z-10">
+            <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
+                <Library class="text-blue-500" size={28} />
+                Physical Inventory
+            </h1>
+            <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
+                Fleet Management & Hardware Status
+            </p>
         </div>
 
-        <div class="flex gap-4">
-            <Button variant="default" size="lg" class="px-8 h-12 font-black uppercase tracking-widest text-[11px]" onclick={() => showRegisterDialog = true}>
+        <div class="flex items-center gap-4 relative z-10">
+            <Button variant="default" size="lg" class="px-8 h-12 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/10" onclick={() => showRegisterDialog = true}>
                 <Plus size={18} class="mr-2" /> Register New Media
             </Button>
         </div>
     </header>
 
-    <div class="space-y-16">
+    <div class="space-y-12">
         <!-- DISCOVERED HARDWARE SECTION -->
         {#if filteredDiscoveredAssets.length > 0}
             <section class="space-y-6">
