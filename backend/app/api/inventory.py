@@ -564,7 +564,8 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
                      FROM file_versions fv
                      JOIN storage_media sm ON sm.id = fv.media_id
                      JOIN filesystem_state fs2 ON fs2.id = fv.filesystem_state_id
-                     WHERE (fs2.file_path = :r OR fs2.file_path LIKE :prefix)) as media_list
+                     WHERE (fs2.file_path = :r OR fs2.file_path LIKE :prefix)) as media_list,
+                    SUM(CASE WHEN EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = fs.id) THEN 1 ELSE 0 END) as selected_count
                 FROM filesystem_state fs
                 WHERE (fs.file_path = :r OR fs.file_path LIKE :prefix)
             """)
@@ -575,10 +576,12 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
             total = 0
             protected = 0
             media_list = []
+            selected_count = 0
             if stats:
                 total = stats[0] or 0
                 protected = stats[1] or 0
                 media_list = stats[2].split(",") if stats[2] else []
+                selected_count = stats[3] or 0
 
             if protected > 0:
                 results.append(
@@ -587,8 +590,12 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
                         "path": root,
                         "type": "directory",
                         "vulnerable": (protected < total),
-                        "selected": (protected == total),
-                        "indeterminate": (protected > 0 and protected < total),
+                        "selected": (
+                            selected_count > 0 and selected_count == protected
+                        ),
+                        "indeterminate": (
+                            selected_count > 0 and selected_count < protected
+                        ),
                         "media": media_list,
                     }
                 )
@@ -606,7 +613,8 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
              FROM file_versions fv
              JOIN storage_media sm ON sm.id = fv.media_id
              JOIN filesystem_state fs2 ON fs2.id = fv.filesystem_state_id
-             WHERE fs2.file_path LIKE :prefix || SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) || '/%') as media_list
+             WHERE fs2.file_path LIKE :prefix || SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) || '/%') as media_list,
+            SUM(CASE WHEN EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = filesystem_state.id) THEN 1 ELSE 0 END) as selected_count
         FROM filesystem_state
         WHERE file_path LIKE :prefix_wildcard
         AND file_path != :prefix
@@ -625,7 +633,8 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
             (SELECT GROUP_CONCAT(sm.identifier)
              FROM file_versions fv
              JOIN storage_media sm ON sm.id = fv.media_id
-             WHERE fv.filesystem_state_id = fs.id) as media_list
+             WHERE fv.filesystem_state_id = fs.id) as media_list,
+            EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = fs.id) as is_selected
         FROM filesystem_state fs
         WHERE fs.file_path LIKE :prefix_wildcard
         AND fs.file_path != :prefix
@@ -644,6 +653,7 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
         total = d[1] or 0
         protected = d[2] or 0
         media_list = d[3].split(",") if d[3] else []
+        selected_count = d[4] or 0
 
         # Only show directories that have at least one protected file
         if protected == 0:
@@ -656,8 +666,8 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
                 "path": full_dir_path,
                 "type": "directory",
                 "vulnerable": (protected < total),
-                "selected": (protected == total),
-                "indeterminate": (protected > 0 and protected < total),
+                "selected": (selected_count > 0 and selected_count == protected),
+                "indeterminate": (selected_count > 0 and selected_count < protected),
                 "media": media_list,
             }
         )
@@ -675,7 +685,7 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
                 "size": f[2],
                 "mtime": datetime.fromtimestamp(f[3], tz=timezone.utc),
                 "vulnerable": False,
-                "selected": True,
+                "selected": bool(f[6]),
                 "media": f[5].split(",") if f[5] else [],
             }
         )
@@ -706,7 +716,8 @@ def search_archive_index(
             (SELECT GROUP_CONCAT(sm.identifier)
              FROM file_versions fv
              JOIN storage_media sm ON sm.id = fv.media_id
-             WHERE fv.filesystem_state_id = fs.id) as media_list
+             WHERE fv.filesystem_state_id = fs.id) as media_list,
+            EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = fs.id) as is_selected
         FROM filesystem_fts fts
         JOIN filesystem_state fs ON fs.id = fts.rowid
         WHERE filesystem_fts MATCH :query
@@ -725,7 +736,7 @@ def search_archive_index(
             "size": r[2],
             "mtime": datetime.fromtimestamp(r[3], tz=timezone.utc),
             "vulnerable": False,
-            "selected": True,
+            "selected": bool(r[6]),
             "media": r[5].split(",") if r[5] else [],
         }
         for r in rows

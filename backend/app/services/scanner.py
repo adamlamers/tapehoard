@@ -1,13 +1,15 @@
-import os
-import hashlib
-import time
-import psutil
-import threading
 import concurrent.futures
+import hashlib
+import os
+import threading
+import time
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
+import psutil
 from loguru import logger
 from sqlalchemy.orm import Session
+
 from app.db import models
 from app.db.database import SessionLocal
 
@@ -457,7 +459,7 @@ class ScannerService:
                                     99.9,
                                     (self.files_hashed / max(total_pending, 1)) * 100,
                                 )
-                                status_msg = f"Hashing Fleet: {self.files_hashed}/{total_pending} objects processed [{self._format_throughput()}]"
+                                status_msg = f"Hashing: {self.files_hashed}/{total_pending} objects processed [{self._format_throughput()}]"
                                 if self.is_throttled:
                                     status_msg += " (THROTTLED)"
                                 JobManager.update_job(
