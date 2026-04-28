@@ -37,12 +37,22 @@ def get_source_roots(db_session: Session) -> List[str]:
     """Retrieves the list of configured root paths from system settings."""
     setting = (
         db_session.query(models.SystemSetting)
-        .filter(models.SystemSetting.key == "scan_paths")
+        .filter(models.SystemSetting.key == "source_roots")
         .first()
     )
     if not setting:
-        return []
-    return json.loads(setting.value)
+        # Fallback to scan_paths for legacy compatibility
+        setting = (
+            db_session.query(models.SystemSetting)
+            .filter(models.SystemSetting.key == "scan_paths")
+            .first()
+        )
+        if not setting:
+            return []
+    try:
+        return json.loads(setting.value)
+    except Exception:
+        return [setting.value] if setting.value else []
 
 
 @router.get("/media", response_model=List[MediaSchema])
@@ -517,37 +527,80 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
 def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_db)):
     """Browses the archived file index at a specific path."""
     if path == "ROOT":
-        query_path = ""
-    else:
-        query_path = path if path.endswith("/") else path + "/"
+        # Root level: show source roots that have at least one protected file
+        source_roots = get_source_roots(db_session)
+        results = []
+        for root in source_roots:
+            # Check if this root contains ANY protected file
+            prot_check = text("""
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) THEN 1 ELSE 0 END) as protected,
+                    (SELECT GROUP_CONCAT(DISTINCT sm.identifier)
+                     FROM file_versions fv
+                     JOIN storage_media sm ON sm.id = fv.media_id
+                     JOIN filesystem_state fs2 ON fs2.id = fv.filesystem_state_id
+                     WHERE (fs2.file_path = :r OR fs2.file_path LIKE :prefix)) as media_list
+                FROM filesystem_state fs
+                WHERE (fs.file_path = :r OR fs.file_path LIKE :prefix)
+            """)
+            stats = db_session.execute(
+                prot_check, {"r": root, "prefix": f"{root}/%"}
+            ).fetchone()
+            total = stats[0] or 0
+            protected = stats[1] or 0
+            media_list = stats[2].split(",") if stats[2] else []
+
+            if protected > 0:
+                results.append(
+                    {
+                        "name": root,
+                        "path": root,
+                        "type": "directory",
+                        "vulnerable": (protected < total),
+                        "selected": (protected == total),
+                        "indeterminate": (protected > 0 and protected < total),
+                        "media": media_list,
+                    }
+                )
+        return results
+
+    query_path = path if path.endswith("/") else path + "/"
 
     # Find directories and their protection stats (Optimized: Single Pass)
     dir_sql = text("""
         SELECT
             SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) as dir_name,
             COUNT(*) as total,
-            SUM(CASE WHEN EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = filesystem_state.id) THEN 1 ELSE 0 END) as protected
+            SUM(CASE WHEN EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = filesystem_state.id) THEN 1 ELSE 0 END) as protected,
+            (SELECT GROUP_CONCAT(DISTINCT sm.identifier)
+             FROM file_versions fv
+             JOIN storage_media sm ON sm.id = fv.media_id
+             JOIN filesystem_state fs2 ON fs2.id = fv.filesystem_state_id
+             WHERE fs2.file_path LIKE :prefix || SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) || '/%') as media_list
         FROM filesystem_state
         WHERE file_path LIKE :prefix_wildcard
         AND file_path != :prefix
         AND INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') > 0
-        AND is_ignored = 0
         GROUP BY dir_name
     """)
     dirs = db_session.execute(
         dir_sql, {"prefix": query_path, "prefix_wildcard": f"{query_path}%"}
     ).fetchall()
 
-    # Find files (immediate children)
+    # Find files (immediate children) with their media locations
     file_sql = text("""
         SELECT
-            id, file_path, size, mtime,
-            EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = filesystem_state.id) as has_version
-        FROM filesystem_state
-        WHERE file_path LIKE :prefix_wildcard
-        AND file_path != :prefix
-        AND INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') = 0
-        AND is_ignored = 0
+            fs.id, fs.file_path, fs.size, fs.mtime,
+            EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) as has_version,
+            (SELECT GROUP_CONCAT(sm.identifier)
+             FROM file_versions fv
+             JOIN storage_media sm ON sm.id = fv.media_id
+             WHERE fv.filesystem_state_id = fs.id) as media_list
+        FROM filesystem_state fs
+        WHERE fs.file_path LIKE :prefix_wildcard
+        AND fs.file_path != :prefix
+        AND INSTR(SUBSTR(fs.file_path, LENGTH(:prefix) + 1), '/') = 0
     """)
     files = db_session.execute(
         file_sql, {"prefix": query_path, "prefix_wildcard": f"{query_path}%"}
@@ -558,22 +611,33 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
     for d in dirs:
         if not d[0] or d[0] == "/":
             continue
-        full_dir_path = query_path + d[0]
+
         total = d[1] or 0
         protected = d[2] or 0
+        media_list = d[3].split(",") if d[3] else []
 
+        # Only show directories that have at least one protected file
+        if protected == 0:
+            continue
+
+        full_dir_path = query_path + d[0]
         results.append(
             {
                 "name": d[0],
                 "path": full_dir_path,
                 "type": "directory",
-                "vulnerable": (total > 0 and protected < total),
-                "selected": (total > 0 and protected == total),
-                "indeterminate": (total > 0 and protected > 0 and protected < total),
+                "vulnerable": (protected < total),
+                "selected": (protected == total),
+                "indeterminate": (protected > 0 and protected < total),
+                "media": media_list,
             }
         )
 
     for f in files:
+        # Only show files that actually have at least one version on media
+        if not f[4]:  # f[4] is has_version
+            continue
+
         results.append(
             {
                 "name": os.path.basename(f[1]),
@@ -581,8 +645,9 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
                 "type": "file",
                 "size": f[2],
                 "mtime": datetime.fromtimestamp(f[3], tz=timezone.utc),
-                "vulnerable": not f[4],
-                "selected": f[4],
+                "vulnerable": False,
+                "selected": True,
+                "media": f[5].split(",") if f[5] else [],
             }
         )
 
@@ -608,11 +673,14 @@ def search_archive_index(
         f"""
         SELECT
             fs.id, fs.file_path, fs.size, fs.mtime,
-            EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) as has_version
+            EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) as has_version,
+            (SELECT GROUP_CONCAT(sm.identifier)
+             FROM file_versions fv
+             JOIN storage_media sm ON sm.id = fv.media_id
+             WHERE fv.filesystem_state_id = fs.id) as media_list
         FROM filesystem_fts fts
         JOIN filesystem_state fs ON fs.id = fts.rowid
         WHERE filesystem_fts MATCH :query
-        AND fs.is_ignored = 0
         {path_filter}
         ORDER BY rank
         LIMIT 100
@@ -627,10 +695,12 @@ def search_archive_index(
             "type": "file",
             "size": r[2],
             "mtime": datetime.fromtimestamp(r[3], tz=timezone.utc),
-            "vulnerable": not r[4],
-            "selected": r[4],
+            "vulnerable": False,
+            "selected": True,
+            "media": r[5].split(",") if r[5] else [],
         }
         for r in rows
+        if r[4]  # Only show if has_version is True
     ]
 
 
@@ -638,22 +708,40 @@ def search_archive_index(
 def get_archive_tree(path: Optional[str] = None, db_session: Session = Depends(get_db)):
     """Returns a recursive tree view of the virtual archive index."""
     if path is None or path == "ROOT":
-        query_path = ""
-    else:
-        query_path = path if path.endswith("/") else path + "/"
+        # Root level: show source roots that have at least one protected file
+        source_roots = get_source_roots(db_session)
+        results = []
+        for root in source_roots:
+            # Check if this root contains ANY protected file
+            prot_check = text("""
+                SELECT 1 FROM filesystem_state fs
+                WHERE (fs.file_path = :r OR fs.file_path LIKE :prefix)
+                AND EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id)
+                LIMIT 1
+            """)
+            has_prot = db_session.execute(
+                prot_check, {"r": root, "prefix": f"{root}/%"}
+            ).fetchone()
+            if has_prot:
+                results.append(TreeNodeSchema(name=root, path=root, has_children=True))
+        return results
 
-    # Find directories (immediate children)
+    query_path = path if path.endswith("/") else path + "/"
+
+    # Find subdirectories that contain at least one protected file (ignoring current is_ignored state)
     dir_sql = text("""
         SELECT DISTINCT
             SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) as dir_name
-        FROM filesystem_state
+        FROM filesystem_state fs
         WHERE file_path LIKE :prefix_wildcard
         AND file_path != :prefix
         AND INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') > 0
-        AND is_ignored = 0
+        AND EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id)
     """)
+
+    path_prefix = query_path
     dirs = db_session.execute(
-        dir_sql, {"prefix": query_path, "prefix_wildcard": f"{query_path}%"}
+        dir_sql, {"prefix": path_prefix, "prefix_wildcard": f"{path_prefix}%"}
     ).fetchall()
 
     results = []

@@ -86,9 +86,19 @@
                 return `${size.toFixed(1)} ${units[unitIndex]}`;
         }
 
-        function formatDate(mtime?: number) {
+        function formatDate(mtime?: number | string | null) {
                 if (!mtime) return "--";
-                const date = new Date(mtime * 1000);
+
+                let date: Date;
+                if (typeof mtime === "number") {
+                        date = new Date(mtime * 1000);
+                } else {
+                        // Handle ISO string from backend
+                        date = new Date(mtime);
+                }
+
+                if (isNaN(date.getTime())) return "Invalid Date";
+
                 return date.toLocaleDateString(undefined, {
                         year: "numeric",
                         month: "short",

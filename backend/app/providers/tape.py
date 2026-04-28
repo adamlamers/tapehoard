@@ -34,6 +34,9 @@ class LTOProvider(AbstractStorageProvider):
 
     def get_drive_info(self) -> dict:
         """Retrieves vendor, model, and firmware version of the tape drive."""
+        if not os.path.exists(self.device_path):
+            return {}
+
         # Return LKG if already populated (drive hardware never changes)
         if LTOProvider._lkg_state[self.device_path]["drive"]:
             return LTOProvider._lkg_state[self.device_path]["drive"]
@@ -62,6 +65,9 @@ class LTOProvider(AbstractStorageProvider):
 
     def get_mam_info(self, force: bool = False) -> dict:
         """Reads Media Auxiliary Memory (MAM) attributes using sg_read_attr --raw."""
+        if not os.path.exists(self.device_path):
+            return {}
+
         # Throttle MAM reads to once every 2 seconds unless forced
         now = time.time()
         if not force and (
@@ -307,6 +313,9 @@ class LTOProvider(AbstractStorageProvider):
 
     def _setup_encryption(self):
         """Configures hardware encryption on the drive using stenc"""
+        if not os.path.exists(self.device_path):
+            return
+
         if not self.encryption_key:
             try:
                 cmd = ["stenc", "-f", self.device_path, "--off"]

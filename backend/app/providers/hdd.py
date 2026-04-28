@@ -37,7 +37,7 @@ class OfflineHDDProvider(AbstractStorageProvider):
 
         return True
 
-    def identify_media(self) -> Optional[str]:
+    def identify_media(self, allow_intrusive=True) -> Optional[str]:
         """Reads the .tapehoard_id file from the root of the HDD."""
         id_file_path = os.path.join(self.mount_base, ".tapehoard_id")
         logger.info(f"HDD Provider: Checking for ID file at: {id_file_path}")
