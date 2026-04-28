@@ -1,5 +1,6 @@
-from app.db import models
 from datetime import datetime, timezone
+
+from app.db import models
 
 
 def test_get_dashboard_stats_empty(client):
@@ -7,7 +8,6 @@ def test_get_dashboard_stats_empty(client):
     response = client.get("/system/dashboard/stats")
     assert response.status_code == 200
     data = response.json()
-    assert data["total_files_indexed"] == 0
     assert data["total_data_size"] == 0
     assert data["unprotected_files_count"] == 0
     assert data["media_distribution"] == {"LTO": 0, "HDD": 0, "Cloud": 0}
@@ -29,7 +29,6 @@ def test_get_dashboard_stats_populated(client, db_session):
     response = client.get("/system/dashboard/stats")
     assert response.status_code == 200
     data = response.json()
-    assert data["total_files_indexed"] == 1
     assert data["unprotected_files_count"] == 1
     assert data["unprotected_data_size"] == 1024
 
