@@ -77,7 +77,7 @@
                 <PieChart class="text-blue-500" size={28} />
                 Insights
             </h1>
-            <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
+            <p class="text-xs font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
                 System Analytics & Statistics
             </p>
         </div>
@@ -97,15 +97,15 @@
             <!-- Global Metrics -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <Card class="p-6 bg-bg-secondary border-border-color flex flex-col gap-2">
-                    <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-60">Total Tracked</span>
+                    <span class="text-3xs font-black uppercase tracking-widest text-text-secondary opacity-60">Total Tracked</span>
                     <span class="text-2xl font-black text-text-primary tabular-nums">{formatSize(insights.summary.total_bytes)}</span>
                 </Card>
                 <Card class="p-6 bg-bg-secondary border-border-color flex flex-col gap-2">
-                    <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-60">Replication Status</span>
+                    <span class="text-3xs font-black uppercase tracking-widest text-text-secondary opacity-60">Replication Status</span>
                     <span class="text-2xl font-black text-success-color tabular-nums">{((insights.summary.protected_bytes / (insights.summary.total_bytes || 1)) * 100).toFixed(1)}%</span>
                 </Card>
                 <Card class="p-6 bg-bg-secondary border-border-color flex flex-col gap-2">
-                    <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-60">Vulnerable Data</span>
+                    <span class="text-3xs font-black uppercase tracking-widest text-text-secondary opacity-60">Vulnerable Data</span>
                     <span class="text-2xl font-black text-error-color tabular-nums">{formatSize(insights.summary.vulnerable_bytes)}</span>
                 </Card>
             </div>
@@ -117,7 +117,7 @@
                         <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500"><LayoutGrid size={20} /></div>
                         <div>
                             <h3 class="text-sm font-black uppercase tracking-tight text-text-primary">Source Protection Status</h3>
-                            <p class="text-[10px] text-text-secondary font-bold uppercase tracking-widest opacity-50">Archive coverage per defined source root</p>
+                            <p class="text-3xs text-text-secondary font-bold uppercase tracking-widest opacity-50">Archive coverage per defined source root</p>
                         </div>
                     </div>
 
@@ -125,8 +125,8 @@
                         {#each insights.roots as root}
                             <div class="space-y-3 p-4 rounded-xl bg-bg-primary/50 border border-border-color">
                                 <div class="flex justify-between items-end px-1">
-                                    <span class="text-[10px] font-black text-text-primary mono truncate max-w-[70%]">{root.root}</span>
-                                    <span class="text-[10px] font-bold text-text-secondary uppercase">
+                                    <span class="text-3xs font-black text-text-primary mono truncate max-w-[70%]">{root.root}</span>
+                                    <span class="text-3xs font-bold text-text-secondary uppercase">
                                         {((root.protected / (root.protected + root.vulnerable || 1)) * 100).toFixed(1)}%
                                     </span>
                                 </div>
@@ -145,7 +145,7 @@
                         <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500"><Clock size={20} /></div>
                         <div>
                             <h3 class="text-sm font-black uppercase tracking-tight text-text-primary">File Age</h3>
-                            <p class="text-[10px] text-text-secondary font-bold uppercase tracking-widest opacity-50">Data distribution by modified age</p>
+                            <p class="text-3xs text-text-secondary font-bold uppercase tracking-widest opacity-50">Data distribution by modified age</p>
                         </div>
                     </div>
 
@@ -153,7 +153,7 @@
                         {#each insights.aging as age}
                             <div class="p-4 rounded-xl bg-bg-primary/50 border border-border-color flex items-center justify-between group">
                                 <div class="flex items-center gap-4">
-                                    <span class="text-[11px] font-black uppercase tracking-widest text-text-primary">{age.bucket}</span>
+                                    <span class="text-2xs font-black uppercase tracking-widest text-text-primary">{age.bucket}</span>
                                 </div>
                                 <div class="text-right">
                                     <span class="text-xs font-black text-text-primary mono">{formatSize(age.size)}</span>
@@ -169,14 +169,14 @@
                         <div class="p-2 bg-success-color/10 rounded-lg text-success-color"><CheckCircle2 size={20} /></div>
                         <div>
                             <h3 class="text-sm font-black uppercase tracking-tight text-text-primary">Media Redundancy</h3>
-                            <p class="text-[10px] text-text-secondary font-bold uppercase tracking-widest opacity-50">Physical copy distribution</p>
+                            <p class="text-3xs text-text-secondary font-bold uppercase tracking-widest opacity-50">Physical copy distribution</p>
                         </div>
                     </div>
 
                     <div class="space-y-4">
                         {#each insights.redundancy as red}
                             <div class="p-4 rounded-xl border flex items-center justify-between bg-bg-primary/50 border-border-color">
-                                <span class="text-[11px] font-black uppercase tracking-widest text-text-primary">{red.copies} Copies</span>
+                                <span class="text-2xs font-black uppercase tracking-widest text-text-primary">{red.copies} Copies</span>
                                 <span class="text-xs font-black text-text-primary mono">{formatSize(red.size)}</span>
                             </div>
                         {/each}
@@ -189,7 +189,7 @@
                         <div class="p-2 bg-purple-500/10 rounded-lg text-purple-500"><LayoutGrid size={20} /></div>
                         <div>
                             <h3 class="text-sm font-black uppercase tracking-tight text-text-primary">Space by Extension</h3>
-                            <p class="text-[10px] text-text-secondary font-bold uppercase tracking-widest opacity-50">Top storage consumers by file type</p>
+                            <p class="text-3xs text-text-secondary font-bold uppercase tracking-widest opacity-50">Top storage consumers by file type</p>
                         </div>
                     </div>
 
@@ -204,7 +204,7 @@
                         <div class="p-2 bg-emerald-500/10 rounded-lg text-emerald-500"><FolderTree size={20} /></div>
                         <div>
                             <h3 class="text-sm font-black uppercase tracking-tight text-text-primary">Space by Directory</h3>
-                            <p class="text-[10px] text-text-secondary font-bold uppercase tracking-widest opacity-50">Top storage consumers by physical path</p>
+                            <p class="text-3xs text-text-secondary font-bold uppercase tracking-widest opacity-50">Top storage consumers by physical path</p>
                         </div>
                     </div>
 

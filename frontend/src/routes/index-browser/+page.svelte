@@ -259,24 +259,24 @@
 
 <div class="flex flex-col gap-6 h-full overflow-hidden">
     <!-- INTEGRATED HEADER -->
-    <header class="flex justify-between items-center bg-bg-secondary px-8 py-5 rounded-xl border border-border-color shadow-2xl relative overflow-hidden shrink-0">
+    <header class="flex justify-between items-center bg-bg-secondary px-6 py-4 rounded-xl border border-border-color shadow-2xl relative overflow-hidden shrink-0">
         <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent pointer-events-none"></div>
         <div class="relative z-10">
-            <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
-                <Library class="text-blue-500" size={28} />
+            <h1 class="text-xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
+                <Library class="text-blue-500" size={24} />
                 Archive Index
             </h1>
-            <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
+            <p class="text-4xs font-bold uppercase tracking-[0.2em] text-text-secondary mt-1 opacity-80">
                 A view of what is stored where on archive media
             </p>
         </div>
 
         {#if restoreCartItems.length > 0}
-            <div class="flex items-center gap-4 z-10 animate-in fade-in zoom-in duration-300">
-                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary bg-bg-primary px-3 py-1.5 rounded-full border border-border-color">
+            <div class="flex items-center gap-3 z-10 animate-in fade-in zoom-in duration-300">
+                <span class="text-5xs font-black uppercase tracking-widest text-text-secondary bg-bg-primary px-3 py-1.5 rounded-full border border-border-color">
                     {restoreCartItems.length} items in queue
                 </span>
-                <Button variant="default" class="bg-success-color hover:bg-success-color/90 text-white font-black uppercase tracking-widest text-[11px] px-6 h-10 shadow-lg shadow-success-color/20" href="/restores">
+                <Button variant="default" class="bg-success-color hover:bg-success-color/90 text-white font-black uppercase tracking-widest text-4xs px-4 h-9 shadow-lg shadow-success-color/20" href="/restores">
                     Review Recovery Manifest
                 </Button>
             </div>
@@ -288,7 +288,7 @@
         <div class="flex-1 flex flex-col min-h-0 relative min-w-0">
             {#if loading}
                 <div class="absolute inset-0 bg-bg-primary/50 z-50 flex items-center justify-center rounded-lg">
-                    <RotateCw size={32} class="animate-spin text-blue-500" />
+                    <RotateCw size={24} class="animate-spin text-blue-500" />
                 </div>
             {/if}
             <FileBrowser
@@ -303,46 +303,46 @@
             />        </div>
 
         <!-- Metadata Sidebar -->
-        <aside class="w-96 flex flex-col gap-4 shrink-0">
+        <aside class="w-80 flex flex-col gap-4 shrink-0">
             {#if selectedItemMetadata}
                 <Card class="flex-1 overflow-hidden flex flex-col bg-bg-secondary border-border-color shadow-2xl relative">
-                    <div class="p-6 border-b border-border-color bg-bg-tertiary/30">
-                        <div class="flex justify-between items-start mb-4">
-                            <div class="p-3 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20">
+                    <div class="p-5 border-b border-border-color bg-bg-tertiary/30">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="p-2.5 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20">
                                 {#if selectedItemMetadata.type === 'directory'}
-                                    <Folder size={24} />
+                                    <Folder size={20} />
                                 {:else}
-                                    <FileText size={24} />
+                                    <FileText size={20} />
                                 {/if}
                             </div>
                             <button class="text-text-secondary hover:text-text-primary transition-colors" onclick={() => selectedItemMetadata = null}>
-                                <X size={20} />
+                                <X size={18} />
                             </button>
                         </div>
-                        <h3 class="text-lg font-black text-text-primary leading-tight truncate" title={selectedItemMetadata.path}>
+                        <h3 class="text-base font-black text-text-primary leading-tight truncate" title={selectedItemMetadata.path}>
                             {selectedItemMetadata.path.split('/').pop()}
                         </h3>
-                        <p class="text-[10px] mono text-text-secondary mt-1 opacity-60 truncate italic">{selectedItemMetadata.path}</p>
+                        <p class="text-5xs mono text-text-secondary mt-1 opacity-60 truncate italic">{selectedItemMetadata.path}</p>
                     </div>
 
                     <ScrollArea class="flex-1">
-                        <div class="p-6 space-y-8">
+                        <div class="p-5 space-y-6">
                             <!-- Core Stats -->
                             <div class="grid grid-cols-2 gap-4">
                                 <div class="space-y-1">
-                                    <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 block">
-                                        {selectedItemMetadata.type === 'directory' ? 'Total Aggregate Size' : 'File Size'}
+                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-50 block">
+                                        {selectedItemMetadata.type === 'directory' ? 'Aggregate Size' : 'File Size'}
                                     </span>
-                                    <span class="text-sm font-bold text-text-primary mono">{formatSize(selectedItemMetadata.size)}</span>
+                                    <span class="text-xs font-bold text-text-primary mono">{formatSize(selectedItemMetadata.size)}</span>
                                 </div>
                                 <div class="space-y-1">
-                                    <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 block">Last Indexed</span>
-                                    <span class="text-sm font-bold text-text-primary mono">{formatLocalDate(selectedItemMetadata.last_seen_timestamp)}</span>
+                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-50 block">Last Indexed</span>
+                                    <span class="text-xs font-bold text-text-primary mono">{formatLocalDate(selectedItemMetadata.last_seen_timestamp)}</span>
                                 </div>
                                 {#if selectedItemMetadata.type === 'directory'}
-                                    <div class="space-y-1 col-span-2 mt-2">
-                                        <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 block">Recursive Child Count</span>
-                                        <span class="text-sm font-bold text-text-primary mono">{selectedItemMetadata.child_count?.toLocaleString()} Indexed Files</span>
+                                    <div class="space-y-1 col-span-2">
+                                        <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-50 block">Child Count</span>
+                                        <span class="text-xs font-bold text-text-primary mono">{selectedItemMetadata.child_count?.toLocaleString()} Indexed Files</span>
                                     </div>
                                 {/if}
                             </div>
@@ -350,44 +350,44 @@
                             {#if selectedItemMetadata.type === 'file'}
                                 <!-- Hash -->
                                 <div class="space-y-2">
-                                    <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-50 block">SHA-256 Fingerprint</span>
-                                    <div class="bg-bg-primary p-3 rounded-lg border border-border-color/50 break-all mono text-[10px] text-blue-400/80 leading-relaxed">
+                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-50 block">SHA-256 Fingerprint</span>
+                                    <div class="bg-bg-primary p-2.5 rounded-lg border border-border-color/50 break-all mono text-5xs text-blue-400/80 leading-relaxed">
                                         {selectedItemMetadata.sha256_hash || 'Pending computation...'}
                                     </div>
                                 </div>
 
                                 <!-- Backup Locations -->
-                                <div class="space-y-4">
+                                <div class="space-y-3">
                                     <div class="flex items-center gap-2">
-                                        <ShieldCheck size={14} class="text-success-color" />
-                                        <span class="text-[10px] font-black uppercase tracking-widest text-text-primary">Storage Locations</span>
+                                        <ShieldCheck size={12} class="text-success-color" />
+                                        <span class="text-5xs font-black uppercase tracking-widest text-text-primary">Storage Locations</span>
                                     </div>
 
                                     <div class="space-y-2">
                                         {#each selectedItemMetadata.versions || [] as version}
-                                            <div class="bg-bg-primary/50 border border-border-color rounded-lg p-3 group hover:border-blue-500/30 transition-all">
-                                                <div class="flex justify-between items-center mb-2">
-                                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-blue-500/10 text-blue-400 text-[10px] font-black border border-blue-500/20">
+                                            <div class="bg-bg-primary/50 border border-border-color rounded-lg p-2.5 group hover:border-blue-500/30 transition-all">
+                                                <div class="flex justify-between items-center mb-1.5">
+                                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-5xs font-black border border-blue-500/20">
                                                         {(version as any).media_id || (version as any).media_identifier}
                                                     </span>
-                                                    <span class="text-[9px] font-bold text-text-secondary opacity-40 uppercase tracking-tighter">
+                                                    <span class="text-6xs font-bold text-text-secondary opacity-40 uppercase tracking-tighter">
                                                         {(version as any).media_type}
                                                     </span>
                                                 </div>
                                                 <div class="flex flex-col gap-1">
-                                                    <div class="flex items-center gap-2 text-[10px] text-text-secondary">
-                                                        <FolderTree size={12} class="opacity-50" />
+                                                    <div class="flex items-center gap-2 text-5xs text-text-secondary">
+                                                        <FolderTree size={10} class="opacity-50" />
                                                         <span class="mono">POS: {(version as any).archive_id || (version as any).file_number}</span>
                                                     </div>
-                                                    <div class="flex items-center gap-1.5 opacity-60">
-                                                        <Clock size={12} class="opacity-50" />
+                                                    <div class="flex items-center gap-1.5 opacity-60 text-5xs">
+                                                        <Clock size={10} class="opacity-50" />
                                                         <span>Archived: {formatLocalDateTime((version as any).timestamp || (version as any).created_at)}</span>
                                                     </div>
                                                 </div>
                                             </div>
                                         {:else}
-                                            <div class="py-8 text-center border-2 border-dashed border-border-color rounded-xl opacity-30">
-                                                <p class="text-[10px] font-black uppercase tracking-widest">No versions stored on media.</p>
+                                            <div class="py-6 text-center border-2 border-dashed border-border-color rounded-xl opacity-30">
+                                                <p class="text-5xs font-black uppercase tracking-widest">No versions stored on media.</p>
                                             </div>
                                         {/each}
                                     </div>
@@ -397,16 +397,16 @@
                     </ScrollArea>
 
                     {#if selectedItemMetadata.type === 'file' && (selectedItemMetadata.versions?.length ?? 0) > 0}
-                        <div class="p-6 bg-bg-tertiary/30 border-t border-border-color mt-auto">
-                            <Button class="w-full h-11 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/10" onclick={() => handleToggleCart({path: selectedItemMetadata?.path || '', type: 'file', name: '', media: (selectedItemMetadata?.versions || []).map((v: any) => v.media_id || v.media_identifier), selected: selectedItemMetadata?.selected} as FileItem)}>
-                                <ShieldCheck size={16} class="mr-2" />
+                        <div class="p-5 bg-bg-tertiary/30 border-t border-border-color mt-auto">
+                            <Button class="w-full h-10 font-black uppercase tracking-widest text-4xs shadow-lg shadow-blue-500/10" onclick={() => handleToggleCart({path: selectedItemMetadata?.path || '', type: 'file', name: '', media: (selectedItemMetadata?.versions || []).map((v: any) => v.media_id || v.media_identifier), selected: selectedItemMetadata?.selected} as FileItem)}>
+                                <ShieldCheck size={14} class="mr-2" />
                                 {selectedItemMetadata.selected ? 'Remove from Queue' : 'Add to Recovery Queue'}
                             </Button>
                         </div>
                     {:else if selectedItemMetadata.type === 'directory' && (selectedItemMetadata.child_count || 0) > 0}
-                        <div class="p-6 bg-bg-tertiary/30 border-t border-border-color mt-auto">
-                            <Button variant="outline" class={cn("w-full h-11 font-black uppercase tracking-widest text-[11px]", "border-success-color/30 text-success-color hover:bg-success-color/10")} onclick={() => handleToggleDirectoryCart(selectedItemMetadata?.path || '')} disabled={selectedItemMetadata.selected}>
-                                <ListPlus size={16} class="mr-2" />
+                        <div class="p-5 bg-bg-tertiary/30 border-t border-border-color mt-auto">
+                            <Button variant="outline" class={cn("w-full h-10 font-black uppercase tracking-widest text-4xs", "border-success-color/30 text-success-color hover:bg-success-color/10")} onclick={() => handleToggleDirectoryCart(selectedItemMetadata?.path || '')} disabled={selectedItemMetadata.selected}>
+                                <ListPlus size={14} class="mr-2" />
                                 {#if selectedItemMetadata.selected}
                                     Folder Fully Queued
                                 {:else}
@@ -417,9 +417,9 @@
                     {/if}
                 </Card>
             {:else}
-                <div class="flex-1 border-2 border-dashed border-border-color rounded-xl flex flex-col items-center justify-center p-12 text-center opacity-20">
-                    <Library size={48} class="mb-4 text-blue-500" />
-                    <p class="text-xs font-black uppercase tracking-widest leading-relaxed">
+                <div class="flex-1 border-2 border-dashed border-border-color rounded-xl flex flex-col items-center justify-center p-8 text-center opacity-20">
+                    <Library size={40} class="mb-3 text-blue-500" />
+                    <p class="text-4xs font-black uppercase tracking-widest leading-relaxed">
                         Select an item from the index<br>to view detailed metadata and<br>storage locations.
                     </p>
                 </div>

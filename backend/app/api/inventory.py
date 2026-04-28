@@ -542,7 +542,7 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
             {"path": dup[0], "size": dup[1], "copies": dup[2], "saved": dup[3]}
             for dup in duplicate_offenders
         ],
-        "directories": convert_tree_to_list(nested_dir_map, 3),
+        "directories": convert_tree_to_list(nested_dir_map, 10),
     }
 
 
@@ -555,9 +555,11 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
         results = []
         for root in source_roots:
             # Check if this root contains ANY protected file
+            # total: count files that are either not ignored OR already have a version
+            # protected: count files that have a version
             prot_check = text("""
                 SELECT
-                    COUNT(*) as total,
+                    SUM(CASE WHEN fs.is_ignored = 0 OR EXISTS(SELECT 1 FROM file_versions fv2 WHERE fv2.filesystem_state_id = fs.id) THEN 1 ELSE 0 END) as total,
                     SUM(CASE WHEN EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) THEN 1 ELSE 0 END) as protected,
                     (SELECT GROUP_CONCAT(DISTINCT sm.identifier)
                      FROM file_versions fv
@@ -606,7 +608,7 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
     dir_sql = text("""
         SELECT
             SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) as dir_name,
-            COUNT(*) as total,
+            SUM(CASE WHEN is_ignored = 0 OR EXISTS(SELECT 1 FROM file_versions fv3 WHERE fv3.filesystem_state_id = filesystem_state.id) THEN 1 ELSE 0 END) as total,
             SUM(CASE WHEN EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = filesystem_state.id) THEN 1 ELSE 0 END) as protected,
             (SELECT GROUP_CONCAT(DISTINCT sm.identifier)
              FROM file_versions fv

@@ -71,7 +71,7 @@
                     onclick={navigateUp}
                 >
                     <ArrowLeft size={16} class="group-hover:-translate-x-1 transition-transform" />
-                    <span class="text-sm font-bold uppercase tracking-widest text-[10px]">Go Up</span>
+                    <span class="text-sm font-bold uppercase tracking-widest text-3xs">Go Up</span>
                 </button>
             {/if}
 
@@ -90,7 +90,7 @@
                 {#if !loading}
                     <div class="py-12 text-center opacity-30">
                         <Folder size={32} class="mx-auto mb-2" />
-                        <p class="text-[10px] font-black uppercase tracking-widest">No Subdirectories</p>
+                        <p class="text-3xs font-black uppercase tracking-widest">No Subdirectories</p>
                     </div>
                 {/if}
             {/each}
@@ -103,8 +103,8 @@
         </div>
 
         <footer class="p-6 bg-bg-tertiary/20 border-t border-border-color flex gap-3">
-            <Button variant="outline" class="flex-1 h-12 font-black uppercase tracking-widest text-[11px]" onclick={onCancel}>Cancel</Button>
-            <Button variant="default" class="flex-[2] h-12 font-black uppercase tracking-widest text-[11px]" onclick={selectCurrent}>
+            <Button variant="outline" class="flex-1 h-12 font-black uppercase tracking-widest text-2xs" onclick={onCancel}>Cancel</Button>
+            <Button variant="default" class="flex-[2] h-12 font-black uppercase tracking-widest text-2xs" onclick={selectCurrent}>
                 <Check size={18} class="mr-2" /> Select This Folder
             </Button>
         </footer>

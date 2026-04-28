@@ -442,7 +442,7 @@
                 <!-- ZONE B: NAVIGATION PANE -->
                 <aside class="flex w-72 shrink-0 flex-col border-r border-border-color bg-bg-secondary/50">
                         <ScrollArea class="flex-1 p-2">
-                                <div class="px-3 py-1 text-[11px] font-bold uppercase text-text-secondary/60 mb-2">
+                                <div class="px-3 py-1 text-2xs font-bold uppercase text-text-secondary/60 mb-2">
                                         Navigation
                                 </div>
                                 <FileBrowserTreeItem node={activeRoot} selectedPath={currentPath} onSelect={navigateTo} isSpecial={true} {mode} />
@@ -464,7 +464,7 @@
 
                                                 <div class="flex flex-auto min-w-[300px] items-center h-full relative group/col">
                                                         <button
-                                                                class="flex w-full items-center justify-between text-[11px] font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
+                                                                class="flex w-full items-center justify-between text-2xs font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
                                                                 onclick={() => toggleSort("name")}
                                                         >
                                                                 Name
@@ -481,7 +481,7 @@
 
                                                 <div class="flex items-center h-full relative group/col shrink-0" style="width: {mtimeWidth}px">
                                                         <button
-                                                                class="flex w-full items-center justify-between text-[11px] font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
+                                                                class="flex w-full items-center justify-between text-2xs font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
                                                                 onclick={() => toggleSort("mtime")}
                                                         >
                                                                 Date modified
@@ -499,7 +499,7 @@
 
                                                 <div class="flex items-center h-full relative group/col shrink-0" style="width: {typeWidth}px">
                                                         <button
-                                                                class="flex w-full items-center justify-between text-[11px] font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
+                                                                class="flex w-full items-center justify-between text-2xs font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
                                                                 onclick={() => toggleSort("type")}
                                                         >
                                                                 Type
@@ -517,7 +517,7 @@
 
                                                 <div class="flex items-center h-full relative group/col shrink-0" style="width: {sizeWidth}px">
                                                         <button
-                                                                class="flex w-full items-center justify-between text-[11px] font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors text-right"
+                                                                class="flex w-full items-center justify-between text-2xs font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors text-right"
                                                                 onclick={() => toggleSort("size")}
                                                         >
                                                                 Size
@@ -565,7 +565,7 @@
 
         <!-- ZONE D: STATUS BAR -->
         <div
-                class="flex h-8 shrink-0 items-center justify-between border-t border-border-color bg-bg-tertiary px-6 text-[10px] font-medium text-text-secondary"
+                class="flex h-8 shrink-0 items-center justify-between border-t border-border-color bg-bg-tertiary px-6 text-3xs font-medium text-text-secondary"
         >
                 <div class="flex items-center gap-4">
                         <span>{filteredFiles.length} items</span>

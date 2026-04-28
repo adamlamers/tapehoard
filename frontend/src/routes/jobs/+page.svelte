@@ -160,7 +160,7 @@
                 <Activity class="text-blue-500" size={28} />
                 Jobs
             </h1>
-            <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
+            <p class="text-xs font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
                 Real-time task monitoring & operational history
             </p>
         </div>
@@ -168,7 +168,7 @@
         <div class="flex items-center gap-4 z-10">
             <div class="flex items-center gap-2 px-4 py-2 bg-bg-primary/50 rounded-lg border border-border-color shadow-inner">
                 <div class="w-2 h-2 rounded-full bg-blue-500 {activeJobs.length > 0 ? 'animate-pulse' : 'opacity-20'}"></div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary">
+                <span class="text-3xs font-black uppercase tracking-widest text-text-secondary">
                     {activeJobs.length} Active Tasks
                 </span>
             </div>
@@ -183,7 +183,7 @@
         <section class="space-y-6">
             <div class="flex items-center gap-3 px-2">
                 <div class="p-1.5 bg-blue-500/10 rounded-md text-blue-500"><Play size={16} /></div>
-                <h2 class="text-[11px] font-black uppercase tracking-[0.2em] text-text-primary">Running Operations</h2>
+                <h2 class="text-2xs font-black uppercase tracking-[0.2em] text-text-primary">Running Operations</h2>
                 <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent"></div>
             </div>
 
@@ -197,13 +197,13 @@
                                 </div>
                                 <div>
                                     <h3 class="font-black text-text-primary uppercase tracking-tighter text-lg leading-none mb-2">{job.job_type} #{job.id}</h3>
-                                    <span class="px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-widest {getStatusColor(job.status)}">{job.status}</span>
+                                    <span class="px-2 py-0.5 rounded-full border text-4xs font-black uppercase tracking-widest {getStatusColor(job.status)}">{job.status}</span>
                                 </div>
                             </div>
 
                             <div class="flex-1 space-y-3">
                                 <div class="flex justify-between items-end">
-                                    <span class="text-[10px] font-black uppercase tracking-widest text-text-secondary truncate max-w-[400px]">
+                                    <span class="text-3xs font-black uppercase tracking-widest text-text-secondary truncate max-w-[400px]">
                                         {job.current_task || 'Starting task...'}
                                     </span>
                                     <span class="text-xs font-bold mono text-text-primary">{job.progress.toFixed(1)}%</span>
@@ -214,8 +214,8 @@
                             </div>
 
                             <div class="grid grid-cols-2 gap-8 shrink-0">
-                                <div><span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Duration</span><span class="text-xs font-bold mono text-text-primary">{formatDuration(job.started_at)}</span></div>
-                                <div><span class="text-[9px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Created</span><span class="text-xs font-bold mono text-text-primary">{formatLocalTime(job.created_at)}</span></div>
+                                <div><span class="text-4xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Duration</span><span class="text-xs font-bold mono text-text-primary">{formatDuration(job.started_at)}</span></div>
+                                <div><span class="text-4xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Created</span><span class="text-xs font-bold mono text-text-primary">{formatLocalTime(job.created_at)}</span></div>
                             </div>
 
                             <Button variant="ghost" size="icon" class="h-10 w-10 text-error-color hover:bg-error-color/10" onclick={() => cancelJob(job.id)} title="Cancel Task">
@@ -226,7 +226,7 @@
                 {:else}
                     <div class="py-12 border-2 border-dashed border-border-color rounded-2xl flex flex-col items-center justify-center opacity-20">
                         <Activity size={48} class="mb-2" />
-                        <p class="text-[10px] font-black uppercase tracking-widest">No active operations</p>
+                        <p class="text-3xs font-black uppercase tracking-widest">No active operations</p>
                     </div>
                 {/each}
             </div>
@@ -236,7 +236,7 @@
         <section class="space-y-6">
             <div class="flex items-center gap-3 px-2">
                 <div class="p-1.5 bg-text-secondary/10 rounded-md text-text-secondary"><History size={16} /></div>
-                <h2 class="text-[11px] font-black uppercase tracking-[0.2em] text-text-secondary">Execution History</h2>
+                <h2 class="text-2xs font-black uppercase tracking-[0.2em] text-text-secondary">Execution History</h2>
                 <div class="h-px flex-1 bg-gradient-to-r from-border-color/30 to-transparent"></div>
             </div>
 
@@ -251,14 +251,14 @@
                             <div class="flex-1">
                                 <div class="flex items-center gap-3">
                                     <span class="text-sm font-black text-text-primary uppercase tracking-tight">{job.job_type} JOB #{job.id}</span>
-                                    <span class="px-2 py-0.5 rounded border text-[8px] font-black uppercase tracking-widest {getStatusColor(job.status)}">{job.status}</span>
+                                    <span class="px-2 py-0.5 rounded border text-5xs font-black uppercase tracking-widest {getStatusColor(job.status)}">{job.status}</span>
                                 </div>
-                                <p class="text-[10px] text-text-secondary mt-1 opacity-60 truncate">{job.error_message || job.current_task || 'Finished successfully'}</p>
+                                <p class="text-3xs text-text-secondary mt-1 opacity-60 truncate">{job.error_message || job.current_task || 'Finished successfully'}</p>
                             </div>
 
                             <div class="grid grid-cols-3 gap-12 shrink-0">
-                                <div><span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-0.5">Duration</span><span class="text-[11px] font-bold mono text-text-primary">{formatDuration(job.started_at, job.completed_at)}</span></div>
-                                <div><span class="text-[8px] font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-0.5">Completed</span><span class="text-[11px] font-bold mono text-text-primary">{formatLocalTime(job.completed_at)}</span></div>
+                                <div><span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-0.5">Duration</span><span class="text-2xs font-bold mono text-text-primary">{formatDuration(job.started_at, job.completed_at)}</span></div>
+                                <div><span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-0.5">Completed</span><span class="text-2xs font-bold mono text-text-primary">{formatLocalTime(job.completed_at)}</span></div>
                                 <div class="flex items-center justify-end">
                                     <Button variant="ghost" size="icon" class="h-8 w-8 opacity-20 group-hover:opacity-100" onclick={() => openJobDetail(job.id)}>
                                         <ExternalLink size={14} />

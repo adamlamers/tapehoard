@@ -221,157 +221,157 @@
     <title>System Settings - TapeHoard</title>
 </svelte:head>
 
-<div class="flex flex-col h-full gap-8 animate-in fade-in duration-700">
-    <header class="flex justify-between items-center bg-bg-secondary px-8 py-5 rounded-xl border border-border-color shadow-2xl relative overflow-hidden shrink-0">
+<div class="flex flex-col h-full gap-6 animate-in fade-in duration-700">
+    <header class="flex justify-between items-center bg-bg-secondary px-6 py-4 rounded-xl border border-border-color shadow-2xl relative overflow-hidden shrink-0">
         <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent pointer-events-none"></div>
         <div class="relative z-10">
-            <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
-                <Database class="text-blue-500" size={28} />
+            <h1 class="text-xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
+                <Database class="text-blue-500" size={24} />
                 Station Settings
             </h1>
-            <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">Configure archival logic & hardware</p>
+            <p class="text-4xs font-bold uppercase tracking-[0.2em] text-text-secondary mt-1 opacity-80">Configure archival logic & hardware</p>
         </div>
 
         <div class="z-10">
-            <Button variant="default" size="lg" class="px-8 h-12 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/10" onclick={saveSettings} disabled={saving || !isDirty}>
+            <Button variant="default" size="lg" class="px-6 h-10 font-black uppercase tracking-widest text-3xs shadow-lg shadow-blue-500/10" onclick={saveSettings} disabled={saving || !isDirty}>
                 {#if saving}
-                    <RotateCw size={18} class="mr-2 animate-spin" /> Saving...
+                    <RotateCw size={14} class="mr-2 animate-spin" /> Saving...
                 {:else}
-                    <Save size={18} class="mr-2" /> Save Configuration
+                    <Save size={14} class="mr-2" /> Save Configuration
                 {/if}
             </Button>
         </div>
     </header>
 
-    <div class="flex flex-col lg:flex-row gap-8 flex-1 overflow-hidden min-h-0">
+    <div class="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden min-h-0">
         <!-- Sidebar Navigation -->
-        <nav class="w-full lg:w-64 flex lg:flex-col gap-1 shrink-0 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0">
+        <nav class="w-full lg:w-56 flex lg:flex-col gap-1 shrink-0 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0">
             {#each tabs as tab}
                 <button
                     class={cn(
-                        "flex items-center gap-3 px-5 py-4 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
+                        "flex items-center gap-3 px-4 py-3 rounded-xl text-3xs font-black uppercase tracking-widest transition-all whitespace-nowrap",
                         activeTab === tab.id
                             ? "bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
                             : "text-text-secondary hover:bg-white/5 border border-transparent"
                     )}
                     onclick={() => activeTab = tab.id}
                 >
-                    <tab.icon size={18} />
+                    <tab.icon size={16} />
                     {tab.label}
                 </button>
             {/each}
         </nav>
 
         <!-- Tab Content -->
-        <main class="flex-1 overflow-y-auto pr-2 pb-12">
+        <main class="flex-1 overflow-y-auto pr-2 pb-8">
             {#if loading}
-                <div class="h-96 bg-bg-secondary animate-pulse rounded-xl border border-border-color/50"></div>
+                <div class="h-80 bg-bg-secondary animate-pulse rounded-xl border border-border-color/50"></div>
             {:else}
                 {#if activeTab === 'hardware'}
                     <div class="animate-in slide-in-from-bottom-4 duration-500">
-                        <Card class="p-8 bg-bg-secondary border-border-color shadow-xl">
-                            <div class="flex items-center gap-4 mb-8">
-                                <div class="p-3 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20"><Monitor size={24} /></div>
+                        <Card class="p-6 bg-bg-secondary border-border-color shadow-xl">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div class="p-2.5 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20"><Monitor size={20} /></div>
                                 <div>
-                                    <h3 class="text-xl font-black text-text-primary uppercase tracking-tight">LTO Hardware</h3>
-                                    <p class="text-[11px] text-text-secondary font-medium uppercase tracking-wider opacity-60">Define tape drive device nodes</p>
+                                    <h3 class="text-lg font-black text-text-primary uppercase tracking-tight">LTO Hardware</h3>
+                                    <p class="text-4xs text-text-secondary font-medium uppercase tracking-wider opacity-60">Define tape drive device nodes</p>
                                 </div>
                             </div>
-                            <div class="space-y-4">
+                            <div class="space-y-3">
                                 {#each tapeDrives as drive, i}
-                                    <div class="flex gap-3 animate-in slide-in-from-left-4 duration-300" style="animation-delay: {i * 50}ms">
+                                    <div class="flex gap-2 animate-in slide-in-from-left-4 duration-300" style="animation-delay: {i * 50}ms">
                                         <div class="relative flex-1">
-                                            <Terminal size={16} class="absolute left-4 top-3.5 text-text-secondary opacity-50" />
-                                            <Input bind:value={tapeDrives[i]} placeholder="/dev/nst0" class="h-12 bg-bg-primary/50 pl-12 border-border-color font-mono text-sm" />
+                                            <Terminal size={14} class="absolute left-4 top-3 text-text-secondary opacity-50" />
+                                            <Input bind:value={tapeDrives[i]} placeholder="/dev/nst0" class="h-10 bg-bg-primary/50 pl-10 border-border-color font-mono text-xs" />
                                         </div>
-                                        <Button variant="ghost" class="h-12 w-12 rounded-xl bg-error-color/5 text-error-color/60 hover:bg-error-color/10 hover:text-error-color" onclick={() => removeDrive(i)}><Trash2 size={18} /></Button>
+                                        <Button variant="ghost" class="h-10 w-10 rounded-xl bg-error-color/5 text-error-color/60 hover:bg-error-color/10 hover:text-error-color" onclick={() => removeDrive(i)}><Trash2 size={16} /></Button>
                                     </div>
                                 {/each}
-                                <Button variant="outline" class="w-full h-14 border-dashed border-2 border-border-color hover:border-blue-500/50 hover:bg-blue-500/5 font-black uppercase tracking-widest text-[11px] mt-4" onclick={addDrive}>
-                                    <Plus size={18} class="mr-2" /> Add Tape Drive
+                                <Button variant="outline" class="w-full h-12 border-dashed border-2 border-border-color hover:border-blue-500/50 hover:bg-blue-500/5 font-black uppercase tracking-widest text-3xs mt-2" onclick={addDrive}>
+                                    <Plus size={16} class="mr-2" /> Add Tape Drive
                                 </Button>
                             </div>
                         </Card>
                     </div>
 
                 {:else if activeTab === 'paths'}
-                    <div class="animate-in slide-in-from-bottom-4 duration-500 space-y-8">
-                        <Card class="p-8 bg-bg-secondary border-border-color shadow-xl">
-                            <div class="flex items-center gap-4 mb-8">
-                                <div class="p-3 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20"><HardDrive size={24} /></div>
+                    <div class="animate-in slide-in-from-bottom-4 duration-500 space-y-6">
+                        <Card class="p-6 bg-bg-secondary border-border-color shadow-xl">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div class="p-2.5 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20"><HardDrive size={20} /></div>
                                 <div>
-                                    <h3 class="text-xl font-black text-text-primary uppercase tracking-tight">Source Roots</h3>
-                                    <p class="text-[11px] text-text-secondary font-medium uppercase tracking-wider opacity-60">Directories available for archival</p>
+                                    <h3 class="text-lg font-black text-text-primary uppercase tracking-tight">Source Roots</h3>
+                                    <p class="text-4xs text-text-secondary font-medium uppercase tracking-wider opacity-60">Directories available for archival</p>
                                 </div>
                             </div>
-                            <div class="space-y-4">
+                            <div class="space-y-3">
                                 {#each sourceRoots as root, i}
-                                    <div class="flex gap-3">
-                                        <Input bind:value={sourceRoots[i]} placeholder="/mnt/data" class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
-                                        <Button variant="ghost" class="h-12 w-12 rounded-xl bg-error-color/5 text-error-color/60 hover:bg-error-color/10 hover:text-error-color" onclick={() => removeSource(i)}><Trash2 size={18} /></Button>
+                                    <div class="flex gap-2">
+                                        <Input bind:value={sourceRoots[i]} placeholder="/mnt/data" class="h-10 bg-bg-primary/50 border-border-color font-mono text-xs" />
+                                        <Button variant="ghost" class="h-10 w-10 rounded-xl bg-error-color/5 text-error-color/60 hover:bg-error-color/10 hover:text-error-color" onclick={() => removeSource(i)}><Trash2 size={16} /></Button>
                                     </div>
                                 {/each}
-                                <Button variant="outline" class="w-full h-14 border-dashed border-2 border-border-color font-black uppercase tracking-widest text-[11px]" onclick={addSource}><Plus size={18} class="mr-2" /> Add Source Root</Button>
+                                <Button variant="outline" class="w-full h-12 border-dashed border-2 border-border-color font-black uppercase tracking-widest text-3xs" onclick={addSource}><Plus size={16} class="mr-2" /> Add Source Root</Button>
                             </div>
                         </Card>
 
-                        <Card class="p-8 bg-bg-secondary border-border-color shadow-xl">
-                            <div class="flex items-center gap-4 mb-8">
-                                <div class="p-3 bg-green-500/10 rounded-xl text-green-500 border border-green-500/20"><ArrowRight size={24} /></div>
+                        <Card class="p-6 bg-bg-secondary border-border-color shadow-xl">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div class="p-2.5 bg-green-500/10 rounded-xl text-green-500 border border-green-500/20"><ArrowRight size={20} /></div>
                                 <div>
-                                    <h3 class="text-xl font-black text-text-primary uppercase tracking-tight">Restore Targets</h3>
-                                    <p class="text-[11px] text-text-secondary font-medium uppercase tracking-wider opacity-60">Permitted recovery destinations</p>
+                                    <h3 class="text-lg font-black text-text-primary uppercase tracking-tight">Restore Targets</h3>
+                                    <p class="text-4xs text-text-secondary font-medium uppercase tracking-wider opacity-60">Permitted recovery destinations</p>
                                 </div>
                             </div>
-                            <div class="space-y-4">
+                            <div class="space-y-3">
                                 {#each restoreDestinations as dest, i}
-                                    <div class="flex gap-3">
-                                        <Input bind:value={restoreDestinations[i]} placeholder="/restores" class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
-                                        <Button variant="ghost" class="h-12 w-12 rounded-xl bg-error-color/5 text-error-color/60 hover:bg-error-color/10 hover:text-error-color" onclick={() => removeDest(i)}><Trash2 size={18} /></Button>
+                                    <div class="flex gap-2">
+                                        <Input bind:value={restoreDestinations[i]} placeholder="/restores" class="h-10 bg-bg-primary/50 border-border-color font-mono text-xs" />
+                                        <Button variant="ghost" class="h-10 w-10 rounded-xl bg-error-color/5 text-error-color/60 hover:bg-error-color/10 hover:text-error-color" onclick={() => removeDest(i)}><Trash2 size={16} /></Button>
                                     </div>
                                 {/each}
-                                <Button variant="outline" class="w-full h-14 border-dashed border-2 border-border-color font-black uppercase tracking-widest text-[11px]" onclick={addDest}><Plus size={18} class="mr-2" /> Add Restore Path</Button>
+                                <Button variant="outline" class="w-full h-12 border-dashed border-2 border-border-color font-black uppercase tracking-widest text-3xs" onclick={addDest}><Plus size={16} class="mr-2" /> Add Restore Path</Button>
                             </div>
                         </Card>
                     </div>
 
                 {:else if activeTab === 'exclusions'}
                     <div class="animate-in slide-in-from-bottom-4 duration-500">
-                        <Card class="p-8 shadow-xl border-border-color/60 bg-bg-secondary">
-                            <div class="flex items-center gap-4 mb-8">
-                                <div class="p-3 bg-orange-500/10 rounded-xl text-orange-500 border border-orange-500/20"><ListX size={24} /></div>
+                        <Card class="p-6 shadow-xl border-border-color/60 bg-bg-secondary">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div class="p-2.5 bg-orange-500/10 rounded-xl text-orange-500 border border-orange-500/20"><ListX size={20} /></div>
                                 <div>
-                                    <h3 class="text-xl font-black text-text-primary uppercase tracking-tight">Exclusion Policy</h3>
-                                    <p class="text-[11px] text-text-secondary font-medium uppercase tracking-wider opacity-60">Git-style ignore patterns for all scans.</p>
+                                    <h3 class="text-lg font-black text-text-primary uppercase tracking-tight">Exclusion Policy</h3>
+                                    <p class="text-4xs text-text-secondary font-medium uppercase tracking-wider opacity-60">Git-style ignore patterns for all scans.</p>
                                 </div>
                             </div>
-                            <div class="space-y-6">
+                            <div class="space-y-5">
                                 <textarea
                                     bind:value={globalExclusions}
-                                    class="w-full h-64 bg-bg-primary/50 border border-border-color rounded-2xl p-6 font-mono text-sm text-text-primary focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/40 transition-all outline-none resize-none"
+                                    class="w-full h-56 bg-bg-primary/50 border border-border-color rounded-2xl p-5 font-mono text-xs text-text-primary focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500/40 transition-all outline-none resize-none"
                                     placeholder="Add one pattern per line (e.g. .git/)"
                                 ></textarea>
 
                                 <div class="space-y-3">
-                                    <h4 class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-40">Common Patterns</h4>
+                                    <h4 class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40">Common Patterns</h4>
                                     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                                         {#each commonExclusions as item}
                                             <button
-                                                class="flex items-center justify-between px-3 py-2 bg-bg-primary/40 border border-border-color/60 rounded-lg hover:border-orange-500/40 hover:bg-orange-500/5 transition-all group"
+                                                class="flex items-center justify-between px-3 py-1.5 bg-bg-primary/40 border border-border-color/60 rounded-lg hover:border-orange-500/40 hover:bg-orange-500/5 transition-all group"
                                                 onclick={() => addCommonExclusion(item.pattern)}
                                             >
-                                                <span class="text-[10px] font-bold text-text-secondary group-hover:text-text-primary">{item.label}</span>
+                                                <span class="text-5xs font-bold text-text-secondary group-hover:text-text-primary">{item.label}</span>
                                                 <Plus size={10} class="text-text-secondary opacity-20 group-hover:opacity-100" />
                                             </button>
                                         {/each}
                                     </div>
                                 </div>
 
-                                <div class="p-5 bg-orange-500/5 border border-dashed border-orange-500/30 rounded-xl flex gap-4 items-start">
-                                    <ShieldAlert size={24} class="text-orange-500 shrink-0 mt-0.5" />
+                                <div class="p-4 bg-orange-500/5 border border-dashed border-orange-500/30 rounded-xl flex gap-4 items-start">
+                                    <ShieldAlert size={20} class="text-orange-500 shrink-0 mt-0.5" />
                                     <div class="space-y-1">
-                                        <span class="text-xs font-black uppercase text-orange-500 tracking-widest">Policy Warning</span>
-                                        <p class="text-[11px] text-text-secondary leading-relaxed font-medium">Broad exclusion patterns can result in critical data being skipped during the archival process. Ensure patterns match only transient data.</p>
+                                        <span class="text-4xs font-black uppercase text-orange-500 tracking-widest">Policy Warning</span>
+                                        <p class="text-5xs text-text-secondary leading-relaxed font-medium">Broad exclusion patterns can result in critical data being skipped during the archival process. Ensure patterns match only transient data.</p>
                                     </div>
                                 </div>
                             </div>
@@ -379,43 +379,43 @@
                     </div>
 
                 {:else if activeTab === 'scheduling'}
-                    <div class="animate-in slide-in-from-bottom-4 duration-500 space-y-8">
-                        <Card class="p-8 bg-bg-secondary border-border-color shadow-xl">
-                            <div class="flex items-center gap-4 mb-8">
-                                <div class="p-3 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20"><CalendarClock size={24} /></div>
+                    <div class="animate-in slide-in-from-bottom-4 duration-500 space-y-6">
+                        <Card class="p-6 bg-bg-secondary border-border-color shadow-xl">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div class="p-2.5 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20"><CalendarClock size={20} /></div>
                                 <div>
-                                    <h3 class="text-xl font-black text-text-primary uppercase tracking-tight">Scan Frequency</h3>
-                                    <p class="text-[11px] text-text-secondary font-medium uppercase tracking-wider opacity-60">Scheduled system discovery policy</p>
+                                    <h3 class="text-lg font-black text-text-primary uppercase tracking-tight">Scan Frequency</h3>
+                                    <p class="text-4xs text-text-secondary font-medium uppercase tracking-wider opacity-60">Scheduled system discovery policy</p>
                                 </div>
                             </div>
-                            <div class="flex gap-4">
+                            <div class="flex gap-3">
                                 <div class="relative flex-1">
-                                    <Terminal size={16} class="absolute left-4 top-3.5 text-text-secondary opacity-50" />
-                                    <Input bind:value={scanSchedule} placeholder="0 2 * * *" class="h-12 bg-bg-primary/50 pl-12 border-border-color font-mono text-sm" />
+                                    <Terminal size={14} class="absolute left-4 top-3 text-text-secondary opacity-50" />
+                                    <Input bind:value={scanSchedule} placeholder="0 2 * * *" class="h-10 bg-bg-primary/50 pl-10 border-border-color font-mono text-xs" />
                                 </div>
                                 <div class="flex gap-2">
-                                    <Button variant="outline" class="h-12 px-4 text-[10px] uppercase font-black tracking-widest" onclick={() => scanSchedule = "0 * * * *"}>Hourly</Button>
-                                    <Button variant="outline" class="h-12 px-4 text-[10px] uppercase font-black tracking-widest" onclick={() => scanSchedule = "0 2 * * *"}>Daily</Button>
+                                    <Button variant="outline" class="h-10 px-3 text-5xs uppercase font-black tracking-widest" onclick={() => scanSchedule = "0 * * * *"}>Hourly</Button>
+                                    <Button variant="outline" class="h-10 px-3 text-5xs uppercase font-black tracking-widest" onclick={() => scanSchedule = "0 2 * * *"}>Daily</Button>
                                 </div>
                             </div>
                         </Card>
 
-                        <Card class="p-8 bg-bg-secondary border-border-color shadow-xl">
-                            <div class="flex items-center gap-4 mb-8">
-                                <div class="p-3 bg-action-color/10 rounded-xl text-action-color border border-action-color/20"><CalendarClock size={24} /></div>
+                        <Card class="p-6 bg-bg-secondary border-border-color shadow-xl">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div class="p-2.5 bg-action-color/10 rounded-xl text-action-color border border-action-color/20"><CalendarClock size={20} /></div>
                                 <div>
-                                    <h3 class="text-xl font-black text-text-primary uppercase tracking-tight">Archival Frequency</h3>
-                                    <p class="text-[11px] text-text-secondary font-medium uppercase tracking-wider opacity-60">Scheduled media ingestion policy</p>
+                                    <h3 class="text-lg font-black text-text-primary uppercase tracking-tight">Archival Frequency</h3>
+                                    <p class="text-4xs text-text-secondary font-medium uppercase tracking-wider opacity-60">Scheduled media ingestion policy</p>
                                 </div>
                             </div>
-                            <div class="flex gap-4">
+                            <div class="flex gap-3">
                                 <div class="relative flex-1">
-                                    <Terminal size={16} class="absolute left-4 top-3.5 text-text-secondary opacity-50" />
-                                    <Input bind:value={archivalSchedule} placeholder="0 4 * * 0" class="h-12 bg-bg-primary/50 pl-12 border-border-color font-mono text-sm" />
+                                    <Terminal size={14} class="absolute left-4 top-3 text-text-secondary opacity-50" />
+                                    <Input bind:value={archivalSchedule} placeholder="0 4 * * 0" class="h-10 bg-bg-primary/50 pl-10 border-border-color font-mono text-xs" />
                                 </div>
                                 <div class="flex gap-2">
-                                    <Button variant="outline" class="h-12 px-4 text-[10px] uppercase font-black tracking-widest" onclick={() => archivalSchedule = "0 4 * * 0"}>Weekly</Button>
-                                    <Button variant="outline" class="h-12 px-4 text-[10px] uppercase font-black tracking-widest" onclick={() => archivalSchedule = "0 4 1 * *"}>Monthly</Button>
+                                    <Button variant="outline" class="h-10 px-3 text-5xs uppercase font-black tracking-widest" onclick={() => archivalSchedule = "0 4 * * 0"}>Weekly</Button>
+                                    <Button variant="outline" class="h-10 px-3 text-5xs uppercase font-black tracking-widest" onclick={() => archivalSchedule = "0 4 1 * *"}>Monthly</Button>
                                 </div>
                             </div>
                         </Card>
@@ -423,50 +423,50 @@
 
                 {:else if activeTab === 'notifications'}
                     <div class="animate-in slide-in-from-bottom-4 duration-500">
-                        <Card class="p-8 bg-bg-secondary border-border-color shadow-xl">
-                            <div class="flex items-center gap-4 mb-8">
-                                <div class="p-3 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20"><Bell size={24} /></div>
+                        <Card class="p-6 bg-bg-secondary border-border-color shadow-xl">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div class="p-2.5 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20"><Bell size={20} /></div>
                                 <div>
-                                    <h3 class="text-xl font-black text-text-primary uppercase tracking-tight">Alerting Endpoints</h3>
-                                    <p class="text-[11px] text-text-secondary font-medium uppercase tracking-wider opacity-60">Apprise-compatible notification URLs</p>
+                                    <h3 class="text-lg font-black text-text-primary uppercase tracking-tight">Alerting Endpoints</h3>
+                                    <p class="text-4xs text-text-secondary font-medium uppercase tracking-wider opacity-60">Apprise-compatible notification URLs</p>
                                 </div>
                             </div>
-                            <div class="space-y-4">
+                            <div class="space-y-3">
                                 {#each notificationUrls as url, i}
-                                    <div class="flex gap-3">
+                                    <div class="flex gap-2">
                                         <div class="relative flex-1">
-                                            <Globe size={16} class="absolute left-4 top-3.5 text-text-secondary opacity-50" />
-                                            <Input bind:value={notificationUrls[i]} placeholder="prowl://apikey" class="h-12 bg-bg-primary/50 pl-12 border-border-color font-mono text-sm" />
+                                            <Globe size={14} class="absolute left-4 top-3 text-text-secondary opacity-50" />
+                                            <Input bind:value={notificationUrls[i]} placeholder="prowl://apikey" class="h-10 bg-bg-primary/50 pl-10 border-border-color font-mono text-xs" />
                                         </div>
-                                        <Button variant="outline" class="h-12 px-4 text-[10px] uppercase font-black tracking-widest border-border-color" onclick={() => testNotify(notificationUrls[i])}>Test</Button>
-                                        <Button variant="ghost" class="h-12 w-12 rounded-xl bg-error-color/5 text-error-color/60 hover:bg-error-color/10 hover:text-error-color" onclick={() => removeNotify(i)}><Trash2 size={18} /></Button>
+                                        <Button variant="outline" class="h-10 px-3 text-5xs uppercase font-black tracking-widest border-border-color" onclick={() => testNotify(notificationUrls[i])}>Test</Button>
+                                        <Button variant="ghost" class="h-10 w-10 rounded-xl bg-error-color/5 text-error-color/60 hover:bg-error-color/10 hover:text-error-color" onclick={() => removeNotify(i)}><Trash2 size={16} /></Button>
                                     </div>
                                 {/each}
-                                <Button variant="outline" class="w-full h-14 border-dashed border-2 border-border-color font-black uppercase tracking-widest text-[11px]" onclick={addNotify}><Plus size={18} class="mr-2" /> Add Notification Endpoint</Button>
+                                <Button variant="outline" class="w-full h-12 border-dashed border-2 border-border-color font-black uppercase tracking-widest text-3xs" onclick={addNotify}><Plus size={16} class="mr-2" /> Add Notification Endpoint</Button>
                             </div>
                         </Card>
                     </div>
 
                 {:else if activeTab === 'system'}
-                    <div class="animate-in slide-in-from-bottom-4 duration-500 space-y-8">
-                        <Card class="p-8 bg-bg-secondary border-border-color shadow-xl">
-                            <div class="flex items-center gap-4 mb-8">
-                                <div class="p-3 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20"><Database size={24} /></div>
+                    <div class="animate-in slide-in-from-bottom-4 duration-500 space-y-6">
+                        <Card class="p-6 bg-bg-secondary border-border-color shadow-xl">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div class="p-2.5 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20"><Database size={20} /></div>
                                 <div>
-                                    <h3 class="text-xl font-black text-text-primary uppercase tracking-tight">Index Management</h3>
-                                    <p class="text-[11px] text-text-secondary font-medium uppercase tracking-wider opacity-60">Backup and restore the system state</p>
+                                    <h3 class="text-lg font-black text-text-primary uppercase tracking-tight">Index Management</h3>
+                                    <p class="text-4xs text-text-secondary font-medium uppercase tracking-wider opacity-60">Backup and restore the system state</p>
                                 </div>
                             </div>
-                            <div class="grid grid-cols-2 gap-6">
-                                <Button variant="outline" class="h-16 font-black uppercase tracking-widest text-[11px] border-border-color hover:bg-blue-500/5 group" onclick={handleExport} disabled={exporting}>
+                            <div class="grid grid-cols-2 gap-4">
+                                <Button variant="outline" class="h-14 font-black uppercase tracking-widest text-3xs border-border-color hover:bg-blue-500/5 group" onclick={handleExport} disabled={exporting}>
                                     {#if exporting}
-                                        <RotateCw size={20} class="mr-3 animate-spin" /> Compiling...
+                                        <RotateCw size={18} class="mr-2 animate-spin" /> Compiling...
                                     {:else}
-                                        <Download size={20} class="mr-3 text-blue-400 group-hover:scale-110 transition-transform" /> Export Database Index
+                                        <Download size={18} class="mr-2 text-blue-400 group-hover:scale-110 transition-transform" /> Export Database Index
                                     {/if}
                                 </Button>
-                                <Button variant="outline" class="h-16 font-black uppercase tracking-widest text-[11px] border-border-color hover:bg-orange-500/5 group opacity-50 cursor-not-allowed">
-                                    <Upload size={20} class="mr-3 text-orange-400" /> Import Index (Restricted)
+                                <Button variant="outline" class="h-14 font-black uppercase tracking-widest text-3xs border-border-color hover:bg-orange-500/5 group opacity-50 cursor-not-allowed">
+                                    <Upload size={18} class="mr-2 text-orange-400" /> Import Index (Restricted)
                                 </Button>
                             </div>
                         </Card>

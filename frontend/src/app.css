@@ -54,9 +54,19 @@
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
+
+  /* High-Density Typography */
+  --font-size-2xs: 0.6875rem;  /* 11px */
+  --font-size-3xs: 0.625rem;   /* 10px */
+  --font-size-4xs: 0.5625rem;  /* 9px */
+  --font-size-5xs: 0.5rem;     /* 8px */
+  --font-size-6xs: 0.4375rem;  /* 7px */
 }
 
 @layer base {
+  html {
+    font-size: 16px;
+  }
   *, ::after, ::before {
     @apply border-border;
   }
@@ -138,12 +148,10 @@ main {
   align-items: center;
   justify-content: center;
   gap: var(--spacing-sm);
-  padding: 0.5rem 1.25rem;
+  padding: 0.6rem 1.5rem;
   border-radius: var(--radius-md);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
+  font-size: 0.875rem;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid var(--color-border-color);

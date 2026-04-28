@@ -65,13 +65,13 @@
                             <div class="flex items-center gap-3 mb-1">
                                 <h2 class="text-2xl font-black text-text-primary uppercase tracking-tighter">{job.job_type} Job #{job.id}</h2>
                                 <span class={cn(
-                                    "px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest",
+                                    "px-3 py-1 rounded-full border text-3xs font-black uppercase tracking-widest",
                                     job.status === 'COMPLETED' ? 'text-success-color border-success-color/20 bg-success-color/5' :
                                     job.status === 'FAILED' ? 'text-error-color border-error-color/20 bg-error-color/5' :
                                     'text-blue-400 border-blue-500/20 bg-blue-500/5'
                                 )}>{job.status}</span>
                             </div>
-                            <p class="text-[11px] font-bold text-text-secondary uppercase tracking-[0.2em] opacity-60">Execution Timeline & Artifacts</p>
+                            <p class="text-2xs font-bold text-text-secondary uppercase tracking-[0.2em] opacity-60">Execution Timeline & Artifacts</p>
                         </div>
                     </div>
                     <Button variant="ghost" size="icon" class="hover:bg-white/5" onclick={onClear}><X size={28} /></Button>
@@ -82,18 +82,18 @@
                 <!-- Operational Summary -->
                 <div class="grid grid-cols-3 gap-6">
                     <div class="p-4 bg-bg-primary/40 border border-border-color/60 rounded-xl">
-                        <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1">Total Duration</span>
+                        <span class="text-4xs font-black uppercase tracking-widest text-text-secondary block mb-1">Total Duration</span>
                         <div class="flex items-center gap-2">
                             <Clock size={14} class="text-blue-400" />
                             <span class="text-lg font-black text-text-primary mono">{formatDuration(job.started_at, job.completed_at)}</span>
                         </div>
                     </div>
                     <div class="p-4 bg-bg-primary/40 border border-border-color/60 rounded-xl">
-                        <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1">Start Time</span>
+                        <span class="text-4xs font-black uppercase tracking-widest text-text-secondary block mb-1">Start Time</span>
                         <span class="text-sm font-bold text-text-primary mono">{formatLocalDateTime(job.started_at)}</span>
                     </div>
                     <div class="p-4 bg-bg-primary/40 border border-border-color/60 rounded-xl">
-                        <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1">End Time</span>
+                        <span class="text-4xs font-black uppercase tracking-widest text-text-secondary block mb-1">End Time</span>
                         <span class="text-sm font-bold text-text-primary mono">{formatLocalDateTime(job.completed_at)}</span>
                     </div>
                 </div>
@@ -102,7 +102,7 @@
                 <div class="space-y-4">
                     <div class="flex items-center gap-2 px-1">
                         <FileText size={14} class="text-text-secondary opacity-50" />
-                        <h3 class="text-[10px] font-black uppercase tracking-widest text-text-secondary">Execution Log</h3>
+                        <h3 class="text-3xs font-black uppercase tracking-widest text-text-secondary">Execution Log</h3>
                     </div>
 
                     <div class={cn(
@@ -113,7 +113,7 @@
                             <div class="flex gap-3 items-start">
                                 <AlertCircle size={16} class="shrink-0 mt-0.5" />
                                 <div>
-                                    <span class="font-black uppercase tracking-widest block mb-2 text-[10px]">Critical Error</span>
+                                    <span class="font-black uppercase tracking-widest block mb-2 text-3xs">Critical Error</span>
                                     {job.error_message}
                                 </div>
                             </div>
@@ -121,7 +121,7 @@
                             <div class="flex gap-3 items-start text-success-color">
                                 <CheckCircle2 size={16} class="shrink-0 mt-0.5" />
                                 <div>
-                                    <span class="font-black uppercase tracking-widest block mb-2 text-[10px]">Task Summary</span>
+                                    <span class="font-black uppercase tracking-widest block mb-2 text-3xs">Task Summary</span>
                                     {job.current_task || 'Process completed successfully with zero hardware interrupts.'}
                                 </div>
                             </div>
@@ -135,17 +135,17 @@
                         <div class="p-2 bg-blue-500/10 rounded-lg text-blue-500"><Database size={20} /></div>
                         <div>
                             <h4 class="text-xs font-black uppercase text-text-primary tracking-tight">Post-Execution State</h4>
-                            <p class="text-[10px] text-text-secondary opacity-70">The database index has been synchronized with the results of this job.</p>
+                            <p class="text-3xs text-text-secondary opacity-70">The database index has been synchronized with the results of this job.</p>
                         </div>
                     </div>
-                    <Button variant="outline" size="sm" class="h-9 px-4 text-[10px] font-black uppercase tracking-widest border-blue-500/30 text-blue-400 group-hover:bg-blue-500/10 transition-all" href={job.job_type === 'SCAN' ? '/filesystem' : '/inventory'}>
+                    <Button variant="outline" size="sm" class="h-9 px-4 text-3xs font-black uppercase tracking-widest border-blue-500/30 text-blue-400 group-hover:bg-blue-500/10 transition-all" href={job.job_type === 'SCAN' ? '/filesystem' : '/inventory'}>
                         View Changes <ArrowRight size={14} class="ml-2" />
                     </Button>
                 </div>
             </div>
 
             <footer class="p-8 bg-bg-tertiary/20 border-t border-border-color flex justify-end">
-                <Button variant="secondary" class="h-11 px-8 font-black uppercase tracking-widest text-[11px]" onclick={onClear}>Close Detail View</Button>
+                <Button variant="secondary" class="h-11 px-8 font-black uppercase tracking-widest text-2xs" onclick={onClear}>Close Detail View</Button>
             </footer>
         {/if}
     </Card>

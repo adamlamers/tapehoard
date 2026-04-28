@@ -198,47 +198,47 @@
     <title>Live Filesystem - TapeHoard</title>
 </svelte:head>
 
-<div class="flex flex-col gap-8 h-full animate-in fade-in duration-700">
-    <header class="flex justify-between items-start bg-bg-secondary px-8 py-6 rounded-xl border border-border-color shadow-2xl relative overflow-hidden">
+<div class="flex flex-col gap-6 h-full animate-in fade-in duration-700">
+    <header class="flex justify-between items-start bg-bg-secondary px-6 py-5 rounded-xl border border-border-color shadow-2xl relative overflow-hidden">
         <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent pointer-events-none"></div>
         <div class="relative z-10">
-            <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
-                <FolderTree class="text-blue-500" size={28} />
+            <h1 class="text-xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
+                <FolderTree class="text-blue-500" size={24} />
                 Live Filesystem
             </h1>
-            <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
+            <p class="text-4xs font-bold uppercase tracking-[0.2em] text-text-secondary mt-1 opacity-80">
                 Define backup rules & browse physical storage
             </p>
         </div>
 
-        <div class="flex items-center gap-3 relative z-10">
+        <div class="flex items-center gap-2 relative z-10">
             {#if hasChanges}
-                <div class="mr-4 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg animate-pulse">
-                    <span class="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">{pendingChanges.size} Pending Changes</span>
+                <div class="mr-3 px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 rounded-lg animate-pulse">
+                    <span class="text-5xs font-black text-blue-400 uppercase tracking-[0.2em]">{pendingChanges.size} Pending Changes</span>
                 </div>
             {/if}
             <Button
                 variant={hasChanges ? "default" : "outline"}
-                class={cn("h-11 px-6 font-black uppercase tracking-widest text-[10px] transition-all duration-500 shadow-lg",
+                class={cn("h-9 px-4 font-black uppercase tracking-widest text-4xs transition-all duration-500 shadow-lg",
                     hasChanges ? "bg-blue-600 hover:bg-blue-700 border-none scale-105" : "border-border-color opacity-50")}
                 onclick={commitChanges}
                 disabled={!hasChanges || committing}
             >
-                <Save size={16} class="mr-2" />
+                <Save size={14} class="mr-2" />
                 {committing ? 'Committing...' : 'Commit Rules'}
             </Button>
             <Button
                 variant="outline"
-                class={cn("h-11 px-6 font-black uppercase tracking-widest text-[10px] border-border-color hover:border-blue-500/30 transition-all",
+                class={cn("h-9 px-4 font-black uppercase tracking-widest text-4xs border-border-color hover:border-blue-500/30 transition-all",
                     scanRunning && "text-blue-500 border-blue-500/20 bg-blue-500/5")}
                 onclick={startScan}
                 disabled={scanRunning}
             >
                 {#if scanRunning}
-                    <RotateCw size={16} class="mr-2 animate-spin" />
+                    <RotateCw size={14} class="mr-2 animate-spin" />
                     Scanning...
                 {:else}
-                    <Activity size={16} class="mr-2" />
+                    <Activity size={14} class="mr-2" />
                     Quick Scan
                 {/if}
             </Button>

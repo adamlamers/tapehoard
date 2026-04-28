@@ -205,7 +205,7 @@
                                         {#if item.media && item.media.length > 0}
                                                 <div class="flex gap-1 overflow-hidden shrink-0">
                                                         {#each item.media as m}
-                                                                <span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[9px] px-1.5 py-0.5 rounded border border-blue-500/20 font-bold uppercase tracking-wider">
+                                                                <span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-4xs px-1.5 py-0.5 rounded border border-blue-500/20 font-bold uppercase tracking-wider">
                                                                         <CassetteTape size={10} />
                                                                         {m}
                                                                 </span>
@@ -219,7 +219,7 @@
 
         <!-- DATE MODIFIED -->
         <div
-                class="shrink-0 px-4 h-full flex items-center text-[12px] text-text-secondary tabular-nums font-medium border-r border-border-color/10"
+                class="shrink-0 px-4 h-full flex items-center text-xs text-text-secondary tabular-nums font-medium border-r border-border-color/10"
                 style="width: {colWidths.mtime}px"
         >
                 {formatDate(item.mtime)}
@@ -227,7 +227,7 @@
 
         <!-- TYPE -->
         <div
-                class="shrink-0 px-4 h-full flex items-center text-[12px] text-text-secondary truncate font-medium border-r border-border-color/10"
+                class="shrink-0 px-4 h-full flex items-center text-xs text-text-secondary truncate font-medium border-r border-border-color/10"
                 style="width: {colWidths.type}px"
         >
                 {getItemTypeLabel(item)}
@@ -235,7 +235,7 @@
 
         <!-- SIZE -->
         <div
-                class="shrink-0 px-4 h-full flex items-center justify-end text-[12px] text-text-secondary mono text-right tabular-nums font-medium border-r border-border-color/10"
+                class="shrink-0 px-4 h-full flex items-center justify-end text-xs text-text-secondary mono text-right tabular-nums font-medium border-r border-border-color/10"
                 style="width: {colWidths.size}px"
         >
                 {item.type === "directory" ? "" : formatSize(item.size)}

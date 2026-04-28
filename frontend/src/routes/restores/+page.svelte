@@ -175,16 +175,16 @@
                 <History class="text-success-color" size={28} />
                 Data Recovery
             </h1>
-            <p class="text-[12px] font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
+            <p class="text-xs font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
                 Recovery Queue & Physical Media Manifest
             </p>
         </div>
 
         <div class="flex gap-3 z-10">
-            <Button variant="outline" class="h-10 px-6 font-black uppercase tracking-widest text-[10px] border-border-color hover:bg-error-color/5 hover:text-error-color hover:border-error-color/30" onclick={clearCart} disabled={(manifest?.total_files || 0) === 0}>
+            <Button variant="outline" class="h-10 px-6 font-black uppercase tracking-widest text-3xs border-border-color hover:bg-error-color/5 hover:text-error-color hover:border-error-color/30" onclick={clearCart} disabled={(manifest?.total_files || 0) === 0}>
                 <Trash2 size={14} class="mr-2" /> Clear Queue
             </Button>
-            <Button variant="default" class="h-10 px-6 font-black uppercase tracking-widest text-[10px] bg-success-color hover:bg-success-color/90" disabled={(manifest?.total_files || 0) === 0 || !selectedDest || restoring} onclick={initiateRestore}>
+            <Button variant="default" class="h-10 px-6 font-black uppercase tracking-widest text-3xs bg-success-color hover:bg-success-color/90" disabled={(manifest?.total_files || 0) === 0 || !selectedDest || restoring} onclick={initiateRestore}>
                 {#if restoring}
                     <RotateCw size={14} class="mr-2 animate-spin" /> Starting...
                 {:else}
@@ -201,10 +201,10 @@
                     <History size={48} class="text-text-secondary" strokeWidth={1} />
                 </div>
                 <h2 class="text-2xl font-black uppercase tracking-tighter text-text-primary">Recovery Queue is Empty</h2>
-                <p class="text-[11px] font-bold uppercase tracking-[0.2em] mt-4 text-text-secondary leading-loose opacity-60">
+                <p class="text-2xs font-bold uppercase tracking-[0.2em] mt-4 text-text-secondary leading-loose opacity-60">
                     You haven't selected any files for restoration yet. Use the Index Browser to find and queue the items you need to recover from your archives.
                 </p>
-                <Button variant="default" class="mt-10 h-12 px-10 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/20" href="/index-browser">
+                <Button variant="default" class="mt-10 h-12 px-10 font-black uppercase tracking-widest text-2xs shadow-lg shadow-blue-500/20" href="/index-browser">
                     Browse Virtual Index <ArrowRight size={14} class="ml-2" />
                 </Button>
             </div>
@@ -231,14 +231,14 @@
             <aside class="flex flex-col gap-6 min-h-0 overflow-y-auto pr-2 pb-4">
                 <!-- Queue Summary -->
                 <Card class="p-6 bg-gradient-to-br from-bg-secondary to-bg-tertiary border-border-color shadow-xl">
-                    <h3 class="text-[10px] font-black uppercase tracking-widest text-text-secondary mb-4 opacity-50">Queue Statistics</h3>
+                    <h3 class="text-3xs font-black uppercase tracking-widest text-text-secondary mb-4 opacity-50">Queue Statistics</h3>
                     <div class="grid grid-cols-2 gap-4">
                         <div class="p-4 bg-bg-primary/40 border border-border-color/40 rounded-xl">
-                            <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1">Total Files</span>
+                            <span class="text-4xs font-black uppercase tracking-widest text-text-secondary block mb-1">Total Files</span>
                             <span class="text-xl font-black text-text-primary mono">{manifest?.total_files || 0}</span>
                         </div>
                         <div class="p-4 bg-bg-primary/40 border border-border-color/40 rounded-xl">
-                            <span class="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1">Recovery Size</span>
+                            <span class="text-4xs font-black uppercase tracking-widest text-text-secondary block mb-1">Recovery Size</span>
                             <span class="text-xl font-black text-text-primary mono">{formatSize(manifest?.total_size || 0)}</span>
                         </div>
                     </div>
@@ -252,7 +252,7 @@
                     </div>
                     <div class="p-5 space-y-4">
                         <div class="space-y-2">
-                            <label for="destination" class="text-[10px] font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1">Restore to Host Path</label>
+                            <label for="destination" class="text-3xs font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1">Restore to Host Path</label>
                             <select
                                 id="destination"
                                 bind:value={selectedDest}
@@ -266,7 +266,7 @@
                                 {/if}
                             </select>
                         </div>
-                        <p class="text-[10px] text-text-secondary leading-relaxed italic opacity-60">
+                        <p class="text-3xs text-text-secondary leading-relaxed italic opacity-60">
                             Files will be restored into this directory, maintaining their original folder structure.
                         </p>
                     </div>
@@ -290,17 +290,17 @@
                                 <div class="flex-1">
                                     <div class="flex justify-between items-center">
                                         <span class="text-sm font-black text-text-primary mono">{media.identifier}</span>
-                                        <span class="text-[9px] font-black uppercase text-blue-400">{media.media_type}</span>
+                                        <span class="text-4xs font-black uppercase text-blue-400">{media.media_type}</span>
                                     </div>
                                     <div class="flex gap-3 mt-1">
-                                        <span class="text-[10px] font-bold text-text-secondary opacity-60 uppercase">{media.file_count} Files</span>
-                                        <span class="text-[10px] font-bold text-text-secondary opacity-60 uppercase border-l border-border-color pl-3">{formatSize(media.total_size)}</span>
+                                        <span class="text-3xs font-bold text-text-secondary opacity-60 uppercase">{media.file_count} Files</span>
+                                        <span class="text-3xs font-bold text-text-secondary opacity-60 uppercase border-l border-border-color pl-3">{formatSize(media.total_size)}</span>
                                     </div>
                                 </div>
                             </div>
                         {:else}
                             <div class="py-12 text-center opacity-20 border-2 border-dashed border-border-color rounded-xl">
-                                <p class="text-[10px] font-black uppercase tracking-widest">No Media Required</p>
+                                <p class="text-3xs font-black uppercase tracking-widest">No Media Required</p>
                             </div>
                         {/each}
                     </div>
@@ -308,7 +308,7 @@
                     <div class="p-5 bg-bg-tertiary/20 border-t border-border-color">
                         <div class="flex items-start gap-3">
                             <ShieldCheck size={14} class="text-success-color shrink-0 mt-0.5" />
-                            <p class="text-[10px] text-text-secondary leading-normal">
+                            <p class="text-3xs text-text-secondary leading-normal">
                                 Verification active: Media identifiers will be checked physically before extraction. Recovery will proceed sequentially by media to minimize hardware cycles.
                             </p>
                         </div>
