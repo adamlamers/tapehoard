@@ -137,6 +137,7 @@ class ArchiverService:
             )
             .filter(
                 models.FilesystemState.is_indexed,
+                models.FilesystemState.is_tracked,
                 not_(models.FilesystemState.is_ignored),
                 (coverage_subquery.c.covered_bytes.is_(None))
                 | (coverage_subquery.c.covered_bytes < models.FilesystemState.size),

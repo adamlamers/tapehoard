@@ -10,7 +10,7 @@ from loguru import logger
 
 class LTOProvider(AbstractStorageProvider):
     # Class-level store for Last Known Good (LKG) hardware state
-    # device_path -> { "drive": {}, "mam": {}, "online": bool }
+    # device_path -> { "drive": {}, "mam": {}, "online": bool, "last_check": float }
     _lkg_state: dict = {}
 
     def __init__(
@@ -25,6 +25,7 @@ class LTOProvider(AbstractStorageProvider):
                 "drive": {},
                 "mam": {},
                 "online": False,
+                "last_check": 0.0,
             }
 
     def _log_command(self, cmd: List[str]):
@@ -59,8 +60,14 @@ class LTOProvider(AbstractStorageProvider):
 
         return LTOProvider._lkg_state[self.device_path]["drive"]
 
-    def get_mam_info(self) -> dict:
+    def get_mam_info(self, force: bool = False) -> dict:
         """Reads Media Auxiliary Memory (MAM) attributes using sg_read_attr --raw."""
+        # Throttle MAM reads to once every 2 seconds unless forced
+        now = time.time()
+        if not force and (
+            now - LTOProvider._lkg_state[self.device_path].get("last_check", 0) < 2.0
+        ):
+            return LTOProvider._lkg_state[self.device_path]["mam"]
 
         # Try up to 3 times with a small backoff if the drive is busy
         for attempt in range(3):
@@ -175,6 +182,7 @@ class LTOProvider(AbstractStorageProvider):
 
                     # SUCCESS! Update LKG MAM state
                     LTOProvider._lkg_state[self.device_path]["mam"] = mam
+                    LTOProvider._lkg_state[self.device_path]["last_check"] = time.time()
                     return mam
 
                 # If we get "Device or resource busy", wait a bit and retry
@@ -198,32 +206,33 @@ class LTOProvider(AbstractStorageProvider):
 
     def get_live_state(self) -> Dict[str, Any]:
         """Performs a single-pass discovery of all hardware metrics to ensure consistency."""
-        online = self.check_online()
-        if not online:
-            return {
-                "online": False,
-                "drive": self.get_drive_info(),
-                "mam": {},
-                "identity": None,
-            }
-
-        # Fetch both in sequence
+        self.check_online()
+        # Since check_online throttles and sets online/last_check, we follow its lead
         mam = self.get_mam_info()
         drive = self.get_drive_info()
 
-        # Primary identity is Barcode, fallback to Serial
         identity = mam.get("barcode") or mam.get("serial")
 
-        return {"online": True, "drive": drive, "mam": mam, "identity": identity}
+        return {
+            "online": LTOProvider._lkg_state[self.device_path]["online"],
+            "drive": drive,
+            "mam": mam,
+            "identity": identity,
+        }
 
     def get_name(self) -> str:
         return "LTO Tape"
 
     def check_online(self) -> bool:
-        """Checks if the tape drive is online. Uses LKG as a fallback when busy."""
+        """Checks if the tape drive is online. Throttled to 2 seconds."""
         if not os.path.exists(self.device_path):
             LTOProvider._lkg_state[self.device_path]["online"] = False
             return False
+
+        # Return LKG if we checked very recently
+        now = time.time()
+        if now - LTOProvider._lkg_state[self.device_path].get("last_check", 0) < 2.0:
+            return LTOProvider._lkg_state[self.device_path]["online"]
 
         try:
             cmd = ["mt", "-f", self.device_path, "status"]
@@ -250,6 +259,7 @@ class LTOProvider(AbstractStorageProvider):
                 LTOProvider._lkg_state[self.device_path]["mam"] = {}
 
             LTOProvider._lkg_state[self.device_path]["online"] = is_online
+            LTOProvider._lkg_state[self.device_path]["last_check"] = now
             return is_online
         except Exception:
             return LTOProvider._lkg_state[self.device_path]["online"]
