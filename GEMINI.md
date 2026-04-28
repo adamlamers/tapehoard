@@ -84,3 +84,9 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
 
 ### Frontend Reactivity
 *   **Svelte 5 State:** When mutating complex data structures like `Map` or `Set` in Svelte 5 `$state`, always explicitly reassign the variable (e.g., `myMap = new Map(myMap)`) after mutation to trigger the reactivity engine.
+
+## 4. Pending Feature Implementations
+*   **Media Pools & Sets:** Transition from targeting individual media to targeting logical `MediaPool` entities. Archiver logic should resolve a pool to its active appendable member. Requires a new DB model and UI management.
+*   **Location & Custody Tracking:** Implement a formalized check-in/out ledger (`MediaCustodyLog`) for physical offline media.
+*   **Barcode & Label Generation:** Add a feature using `reportlab` or `weasyprint` to generate printable Avery-format PDF sheets containing Code 39 barcodes for tapes and QR codes for HDDs.
+*   **Lifecycle Policies:** Implement background tasks in `scheduler.py` to flag expired data for pruning based on user-defined retention rules. Add physical wear alerts to the dashboard based on tape `load_count` and `lifetime_mib_written`.

@@ -143,6 +143,7 @@ def test_run_backup_mocked(db_session, mocker, tmp_path):
 
     # Mock Provider
     mock_provider = mocker.MagicMock()
+    mock_provider.capabilities = {"supports_random_access": False}
     mock_provider.identify_media.return_value = "DISK_001"
     mock_provider.prepare_for_write.return_value = True
     mock_provider.write_archive.return_value = "ARCH_1"
