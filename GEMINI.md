@@ -76,8 +76,10 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
 ### Deployment & Testing
 *   **Temporal Standard:** Backend uses **UTC**. Frontend uses `parseUTCDate` to convert to browser **Local Time**.
 *   **Unsaved Changes Guard:** UI must use `beforeNavigate` and `beforeunload` listeners to warn users if they leave the Settings or Media registration forms with uncommitted changes.
-*   **Testing Protocol:** Use **Alembic-driven file-based SQLite** for tests to ensure 100% schema fidelity (including FTS5 and triggers) and reliable cross-thread data visibility. Atomic truncation must occur between tests.
-*  `just pytest` to run backend tests
+*   **Backend Testing:** Use **Alembic-driven file-based SQLite** for tests to ensure 100% schema fidelity (including FTS5 and triggers) and reliable cross-thread data visibility. Atomic truncation must occur between tests. Run `just pytest` to execute backend tests.
+*   **End-to-End (E2E) Testing:** Playwright is used for E2E testing (`frontend/tests/`).
+    *   **Mock Hardware:** To simulate LTO drives in CI, the backend supports a `TAPEHOARD_TEST_MODE=true` flag. This registers a `MockLTOProvider` that uses local directories instead of physical SCSI devices.
+    *   **Running E2E:** Use `just e2e-server` to start the mock backend (on port 8001), and then `just playwright` to execute the Playwright test suite against it.
 
 ### UI & UX Philosophy
 *   **Direct Terminology:** Use technical terms like "Backup Manager", "System Status", "Archive Index". Avoid marketing fluff.

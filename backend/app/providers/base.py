@@ -47,7 +47,7 @@ class AbstractStorageProvider(ABC):
         return {"status": "HEALTHY", "alerts": []}
 
     @abstractmethod
-    def identify_media(self) -> Optional[str]:
+    def identify_media(self, allow_intrusive=True) -> Optional[str]:
         """
         Attempts to read the identifier (barcode/UUID) from the currently inserted media.
         Returns None if no media is inserted or it's unidentifiable.

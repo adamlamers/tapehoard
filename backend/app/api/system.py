@@ -160,6 +160,32 @@ def get_ignored_status(
 # --- Endpoints ---
 
 
+@router.post("/test/reset")
+def reset_test_environment(db_session: Session = Depends(get_db)):
+    """Wipes the database and resets state for E2E testing."""
+    import os
+
+    if os.environ.get("TAPEHOARD_TEST_MODE") != "true":
+        raise HTTPException(status_code=403, detail="Reset only allowed in test mode")
+
+    # Wipe tables
+    db_session.query(models.FileVersion).delete()
+    db_session.query(models.RestoreCart).delete()
+    db_session.query(models.Job).delete()
+    db_session.query(models.TrackedSource).delete()
+    db_session.query(models.FilesystemState).delete()
+    db_session.query(models.StorageMedia).delete()
+    # Note: Keep SystemSettings if needed, or wipe them too
+    db_session.query(models.SystemSetting).delete()
+
+    db_session.commit()
+
+    # Clear mock hardware dirs if we can find them
+    # But usually the test will re-initialize them
+
+    return {"message": "Test environment reset"}
+
+
 @router.get("/dashboard/stats", response_model=DashboardStatsSchema)
 def get_dashboard_stats(db_session: Session = Depends(get_db)):
     """Computes high-level system statistics for the overview dashboard."""
@@ -438,6 +464,15 @@ def browse_system_path(
                 continue
     except PermissionError:
         raise HTTPException(status_code=403, detail="Permission denied")
+
+    # Deduplicate by path to prevent frontend keyed each block errors
+    seen_paths: set[str] = set()
+    deduped_results: list[FileItemSchema] = []
+    for r in results:
+        if r.path not in seen_paths:
+            seen_paths.add(r.path)
+            deduped_results.append(r)
+    results = deduped_results
 
     results.sort(key=lambda x: (x.type != "directory", x.name.lower()))
     return results

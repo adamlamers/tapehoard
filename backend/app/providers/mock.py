@@ -47,7 +47,7 @@ class MockLTOProvider(AbstractStorageProvider):
                 return True
         return False
 
-    def identify_media(self) -> Optional[str]:
+    def identify_media(self, allow_intrusive=True) -> Optional[str]:
         if not os.path.exists(self.mam_path):
             return None
         try:

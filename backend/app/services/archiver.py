@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 import time
 import uuid
@@ -104,7 +105,9 @@ class ArchiverService:
         if os.environ.get("TAPEHOARD_TEST_MODE") == "true":
             from app.providers.mock import MockLTOProvider
 
-            provider_map[MockLTOProvider.provider_id] = MockLTOProvider
+            provider_map[MockLTOProvider.provider_id] = (
+                MockLTOProvider  # ty: ignore[invalid-assignment]
+            )
 
         provider_cls = provider_map.get(media_record.media_type)
         if not provider_cls:
@@ -447,51 +450,59 @@ class ArchiverService:
                     # Sequential Media (Tape): Hybrid Tar Generation
                     has_splits = any(item["is_split"] for item in remaining_to_write)
 
-                    if not has_splits and shutil.which("tar"):
-                        # PERFORMANCE PATH: Use system tar binary for whole files
-                        # Generate a null-terminated file list to handle special characters safely
-                        file_list_path = staging_full_path + ".list"
-                        with open(file_list_path, "w") as f_list:
-                            for item in remaining_to_write:
-                                # Write absolute path to list
-                                f_list.write(item["file_state"].file_path + "\0")
+                    if not has_splits:
+                        # PERFORMANCE PATH: Use GNU tar binary for whole files
+                        # Prefer gtar on Darwin (macOS ships BSD tar without --null support)
+                        tar_binary = None
+                        if sys.platform == "darwin":
+                            tar_binary = shutil.which("gtar")
+                        if tar_binary is None:
+                            tar_binary = shutil.which("tar")
 
-                        try:
-                            # Use -C / to handle absolute paths, --null and -T for the list
-                            # --no-recursion since we've already resolved the file list
-                            cmd = [
-                                "tar",
-                                "-cf",
-                                staging_full_path,
-                                "--null",
-                                "-T",
-                                file_list_path,
-                                "--no-recursion",
-                                "--absolute-names",
-                            ]
-                            logger.debug(f"RUNNING BINARY TAR: {' '.join(cmd)}")
-                            subprocess.run(cmd, check=True, capture_output=True)
+                        if tar_binary:
+                            # Generate a null-terminated file list to handle special characters safely
+                            file_list_path = staging_full_path + ".list"
+                            with open(file_list_path, "w") as f_list:
+                                for item in remaining_to_write:
+                                    # Write absolute path to list
+                                    f_list.write(item["file_state"].file_path + "\0")
 
-                            # Update progress to 100% for this chunk
-                            processed_bytes += sum(
-                                i["offset_end"] - i["offset_start"]
-                                for i in remaining_to_write
-                            )
-                            JobManager.update_job(
-                                job_id,
-                                15.0 + (70.0 * (processed_bytes / safe_divisor)),
-                                f"Archived chunk {chunk_index+1} via binary tar",
-                            )
-                        except Exception as e:
-                            logger.error(
-                                f"Binary tar failed, falling back to Python: {e}"
-                            )
-                            has_splits = True  # Trigger fallback
-                        finally:
-                            if os.path.exists(file_list_path):
-                                os.remove(file_list_path)
+                            try:
+                                # --null must come before -T; --no-recursion and --absolute-names
+                                # must come before positional/non-option arguments
+                                cmd = [
+                                    tar_binary,
+                                    "-cf",
+                                    staging_full_path,
+                                    "--null",
+                                    "--no-recursion",
+                                    "--absolute-names",
+                                    "-T",
+                                    file_list_path,
+                                ]
+                                logger.debug(f"RUNNING BINARY TAR: {' '.join(cmd)}")
+                                subprocess.run(cmd, check=True, capture_output=True)
 
-                    if has_splits or not shutil.which("tar"):
+                                # Update progress to 100% for this chunk
+                                processed_bytes += sum(
+                                    i["offset_end"] - i["offset_start"]
+                                    for i in remaining_to_write
+                                )
+                                JobManager.update_job(
+                                    job_id,
+                                    15.0 + (70.0 * (processed_bytes / safe_divisor)),
+                                    f"Archived chunk {chunk_index+1} via binary tar",
+                                )
+                            except Exception as e:
+                                logger.error(
+                                    f"Binary tar failed, falling back to Python: {e}"
+                                )
+                                has_splits = True  # Trigger fallback
+                            finally:
+                                if os.path.exists(file_list_path):
+                                    os.remove(file_list_path)
+
+                    if has_splits:
                         # COMPATIBILITY PATH: Pure Python for fragments or if tar is missing
                         with tarfile.open(staging_full_path, "w") as tar_bundle:
                             for item in remaining_to_write:

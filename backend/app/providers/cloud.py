@@ -128,7 +128,7 @@ class CloudStorageProvider(AbstractStorageProvider):
         except Exception:
             return False
 
-    def identify_media(self) -> Optional[str]:
+    def identify_media(self, allow_intrusive=True) -> Optional[str]:
         try:
             response = self.s3.get_object(Bucket=self.bucket_name, Key=".tapehoard_id")
             return response["Body"].read().decode("utf-8").strip()

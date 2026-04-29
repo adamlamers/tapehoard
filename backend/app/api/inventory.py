@@ -68,7 +68,7 @@ def list_storage_providers():
     if os.environ.get("TAPEHOARD_TEST_MODE") == "true":
         from app.providers.mock import MockLTOProvider
 
-        providers.append(MockLTOProvider)
+        providers.append(MockLTOProvider)  # ty: ignore[invalid-argument-type]
 
     return [
         StorageProviderSchema(
@@ -755,6 +755,15 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
                 "media": f[5].split(",") if f[5] else [],
             }
         )
+
+    # Deduplicate by path to prevent frontend keyed each block errors
+    seen_paths: set[str] = set()
+    deduped_results: list[dict] = []
+    for r in results:
+        if r["path"] not in seen_paths:
+            seen_paths.add(r["path"])
+            deduped_results.append(r)
+    results = deduped_results
 
     return results
 

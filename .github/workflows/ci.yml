@@ -87,21 +87,13 @@ jobs:
         npm ci
         npx playwright install --with-deps chromium
 
-    - name: Start Backend Test Server
-      run: |
-        cd backend
-        uv sync --dev
-        DATABASE_URL="sqlite:///test.db" TAPEHOARD_TEST_MODE="true" uv run alembic upgrade head
-        DATABASE_URL="sqlite:///test.db" TAPEHOARD_TEST_MODE="true" uv run uvicorn app.main:app --host 0.0.0.0 --port 8001 &
-        sleep 5 # Wait for server to start
-
     - name: Run Playwright Tests
       run: |
         cd frontend
         npx playwright test
 
     - name: Upload Playwright Report
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       if: always()
       with:
         name: playwright-report

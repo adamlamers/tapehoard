@@ -205,23 +205,28 @@
                 return crumbs;
         });
 
-        const filteredFiles = $derived.by(() => {
-                // When doing backend search, the parent feeds us already-filtered results.
-                // We'll still do a light local filter to ensure things like name matching,
-                // but we should match on the full path just in case.
-                let result = files.filter((f: FileItem) => f.path.toLowerCase().includes((searchQuery || "").toLowerCase()));
+	const filteredFiles = $derived.by(() => {
+		let result = files.filter((f: FileItem) => f.path.toLowerCase().includes((searchQuery || "").toLowerCase()));
 
-                result.sort((a: FileItem, b: FileItem) => {
-                        const valA = sortColumn === "type" ? a.type : a[sortColumn as keyof FileItem] || 0;
-                        const valB = sortColumn === "type" ? b.type : b[sortColumn as keyof FileItem] || 0;
+		// Deduplicate by path to prevent keyed each block errors
+		const seen = new Set<string>();
+		result = result.filter((f: FileItem) => {
+			if (seen.has(f.path)) return false;
+			seen.add(f.path);
+			return true;
+		});
 
-                        if (valA < (valB as any)) return sortDirection === "asc" ? -1 : 1;
-                        if (valA > (valB as any)) return sortDirection === "asc" ? 1 : -1;
-                        return 0;
-                });
+		result.sort((a: FileItem, b: FileItem) => {
+			const valA = sortColumn === "type" ? a.type : a[sortColumn as keyof FileItem] || 0;
+			const valB = sortColumn === "type" ? b.type : b[sortColumn as keyof FileItem] || 0;
 
-                return result;
-        });
+			if (valA < (valB as any)) return sortDirection === "asc" ? -1 : 1;
+			if (valA > (valB as any)) return sortDirection === "asc" ? 1 : -1;
+			return 0;
+		});
+
+		return result;
+	});
 
         function toggleSort(col: typeof sortColumn) {
                 if (sortColumn === col) {

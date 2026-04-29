@@ -110,6 +110,9 @@ def test_scan_sources_mocked(db_session, mocker):
     """Tests the discovery scan with mocked filesystem."""
     scanner = ScannerService()
 
+    # Disable fast find so the test uses the os.walk fallback path
+    mocker.patch("app.services.scanner._FAST_FIND_BINARY", None)
+
     # Mock settings
     mocker.patch("app.api.system.get_source_roots", return_value=["/mock_source"])
     mocker.patch("app.api.system.get_exclusion_spec", return_value=None)
