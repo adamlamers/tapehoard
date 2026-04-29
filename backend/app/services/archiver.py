@@ -671,6 +671,8 @@ class ArchiverService:
 
         media_workload: Dict[int, Dict[str, List[models.FileVersion]]] = {}
         for cart_item in active_cart:
+            if cart_item.file_state.is_deleted:
+                continue
             if not cart_item.file_state.versions:
                 continue
             latest_v = max(cart_item.file_state.versions, key=lambda v: v.created_at)

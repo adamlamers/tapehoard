@@ -387,6 +387,7 @@ class ScannerService:
         self.files_hashed: int = 0
         self.files_new: int = 0
         self.files_modified: int = 0
+        self.files_missing: int = 0
         self.total_files_found: int = 0
         self.bytes_hashed: int = 0
         self.start_time: float = 0.0
@@ -480,6 +481,7 @@ class ScannerService:
             self.files_processed = 0
             self.files_new = 0
             self.files_modified = 0
+            self.files_missing = 0
             self.total_files_found = 0
 
         try:
@@ -589,6 +591,36 @@ class ScannerService:
                 )
                 db_session.commit()
 
+            # Detect files present in DB but not found during this scan
+            stale_records = (
+                db_session.query(models.FilesystemState)
+                .filter(
+                    models.FilesystemState.last_seen_timestamp < current_timestamp,
+                    models.FilesystemState.is_deleted.is_(False),
+                    models.FilesystemState.is_ignored.is_(False),
+                )
+                .all()
+            )
+            if (
+                stale_records and not JobManager.is_cancelled(job_id)
+                if job_id
+                else True
+            ):
+                missing_count = 0
+                for record in stale_records:
+                    if not os.path.exists(record.file_path):
+                        record.is_deleted = True
+                        missing_count += 1
+                    else:
+                        record.last_seen_timestamp = current_timestamp
+                db_session.commit()
+                if missing_count:
+                    with self._metrics_lock:
+                        self.files_missing += missing_count
+                    logger.info(
+                        f"Scan detected {missing_count} files missing from disk (marked as deleted)"
+                    )
+
             if job_id is not None and not JobManager.is_cancelled(job_id):
                 JobManager.complete_job(job_id)
                 self.last_run_time = current_timestamp
@@ -683,6 +715,7 @@ class ScannerService:
                     .filter(
                         models.FilesystemState.sha256_hash.is_(None),
                         models.FilesystemState.is_ignored.is_(False),
+                        models.FilesystemState.is_deleted.is_(False),
                     )
                     .count()
                 )
@@ -693,12 +726,13 @@ class ScannerService:
                 FETCH_LIMIT = HASH_BATCH_SIZE * 4
 
                 while self.is_hashing:
-                    # Find unindexed work
+                    # Find unindexed work (exclude deleted files)
                     hashing_targets = (
                         db_session.query(models.FilesystemState)
                         .filter(
                             models.FilesystemState.sha256_hash.is_(None),
                             models.FilesystemState.is_ignored.is_(False),
+                            models.FilesystemState.is_deleted.is_(False),
                         )
                         .limit(FETCH_LIMIT)
                         .all()
@@ -759,6 +793,17 @@ class ScannerService:
                                             self.bytes_hashed += target_record.size or 0
                                             self.files_hashed += 1
 
+                                # Detect files in this batch that didn't get a hash
+                                # (likely missing from disk) and mark them as deleted
+                                for file_path, target_record in path_to_record.items():
+                                    if (
+                                        file_path not in batch_results
+                                        and not os.path.exists(file_path)
+                                    ):
+                                        target_record.is_deleted = True
+                                        with self._metrics_lock:
+                                            self.files_missing += 1
+
                                 # Throttle between sub-batches if I/O pressure is high
                                 with self._metrics_lock:
                                     should_throttle = self.is_throttled
@@ -806,6 +851,10 @@ class ScannerService:
                                 if computed_hash:
                                     target_record.sha256_hash = computed_hash
                                     self.files_hashed += 1
+                                elif not os.path.exists(target_record.file_path):
+                                    target_record.is_deleted = True
+                                    with self._metrics_lock:
+                                        self.files_missing += 1
 
                                 if self.files_hashed % 5 == 0:
                                     progress = min(

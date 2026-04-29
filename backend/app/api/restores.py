@@ -137,7 +137,17 @@ def add_file_to_recovery_queue(file_id: int, db_session: Session = Depends(get_d
         return {"message": "Item already in queue."}
 
     file_record = db_session.get(models.FilesystemState, file_id)
-    if not file_record or not file_record.versions:
+    if not file_record:
+        raise HTTPException(
+            status_code=404,
+            detail="File record not found.",
+        )
+    if file_record.is_deleted:
+        raise HTTPException(
+            status_code=400,
+            detail="File is marked as deleted and cannot be recovered.",
+        )
+    if not file_record.versions:
         raise HTTPException(
             status_code=400,
             detail="File has no backed up versions and cannot be recovered.",
@@ -172,11 +182,12 @@ def calculate_recovery_manifest(db_session: Session = Depends(get_db)):
         JOIN restore_cart rc ON rc.filesystem_state_id = fs.id
         JOIN file_versions fv ON fv.filesystem_state_id = fs.id
         JOIN storage_media sm ON sm.id = fv.media_id
-        WHERE fv.id = (
-            SELECT id FROM file_versions
-            WHERE filesystem_state_id = fs.id
-            ORDER BY created_at DESC LIMIT 1
-        )
+        WHERE fs.is_deleted = 0
+          AND fv.id = (
+              SELECT id FROM file_versions
+              WHERE filesystem_state_id = fs.id
+              ORDER BY created_at DESC LIMIT 1
+          )
         GROUP BY sm.identifier, sm.media_type
     """)
 

@@ -22,6 +22,9 @@ class FilesystemState(Base):
     is_ignored: Mapped[bool] = mapped_column(
         Boolean, default=False
     )  # True if matches exclusion
+    is_deleted: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # True if confirmed missing from disk
     last_seen_timestamp: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )

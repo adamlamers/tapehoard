@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
-from app.api.schemas import TreeNodeSchema
+from app.api.schemas import DiscrepancySchema, TreeNodeSchema
 from app.db import models
 from app.db.database import SessionLocal, get_db
 from app.services.scanner import JobManager, scanner_manager
@@ -76,6 +76,7 @@ class ScanStatusSchema(BaseModel):
     files_hashed: int
     files_new: int
     files_modified: int
+    files_missing: int
     total_files_found: int
     current_path: str
     is_throttled: bool
@@ -364,6 +365,7 @@ def get_scan_status():
         files_hashed=scanner_manager.files_hashed,
         files_new=scanner_manager.files_new,
         files_modified=scanner_manager.files_modified,
+        files_missing=scanner_manager.files_missing,
         total_files_found=scanner_manager.total_files_found,
         current_path=scanner_manager.current_path,
         is_throttled=scanner_manager.is_throttled,
@@ -899,3 +901,103 @@ def get_system_tree(path: Optional[str] = None, db_session: Session = Depends(ge
             pass
     results.sort(key=lambda x: x.name.lower())
     return results
+
+
+# --- Discrepancy Endpoints ---
+
+
+@router.get("/discrepancies", response_model=List[DiscrepancySchema])
+def list_discrepancies(db_session: Session = Depends(get_db)):
+    """Lists files with discrepancies: confirmed deleted or unhashed and missing from disk."""
+    deleted_records = (
+        db_session.query(models.FilesystemState)
+        .filter(models.FilesystemState.is_deleted.is_(True))
+        .order_by(models.FilesystemState.last_seen_timestamp.desc())
+        .all()
+    )
+
+    unhashed_missing = (
+        db_session.query(models.FilesystemState)
+        .filter(
+            models.FilesystemState.sha256_hash.is_(None),
+            models.FilesystemState.is_ignored.is_(False),
+            models.FilesystemState.is_deleted.is_(False),
+        )
+        .all()
+    )
+
+    results = []
+    seen_ids = set()
+    for record in deleted_records + unhashed_missing:
+        if record.id in seen_ids:
+            continue
+        seen_ids.add(record.id)
+        if record.is_deleted:
+            results.append(
+                DiscrepancySchema(
+                    id=record.id,
+                    path=record.file_path,
+                    size=record.size,
+                    mtime=datetime.fromtimestamp(record.mtime, tz=timezone.utc),
+                    last_seen_timestamp=record.last_seen_timestamp,
+                    sha256_hash=record.sha256_hash,
+                    is_deleted=True,
+                    has_versions=len(record.versions) > 0,
+                )
+            )
+        elif not os.path.exists(record.file_path):
+            results.append(
+                DiscrepancySchema(
+                    id=record.id,
+                    path=record.file_path,
+                    size=record.size,
+                    mtime=datetime.fromtimestamp(record.mtime, tz=timezone.utc),
+                    last_seen_timestamp=record.last_seen_timestamp,
+                    sha256_hash=record.sha256_hash,
+                    is_deleted=False,
+                    has_versions=len(record.versions) > 0,
+                )
+            )
+
+    return results
+
+
+@router.post("/discrepancies/{file_id}/confirm")
+def confirm_file_deleted(file_id: int, db_session: Session = Depends(get_db)):
+    """Marks a file as confirmed deleted (soft delete)."""
+    record = db_session.get(models.FilesystemState, file_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="File record not found")
+    record.is_deleted = True
+    db_session.commit()
+    return {"message": f"File '{record.file_path}' marked as deleted"}
+
+
+@router.post("/discrepancies/{file_id}/dismiss")
+def dismiss_discrepancy(file_id: int, db_session: Session = Depends(get_db)):
+    """Clears the deleted flag — user confirms file should be tracked again."""
+    record = db_session.get(models.FilesystemState, file_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="File record not found")
+    record.is_deleted = False
+    record.last_seen_timestamp = datetime.now(timezone.utc)
+    db_session.commit()
+    return {"message": f"File '{record.file_path}' discrepancy dismissed"}
+
+
+@router.delete("/discrepancies/{file_id}")
+def delete_file_record(file_id: int, db_session: Session = Depends(get_db)):
+    """Hard-deletes a file record and all associated versions/cart entries."""
+    record = db_session.get(models.FilesystemState, file_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="File record not found")
+    db_session.query(models.RestoreCart).filter(
+        models.RestoreCart.filesystem_state_id == file_id
+    ).delete()
+    db_session.query(models.FileVersion).filter(
+        models.FileVersion.filesystem_state_id == file_id
+    ).delete()
+    file_path = record.file_path
+    db_session.delete(record)
+    db_session.commit()
+    return {"message": f"File record '{file_path}' permanently deleted"}

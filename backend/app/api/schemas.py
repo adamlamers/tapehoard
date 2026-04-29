@@ -18,9 +18,22 @@ class ItemMetadataSchema(BaseModel):
     last_seen_timestamp: Optional[datetime] = None
     sha256_hash: Optional[str] = None
     is_ignored: bool = False
+    is_deleted: bool = False
+    exists_on_disk: Optional[bool] = None
     child_count: Optional[int] = 0
     selected: bool = False
     versions: List[Dict[str, Any]] = []
+
+
+class DiscrepancySchema(BaseModel):
+    id: int
+    path: str
+    size: int
+    mtime: datetime
+    last_seen_timestamp: Optional[datetime] = None
+    sha256_hash: Optional[str] = None
+    is_deleted: bool
+    has_versions: bool = False
 
 
 class MediaSchema(BaseModel):
