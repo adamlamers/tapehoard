@@ -145,7 +145,6 @@ class ArchiverService:
                 models.FilesystemState.id == coverage_subquery.c.filesystem_state_id,
             )
             .filter(
-                models.FilesystemState.is_indexed,
                 not_(models.FilesystemState.is_ignored),
                 (coverage_subquery.c.covered_bytes.is_(None))
                 | (coverage_subquery.c.covered_bytes < models.FilesystemState.size),
@@ -723,11 +722,7 @@ class ArchiverService:
                         media_record.identifier, archive_id
                     )
 
-                    is_tar = (
-                        not provider.capabilities.get("supports_random_access")
-                        or str(archive_id).endswith(".tar")
-                        or str(archive_id).isdigit()
-                    )
+                    is_tar = self._test_is_tar_logic(provider, media_record, archive_id)
 
                     if not is_tar:
                         # Format Negotiation: Direct file recovery
@@ -778,7 +773,12 @@ class ArchiverService:
                             )
                         continue
 
-                    tar_mode = "r|*" if media_record.media_type == "tape" else "r:*"
+                    tar_mode = (
+                        "r|*"
+                        if media_record.media_type
+                        in ["tape", "lto_tape", "cloud", "s3_compat"]
+                        else "r:*"
+                    )
 
                     with tarfile.open(fileobj=bitstream, mode=tar_mode) as tar_bundle:
                         normalized_map = {}
@@ -853,6 +853,27 @@ class ArchiverService:
         except Exception as e:
             logger.exception(f"Restore failed: {e}")
             JobManager.fail_job(job_id, str(e))
+
+    def _test_is_tar_logic(self, provider, media_record, archive_id: str) -> bool:
+        """Internal logic to determine if a location_id refers to a tarball vs a native file."""
+        # 1. If provider doesn't support random access (Tape), it's ALWAYS a tar stream.
+        if not provider.capabilities.get("supports_random_access"):
+            return True
+
+        # 2. Explicit extensions or prefixes
+        if str(archive_id).endswith(".tar") or "archives/" in str(archive_id):
+            return True
+
+        # 3. Tape file numbers (if they happen to be passed here for cloud, which is rare)
+        if str(archive_id).isdigit() and media_record.media_type in [
+            "tape",
+            "lto_tape",
+        ]:
+            return True
+
+        # 4. Otherwise, if it has random access (Cloud/HDD) and isn't explicitly an archive,
+        # it's a native file.
+        return False
 
 
 archiver_manager = ArchiverService()

@@ -29,55 +29,83 @@ class JobManager:
     @staticmethod
     def start_job(job_id: int):
         """Marks a job as running and sets the start timestamp."""
+        from sqlalchemy.orm.exc import StaleDataError
+
         with SessionLocal() as db_session:
-            job_record = db_session.get(models.Job, job_id)
-            if job_record:
-                job_record.status = "RUNNING"
-                job_record.started_at = datetime.now(timezone.utc)
-                db_session.commit()
+            try:
+                job_record = db_session.get(models.Job, job_id)
+                if job_record:
+                    job_record.status = "RUNNING"
+                    job_record.started_at = datetime.now(timezone.utc)
+                    db_session.commit()
+            except StaleDataError:
+                db_session.rollback()
+                logger.debug(
+                    f"Job {job_id} already modified or deleted (StaleDataError)."
+                )
 
     @staticmethod
     def update_job(job_id: int, progress: float, current_task: str):
         """Updates the progress and current task description for a job."""
+        from sqlalchemy.orm.exc import StaleDataError
+
         with SessionLocal() as db_session:
-            job_record = db_session.get(models.Job, job_id)
-            if job_record:
-                job_record.progress = progress
-                job_record.current_task = current_task
-                db_session.commit()
+            try:
+                job_record = db_session.get(models.Job, job_id)
+                if job_record:
+                    job_record.progress = progress
+                    job_record.current_task = current_task
+                    db_session.commit()
+            except StaleDataError:
+                db_session.rollback()
 
     @staticmethod
     def complete_job(job_id: int):
         """Marks a job as successfully completed."""
+        from sqlalchemy.orm.exc import StaleDataError
+
         with SessionLocal() as db_session:
-            job_record = db_session.get(models.Job, job_id)
-            if job_record:
-                job_record.status = "COMPLETED"
-                job_record.progress = 100.0
-                job_record.completed_at = datetime.now(timezone.utc)
-                db_session.commit()
+            try:
+                job_record = db_session.get(models.Job, job_id)
+                if job_record:
+                    job_record.status = "COMPLETED"
+                    job_record.progress = 100.0
+                    job_record.completed_at = datetime.now(timezone.utc)
+                    db_session.commit()
+            except StaleDataError:
+                db_session.rollback()
 
     @staticmethod
     def fail_job(job_id: int, error_message: str):
         """Marks a job as failed and records the error message."""
+        from sqlalchemy.orm.exc import StaleDataError
+
         with SessionLocal() as db_session:
-            job_record = db_session.get(models.Job, job_id)
-            if job_record:
-                job_record.status = "FAILED"
-                job_record.error_message = error_message
-                job_record.completed_at = datetime.now(timezone.utc)
-                db_session.commit()
+            try:
+                job_record = db_session.get(models.Job, job_id)
+                if job_record:
+                    job_record.status = "FAILED"
+                    job_record.error_message = error_message
+                    job_record.completed_at = datetime.now(timezone.utc)
+                    db_session.commit()
+            except StaleDataError:
+                db_session.rollback()
 
     @staticmethod
     def cancel_job(job_id: int):
         """Submits a cancellation request for a pending or running job."""
+        from sqlalchemy.orm.exc import StaleDataError
+
         with SessionLocal() as db_session:
-            job_record = db_session.get(models.Job, job_id)
-            if job_record and job_record.status in ["PENDING", "RUNNING"]:
-                job_record.status = "FAILED"
-                job_record.error_message = "Cancelled by user"
-                job_record.completed_at = datetime.now(timezone.utc)
-                db_session.commit()
+            try:
+                job_record = db_session.get(models.Job, job_id)
+                if job_record and job_record.status in ["PENDING", "RUNNING"]:
+                    job_record.status = "FAILED"
+                    job_record.error_message = "Cancelled by user"
+                    job_record.completed_at = datetime.now(timezone.utc)
+                    db_session.commit()
+            except StaleDataError:
+                db_session.rollback()
 
     @staticmethod
     def is_cancelled(job_id: int) -> bool:
@@ -354,7 +382,6 @@ class ScannerService:
                         mtime=file_meta["mtime"],
                         is_ignored=file_meta["ignored"],
                         last_seen_timestamp=timestamp,
-                        is_indexed=False,
                     )
                 )
             else:
@@ -363,7 +390,7 @@ class ScannerService:
                     or record.mtime != file_meta["mtime"]
                 )
                 if metadata_changed:
-                    record.is_indexed = False
+                    record.sha256_hash = None
                     with self._metrics_lock:
                         self.files_modified += 1
 
@@ -396,7 +423,7 @@ class ScannerService:
             total_pending = (
                 db_session.query(models.FilesystemState)
                 .filter(
-                    models.FilesystemState.is_indexed.is_(False),
+                    models.FilesystemState.sha256_hash.is_(None),
                     models.FilesystemState.is_ignored.is_(False),
                 )
                 .count()
@@ -408,7 +435,7 @@ class ScannerService:
                     hashing_targets = (
                         db_session.query(models.FilesystemState)
                         .filter(
-                            models.FilesystemState.is_indexed.is_(False),
+                            models.FilesystemState.sha256_hash.is_(None),
                             models.FilesystemState.is_ignored.is_(False),
                         )
                         .limit(100)
@@ -422,7 +449,7 @@ class ScannerService:
                             total_pending = (
                                 db_session.query(models.FilesystemState)
                                 .filter(
-                                    models.FilesystemState.is_indexed.is_(False),
+                                    models.FilesystemState.sha256_hash.is_(None),
                                     models.FilesystemState.is_ignored.is_(False),
                                 )
                                 .count()
@@ -451,7 +478,6 @@ class ScannerService:
 
                             if computed_hash:
                                 target_record.sha256_hash = computed_hash
-                                target_record.is_indexed = True
                                 self.files_hashed += 1
 
                             if self.files_hashed % 5 == 0:

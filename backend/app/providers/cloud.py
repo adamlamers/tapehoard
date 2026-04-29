@@ -1,3 +1,4 @@
+import hashlib
 import boto3
 import os
 import io
@@ -9,6 +10,8 @@ from loguru import logger
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA256
+
+from app.core.config import settings
 
 
 class CloudStorageProvider(AbstractStorageProvider):
@@ -48,6 +51,12 @@ class CloudStorageProvider(AbstractStorageProvider):
             "title": "Client-Side Encryption Passphrase",
             "description": "Used to encrypt data locally before uploading via AES-256-GCM.",
         },
+        "obfuscate_filenames": {
+            "type": "boolean",
+            "title": "Obfuscate Filenames",
+            "description": "Store files as SHA-256 hashes in the cloud to hide metadata.",
+            "default": False,
+        },
     }
 
     def __init__(self, config: Dict[str, Any]):
@@ -55,9 +64,12 @@ class CloudStorageProvider(AbstractStorageProvider):
         self.bucket_name = config.get("bucket_name")
         self.region = config.get("region", "us-east-1")
         self.endpoint_url = config.get("endpoint_url")
+        self.obfuscate = config.get("obfuscate_filenames", False)
 
-        # Local Encryption Settings
-        self.passphrase = config.get("encryption_passphrase")
+        # Local Encryption Settings: Use provided or global default
+        self.passphrase = (
+            config.get("encryption_passphrase") or settings.encryption_passphrase
+        )
 
         # Credentials
         access_key = config.get("access_key")
@@ -79,6 +91,16 @@ class CloudStorageProvider(AbstractStorageProvider):
         return PBKDF2(
             self.passphrase, salt, dkLen=32, count=100000, hmac_hash_module=SHA256
         )
+
+    def _get_obfuscated_key(self, prefix: str, path: str) -> str:
+        """Returns a hashed version of the filename if obfuscation is enabled."""
+        if not self.obfuscate:
+            return f"{prefix}/{path.lstrip('./')}"
+
+        # We hash the path to hide metadata while keeping it deterministic
+        hashed = hashlib.sha256(path.encode("utf-8")).hexdigest()
+        # Use two-level sharding to prevent S3 prefix performance issues with 100k+ files
+        return f"{prefix}/{hashed[:2]}/{hashed[2:4]}/{hashed}"
 
     def get_name(self) -> str:
         return f"Cloud ({self.provider_type})"
@@ -122,7 +144,7 @@ class CloudStorageProvider(AbstractStorageProvider):
         try:
             self.s3.head_bucket(Bucket=self.bucket_name)
             paginator = self.s3.get_paginator("list_objects_v2")
-            for page in paginator.paginate(Bucket=self.bucket_name, Prefix="archives/"):
+            for page in paginator.paginate(Bucket=self.bucket_name):
                 if "Contents" in page:
                     objects = [{"Key": obj["Key"]} for obj in page["Contents"]]
                     self.s3.delete_objects(
@@ -148,7 +170,9 @@ class CloudStorageProvider(AbstractStorageProvider):
         """
         import uuid
 
-        object_key = f"archives/{uuid.uuid4().hex}.tar"
+        # Archives are always obfuscated by UUID for privacy and collision avoidance
+        raw_key = f"archives/{uuid.uuid4().hex}.tar"
+        object_key = self._get_obfuscated_key("archives", raw_key)
 
         if self.passphrase:
             logger.info(
@@ -166,7 +190,6 @@ class CloudStorageProvider(AbstractStorageProvider):
             ciphertext, tag = cipher.encrypt_and_digest(data)
 
             # 3. Concatenate and upload
-            # We store everything needed for decryption in the blob itself for maximum portability
             payload = salt + nonce + tag + ciphertext
 
             try:
@@ -174,7 +197,10 @@ class CloudStorageProvider(AbstractStorageProvider):
                     Bucket=self.bucket_name,
                     Key=object_key,
                     Body=payload,
-                    Metadata={"x-amz-meta-tapehoard-encrypted": "v2-gcm"},
+                    Metadata={
+                        "x-amz-meta-tapehoard-encrypted": "v2-gcm",
+                        "x-amz-meta-tapehoard-type": "archive",
+                    },
                 )
                 return object_key
             except Exception as e:
@@ -193,10 +219,9 @@ class CloudStorageProvider(AbstractStorageProvider):
         self, media_id: str, relative_path: str, stream: BinaryIO
     ) -> str:
         """
-        Uploads a single file directly to the cloud, maintaining structure.
+        Uploads a single file directly to the cloud.
         """
-        clean_path = relative_path.lstrip("./")
-        object_key = f"objects/{clean_path}"
+        object_key = self._get_obfuscated_key("objects", relative_path)
 
         if self.passphrase:
             logger.info(
@@ -221,7 +246,10 @@ class CloudStorageProvider(AbstractStorageProvider):
                     Bucket=self.bucket_name,
                     Key=object_key,
                     Body=payload,
-                    Metadata={"x-amz-meta-tapehoard-encrypted": "v2-gcm"},
+                    Metadata={
+                        "x-amz-meta-tapehoard-encrypted": "v2-gcm",
+                        "x-amz-meta-tapehoard-type": "object",
+                    },
                 )
                 return object_key
             except Exception as e:

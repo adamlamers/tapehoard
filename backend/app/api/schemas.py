@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -17,7 +17,6 @@ class ItemMetadataSchema(BaseModel):
     mtime: datetime
     last_seen_timestamp: Optional[datetime] = None
     sha256_hash: Optional[str] = None
-    is_indexed: bool = False
     is_ignored: bool = False
     child_count: Optional[int] = 0
     selected: bool = False
@@ -44,8 +43,7 @@ class MediaSchema(BaseModel):
     host_total_bytes: Optional[int] = None
     live_info: Optional[Dict[str, Any]] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MediaCreateSchema(BaseModel):

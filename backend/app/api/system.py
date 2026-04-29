@@ -8,7 +8,7 @@ import pathspec
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
@@ -37,6 +37,8 @@ class DashboardStatsSchema(BaseModel):
 
 
 class JobSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     job_type: str
     status: str
@@ -46,9 +48,6 @@ class JobSchema(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class FileItemSchema(BaseModel):
@@ -172,7 +171,7 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
             SUM(CASE WHEN is_ignored = 1 THEN size ELSE 0 END) as ignored_size,
             SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN 1 ELSE 0 END) as unprotected_count,
             SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN size ELSE 0 END) as unprotected_size,
-            SUM(CASE WHEN is_indexed = 1 AND is_ignored = 0 THEN 1 ELSE 0 END) as hashed_count,
+            SUM(CASE WHEN sha256_hash IS NOT NULL AND is_ignored = 0 THEN 1 ELSE 0 END) as hashed_count,
             SUM(CASE WHEN is_ignored = 0 THEN 1 ELSE 0 END) as eligible_count,
             SUM(CASE WHEN id IN (SELECT filesystem_state_id FROM file_versions) THEN size ELSE 0 END) as archived_size
         FROM filesystem_state

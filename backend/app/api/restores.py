@@ -1,6 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
 from app.db.database import get_db, SessionLocal
@@ -17,13 +17,12 @@ router = APIRouter(prefix="/restores", tags=["Restores"])
 
 
 class CartItemSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     file_path: str
     size: int
     type: str
-
-    class Config:
-        from_attributes = True
 
 
 class RestoreTriggerRequest(BaseModel):
@@ -115,7 +114,9 @@ def add_directory_to_recovery_queue(
         AND rc.id IS NULL
     """)
 
-    db_session.execute(discovery_sql, {"prefix": f"{target_directory}%", "now": now})
+    db_session.execute(
+        discovery_sql, {"prefix": f"{target_directory}%", "now": now.isoformat()}
+    )
     db_session.commit()
 
     total_in_queue = db_session.query(models.RestoreCart).count()

@@ -66,7 +66,6 @@ def test_get_insights(client, db_session):
         file_path="/source/f1.txt",
         size=100,
         mtime=1000,
-        is_indexed=True,
         sha256_hash="hash1",
     )
     db_session.add(file1)
@@ -127,7 +126,6 @@ def test_search_index(client, db_session):
         file_path="data/important.doc",
         size=500,
         mtime=2000,
-        is_indexed=True,
         sha256_hash="hash",
     )
     db_session.add(file1)

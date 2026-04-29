@@ -337,11 +337,11 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
         SELECT
             COUNT(*) as total_files,
             SUM(size) as total_size,
-            SUM(CASE WHEN is_indexed = 1 THEN size ELSE 0 END) as total_hashed_size,
+            SUM(CASE WHEN sha256_hash IS NOT NULL THEN size ELSE 0 END) as total_hashed_size,
             (SELECT SUM(min_size) FROM (
                 SELECT MIN(size) as min_size
                 FROM filesystem_state
-                WHERE is_indexed = 1 AND sha256_hash IS NOT NULL AND is_ignored = 0
+                WHERE sha256_hash IS NOT NULL AND is_ignored = 0
                 GROUP BY sha256_hash
             )) as unique_hashed_size
         FROM filesystem_state
@@ -453,7 +453,7 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
             COUNT(*) as copy_count,
             (size * (COUNT(*) - 1)) as saved_bytes
         FROM filesystem_state
-        WHERE is_indexed = 1 AND sha256_hash IS NOT NULL AND is_ignored = 0
+        WHERE sha256_hash IS NOT NULL AND is_ignored = 0
         GROUP BY sha256_hash
         HAVING copy_count > 1
         ORDER BY saved_bytes DESC
@@ -465,7 +465,8 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
     directory_aggregation_sql = text("""
         SELECT
             RTRIM(file_path, REPLACE(file_path, '/', '')) as dir_path,
-            SUM(size) as byte_total
+            SUM(size) as byte_total,
+            MAX(mtime) as latest_mtime
         FROM filesystem_state
         WHERE is_ignored = 0
         GROUP BY dir_path
@@ -474,7 +475,7 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
 
     # Hierarchical tree construction
     nested_dir_map = {}
-    for path_str, size_val in all_directories:
+    for path_str, size_val, mtime_val in all_directories:
         if not path_str:
             continue
         path_segments = [p for p in path_str.split("/") if p]
@@ -492,10 +493,14 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
             if segment not in current_node:
                 current_node[segment] = {
                     "size": 0,
+                    "mtime": 0,
                     "children": {},
                     "fullPath": accumulated_path,
                 }
             current_node[segment]["size"] += size_val
+            current_node[segment]["mtime"] = max(
+                current_node[segment]["mtime"], mtime_val or 0
+            )
             current_node = current_node[segment]["children"]
 
     # Collapse unhelpful single-child roots
@@ -517,6 +522,7 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
                 {
                     "path": key,
                     "size": value["size"],
+                    "mtime": value["mtime"],
                     "fullPath": value["fullPath"],
                     "children": children_list,
                 }
@@ -877,12 +883,10 @@ def get_archive_item_metadata(path: str, db_session: Session = Depends(get_db)):
     return ItemMetadataSchema(
         id=item.id,
         path=item.file_path,
-        type="file",
         size=item.size,
         mtime=datetime.fromtimestamp(item.mtime, tz=timezone.utc),
         last_seen_timestamp=item.last_seen_timestamp,
         sha256_hash=item.sha256_hash,
-        is_indexed=item.is_indexed,
         is_ignored=item.is_ignored,
         versions=versions,
     )

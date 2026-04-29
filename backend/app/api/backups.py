@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.db import models
@@ -17,14 +17,13 @@ router = APIRouter(prefix="/backups", tags=["Backups"])
 
 
 class BackupJobSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     job_type: str
     status: str
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
 
 
 # --- Endpoints ---

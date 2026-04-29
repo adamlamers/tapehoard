@@ -15,7 +15,11 @@ services:
     # devices:
     #   - /dev/nst0:/dev/nst0
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=0
+      - PGID=0
+      - RUN_AS_ROOT=true
       - TZ=UTC
+    user: "0:0"
+    cap_add:
+      - SYS_RAWIO
     restart: unless-stopped

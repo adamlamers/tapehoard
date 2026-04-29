@@ -21,7 +21,6 @@ def test_get_dashboard_stats_populated(client, db_session):
         size=1024,
         mtime=datetime.now(timezone.utc).timestamp(),
         is_ignored=False,
-        is_indexed=True,
     )
     db_session.add(file_state)
     db_session.commit()

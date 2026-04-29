@@ -19,7 +19,6 @@ class FilesystemState(Base):
     sha256_hash: Mapped[Optional[str]] = mapped_column(
         String, index=True, nullable=True
     )
-    is_indexed: Mapped[bool] = mapped_column(Boolean, default=False)  # True if hashed
     is_ignored: Mapped[bool] = mapped_column(
         Boolean, default=False
     )  # True if matches exclusion

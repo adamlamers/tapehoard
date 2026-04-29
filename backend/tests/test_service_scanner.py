@@ -91,7 +91,7 @@ def test_metadata_update_on_change(db_session):
 
     # Initial state
     f1 = models.FilesystemState(
-        file_path="/data/up.txt", size=50, mtime=1, is_indexed=True, sha256_hash="old"
+        file_path="/data/up.txt", size=50, mtime=1, sha256_hash="old"
     )
     db_session.add(f1)
     db_session.commit()
@@ -103,7 +103,7 @@ def test_metadata_update_on_change(db_session):
 
     db_session.refresh(f1)
     assert f1.size == 999
-    assert f1.is_indexed is False  # Should be reset for re-hashing
+    assert f1.sha256_hash is None  # Should be reset for re-hashing
 
 
 def test_scan_sources_mocked(db_session, mocker):
@@ -141,7 +141,7 @@ def test_run_hashing_mocked(db_session, mocker):
 
     # Setup unindexed file
     f = models.FilesystemState(
-        file_path="/data/hash.me", size=10, mtime=1, is_indexed=False, is_ignored=False
+        file_path="/data/hash.me", size=10, mtime=1, is_ignored=False
     )
     db_session.add(f)
     db_session.commit()
@@ -154,5 +154,4 @@ def test_run_hashing_mocked(db_session, mocker):
     scanner.run_hashing()
 
     db_session.refresh(f)
-    assert f.is_indexed is True
     assert f.sha256_hash == "mocked_hash"

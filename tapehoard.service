@@ -1,0 +1,17 @@
+[Unit]
+Description=TapeHoard Backup Manager
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/tapehoard
+# We use root to ensure direct /dev/nst0 and raw SCSI access
+ExecStart=/usr/bin/just dev
+Restart=always
+RestartSec=10
+# Give the tape drive time to rewind on shutdown
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

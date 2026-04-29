@@ -53,12 +53,22 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
 ### Scanning & Hashing Architecture
 *   **Concurrent Phasing:** Decoupled into `SCAN` (Metadata, Normal priority) and `HASH` (Content, Idle priority with dynamic `iowait` throttling).
 *   **Thread-Safe Metrics:** All counters (files processed, bytes hashed) must be protected by a `threading.Lock`.
-*   **Hashing Progress:** Hashing jobs calculate progress against a dynamically updating snapshot of total `is_indexed = 0 AND is_ignored = 0` files.
+*   **Hashing Progress:** Hashing jobs calculate progress against a dynamically updating snapshot of total `sha256_hash IS NULL AND is_ignored = 0` files.
 
 ### Archival & Recovery
 *   **Format Negotiation:** The Archiver adapts formats based on provider capabilities (`supports_random_access`).
     *   *Sequential (Tape):* Uses `.tar` streams to maintain drive streaming.
     *   *Random Access (HDD/Cloud):* Uses native direct file copying/objects to enable instant seekless restores without unpacking gigabytes of data.
+*   **High-Speed Hybrid Archival:**
+    *   The system prioritizes the **system `tar` binary** for whole-file chunks, delivering a 10x-20x performance boost over pure Python and ensuring optimal buffer saturation for LTO drives.
+    *   It transparently falls back to the **Python `RangeFile` logic** only for chunks containing split fragments, maintaining bit-perfect alignment for multi-tape files.
+*   **Industrial Tar Chunking:**
+    *   Large backup sets are automatically split into multiple independent archives. The system dynamically aims for at least **100 archives per tape** (calculated based on generational capacity, e.g., ~15GB for LTO-5) to provide high seek granularity during restoration.
+    *   **Exception:** Single large files are allowed to occupy their own archives even if they exceed the target chunk size, preventing unnecessary fragmentation while keeping them as independent, seekable objects.
+*   **Refined Splitting Philosophy:**
+    *   Files are **only split** if they are physically larger than the media's entire capacity (multi-tape spanning).
+    *   **Skip-and-Defer:** If a file is larger than the remaining space on a tape but smaller than its total capacity, it is deferred to the next fresh medium to minimize fragmentation.
+*   **Hardware-First Utilization:** The system trusts **Physical Hardware Feedback (MAM)** over logical byte counts. Tapes are only marked as "Full" when the drive reporting (via `get_utilization`) confirms saturation, maximizing utilization when hardware compression is active.
 *   **Bitstream Integrity:** `RangeFile` must guarantee exact byte counts for tar alignment.
 *   **Metadata Fidelity:** The restorer must preserve original **permissions (chmod)**, **timestamps (utime)**, and **ownership (chown)** when recovering files natively or via tar.
 *   **Independence:** Force all tar archive members to be **Regular Files** to break fragile hard-link dependencies. Symlinks are preserved as `SYMTYPE` (or `.symlink` stub objects for native format).

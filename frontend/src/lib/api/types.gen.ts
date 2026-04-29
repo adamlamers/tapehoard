@@ -270,10 +270,7 @@ export type ItemMetadataSchema = {
      * Sha256 Hash
      */
     sha256_hash?: string | null;
-    /**
-     * Is Indexed
-     */
-    is_indexed?: boolean;
+
     /**
      * Is Ignored
      */

@@ -37,7 +37,7 @@ lint:
 # Run all backend tests
 pytest:
     @echo "Running backend tests..."
-    cd backend && uv run pytest
+    cd backend && COVERAGE_CORE=sysmon uv run pytest
 
 # Run frontend checks
 check:
