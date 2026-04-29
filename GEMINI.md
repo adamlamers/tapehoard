@@ -82,6 +82,9 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
         *   `StatCard`: Modular metric tiles with consistent scaling and alignment for big numbers.
         *   `ProgressBar`: Unified utilization and task indicators with industrial glow effects.
         *   `StatusBadge`: Centralized state indicators (Success, Error, Warning, Neutral, Blue) with consistent padding.
+        *   `Dialog`: Standardized modal/dialog system with backdrop blurring and consistent ARIA roles.
+        *   `EmptyState`: Unified visual pattern for empty views with consistent icons and typography.
+        *   `IconButton`: Standardized boilerplate for icon-only buttons with fixed SVG scaling and consistent sizes.
         *   `Card`: Unified **p-5** padding, **rounded-xl** borders, and **shadow-xl** for all content containers.
         *   `Button`: Standardized high-density **h-9 px-4** sizing (or **h-11** for primary CTAs) with `font-medium` sentence-case labels.
     *   **High Density:** Maintain maximum information density without sacrificing legibility by utilizing high-density typography classes (`text-4xs` to `text-6xs`) for metadata and technical labels.

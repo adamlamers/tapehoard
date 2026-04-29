@@ -14,7 +14,7 @@
         children: Snippet;
     }>();
 
-    let menuElement: HTMLElement;
+    let menuElement = $state<HTMLElement | null>(null);
 
     // Adjust position to stay within viewport
     let adjustedX = $state(0);

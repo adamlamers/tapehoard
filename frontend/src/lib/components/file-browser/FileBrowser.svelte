@@ -326,10 +326,10 @@
         }
 </script>
 
+<svelte:window onkeydown={handleKeyDown} />
+
 <div
         class="file-browser flex h-full flex-col overflow-hidden rounded-lg border border-border-color bg-bg-secondary shadow-2xl min-w-0"
-        onkeydown={handleKeyDown}
-        tabindex="0"
         role="application"
         aria-label="File Browser"
 >
@@ -378,8 +378,9 @@
                         <div
                                 class="flex-1 flex items-center bg-bg-primary border border-border-color/40 rounded-md px-3 h-9 shadow-inner overflow-hidden max-w-3xl group transition-all focus-within:border-action-color/50 min-w-0"
                                 onclick={handleAddressClick}
+                                onkeydown={(e) => e.key === 'Enter' && handleAddressClick()}
                                 role="button"
-                                tabindex="-1"
+                                tabindex="0"
                         >
                                 <Folder size={16} class="text-yellow-500/80 mr-2 shrink-0"></Folder>
 
@@ -389,7 +390,6 @@
                                                 class="flex-1 bg-transparent border-none outline-none text-[13px] text-text-primary mono"
                                                 bind:value={pathInputValue}
                                                 onblur={() => setTimeout(() => isEditingPath = false, 100)}
-                                                autoFocus
                                         />
                                 {:else}
                                         <div class="flex-1 flex items-center overflow-x-auto scrollbar-hide">

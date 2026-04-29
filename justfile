@@ -39,6 +39,11 @@ pytest:
     @echo "Running backend tests..."
     cd backend && uv run pytest
 
+# Run frontend checks
+check:
+    @echo "Running frontend checks..."
+    cd frontend && npm run check
+
 # Auto-format all code (Ruff Format)
 format:
     @echo "Formatting Python (Ruff)..."

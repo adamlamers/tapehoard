@@ -2,6 +2,7 @@
     import { X, Activity, Search, Play, RotateCw, Clock, CheckCircle2, AlertCircle, FileText, Database, HardDrive, MapPin, ExternalLink, ArrowRight } from 'lucide-svelte';
     import { Button } from './ui/button';
     import { Card } from './ui/card';
+    import Dialog from './ui/Dialog.svelte';
     import { getJobDetailSystemJobsJobIdGet, type JobSchema } from '$lib/api';
     import { cn, formatLocalTime, formatLocalDateTime, parseUTCDate } from '$lib/utils';
     import { onMount } from 'svelte';
@@ -44,8 +45,8 @@
     onMount(loadJob);
 </script>
 
-<div class="fixed inset-0 z-[1200] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300" onmousedown={onClear}>
-    <Card class="w-[800px] max-h-[90vh] bg-bg-secondary border-border-color shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300" onmousedown={(e) => e.stopPropagation()}>
+<Dialog show={true} onClose={onClear} ariaLabelledBy="modal-title">
+    <Card class="w-[800px] max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
         {#if loading}
             <div class="flex-1 flex flex-col items-center justify-center gap-4 py-24">
                 <RotateCw size={48} class="animate-spin text-blue-500" />
@@ -63,7 +64,7 @@
                         </div>
                         <div>
                             <div class="flex items-center gap-3 mb-1">
-                                <h2 class="text-xl font-bold text-text-primary">{job.job_type.charAt(0) + job.job_type.slice(1).toLowerCase()} job #{job.id}</h2>
+                                <h2 id="modal-title" class="text-xl font-bold text-text-primary">{job.job_type.charAt(0) + job.job_type.slice(1).toLowerCase()} job #{job.id}</h2>
                                 <span class={cn(
                                     "px-2.5 py-0.5 rounded-full border text-[10px] font-medium uppercase tracking-wider",
                                     job.status === 'COMPLETED' ? 'text-success-color border-success-color/20 bg-success-color/5' :
@@ -149,4 +150,4 @@
             </footer>
         {/if}
     </Card>
-</div>
+</Dialog>

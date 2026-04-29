@@ -33,6 +33,7 @@
     import SectionHeader from '$lib/components/ui/SectionHeader.svelte';
     import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
     import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
+    import Dialog from '$lib/components/ui/Dialog.svelte';
     import { Card } from '$lib/components/ui/card';
     import { Input } from '$lib/components/ui/input';
     import { cn } from '$lib/utils';
@@ -459,8 +460,8 @@
                     <Button variant="default" size="sm" class="h-7 text-[10px] bg-blue-600 hover:bg-blue-500" onclick={() => handleStartBackup(media.id, media.identifier)}>Archive</Button>
                 {/if}
             {/if}
-            <Button variant="ghost" size="icon" class="h-7 w-7 text-text-secondary hover:text-text-primary hover:bg-white/5" onclick={() => openEdit(media)}><Edit3 size={12} /></Button>
-            <Button variant="ghost" size="icon" class="h-7 w-7 text-text-secondary hover:text-error-color hover:bg-error-color/10" onclick={() => handleDelete(media.id)}><Trash2 size={12} /></Button>
+            <Button variant="ghost" size="icon" class="h-7 w-7 text-text-secondary hover:text-text-primary hover:bg-white/5" onclick={() => openEdit(media)}><Edit3 size={14} /></Button>
+            <Button variant="ghost" size="icon" class="h-7 w-7 text-text-secondary hover:text-error-color hover:bg-error-color/10" onclick={() => handleDelete(media.id)}><Trash2 size={16} /></Button>
         </div>
     </td>
 {/snippet}
@@ -828,89 +829,87 @@
     </div>
 
     <!-- Registration Dialog -->
-    {#if showRegisterDialog}
-        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6" onmousedown={() => showRegisterDialog = false}>
-            <Card class="w-[700px] max-h-[90vh] overflow-y-auto bg-bg-secondary border-border-color shadow-2xl p-8 flex flex-col gap-6 animate-in zoom-in-95 duration-300" onmousedown={(e) => e.stopPropagation()}>
-                <header class="flex justify-between items-start">
-                    <div>
-                        <h2 class="text-xl font-bold text-text-primary">Add new media</h2>
-                        <p class="text-sm text-text-secondary mt-1 opacity-60">Add physical storage locations for your backups.</p>
-                    </div>
-                    <Button variant="ghost" size="icon" class="hover:bg-white/5" onclick={() => showRegisterDialog = false}><X size={20} /></Button>
-                </header>
-
-                <div class="grid grid-cols-3 gap-4">
-                    {#each providersList as provider}
-                        <button class={cn("flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all", newMedia.media_type === provider.provider_id ? "bg-blue-500/10 border-blue-500 text-blue-400 shadow-lg shadow-blue-500/10" : "bg-bg-primary/50 border-border-color text-text-secondary hover:border-text-secondary/30")}
-                            onclick={() => {
-                                newMedia.media_type = provider.provider_id;
-                                if (provider.provider_id === 'lto_tape') newMedia.location = 'Storage Shelf';
-                                else if (provider.provider_id === 'local_hdd') newMedia.location = 'Offsite Safe';
-                                else newMedia.location = 'Cloud';
-                            }}
-                        >
-                            {@render ConfigIcon(provider.provider_id)}
-                            <span class="text-xs font-semibold">{provider.name}</span>
-                        </button>
-                    {/each}
+    <Dialog show={showRegisterDialog} onClose={() => showRegisterDialog = false} ariaLabelledBy="register-title">
+        <Card class="w-[700px] max-h-[90vh] overflow-y-auto p-8 flex flex-col gap-6 shadow-2xl">
+            <header class="flex justify-between items-start">
+                <div>
+                    <h2 id="register-title" class="text-xl font-bold text-text-primary">Add new media</h2>
+                    <p class="text-sm text-text-secondary mt-1 opacity-60">Add physical storage locations for your backups.</p>
                 </div>
+                <Button variant="ghost" size="icon" class="hover:bg-white/5" onclick={() => showRegisterDialog = false}><X size={20} /></Button>
+            </header>
 
-                <div class="space-y-6">
-                    <div class="grid grid-cols-2 gap-6">
-                        <div class="space-y-2">
-                            <label class="text-xs font-medium text-text-secondary ml-1" for="identifier">Identifier (Barcode/SN)</label>
-                            <Input id="identifier" bind:value={newMedia.identifier} placeholder="BUP-00001" class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-xs font-medium text-text-secondary ml-1" for="capacity">Capacity (GB)</label>
-                            <Input id="capacity" type="number" bind:value={newMedia.capacity_gb} class="h-10 bg-bg-primary/50 border-border-color font-mono" />
-                            <p class="text-[10px] text-text-secondary leading-tight opacity-60">Auto-detected when possible. You can manually reduce this to reserve space.</p>
-                        </div>
-                    </div>
+            <div class="grid grid-cols-3 gap-4">
+                {#each providersList as provider}
+                    <button class={cn("flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all", newMedia.media_type === provider.provider_id ? "bg-blue-500/10 border-blue-500 text-blue-400 shadow-lg shadow-blue-500/10" : "bg-bg-primary/50 border-border-color text-text-secondary hover:border-text-secondary/30")}
+                        onclick={() => {
+                            newMedia.media_type = provider.provider_id;
+                            if (provider.provider_id === 'lto_tape') newMedia.location = 'Storage Shelf';
+                            else if (provider.provider_id === 'local_hdd') newMedia.location = 'Offsite Safe';
+                            else newMedia.location = 'Cloud';
+                        }}
+                    >
+                        {@render ConfigIcon(provider.provider_id)}
+                        <span class="text-xs font-semibold">{provider.name}</span>
+                    </button>
+                {/each}
+            </div>
 
+            <div class="space-y-6">
+                <div class="grid grid-cols-2 gap-6">
                     <div class="space-y-2">
-                        <label class="text-xs font-medium text-text-secondary ml-1" for="location">Physical location</label>
-                        <div class="relative">
-                            <MapPin size={16} class="absolute left-4 top-3 text-text-secondary opacity-50" />
-                            <Input id="location" bind:value={newMedia.location} placeholder="Cabinet A, Shelf 2" class="h-10 bg-bg-primary/50 pl-12 border-border-color font-mono text-sm" />
-                        </div>
+                        <label class="text-xs font-medium text-text-secondary ml-1" for="identifier">Identifier (Barcode/SN)</label>
+                        <Input id="identifier" bind:value={newMedia.identifier} placeholder="BUP-00001" class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
                     </div>
-
-                    <!-- Dynamic Provider Config Fields -->
-                    {#if activeProvider}
-                        <div class="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
-                            {#each Object.entries(activeProvider.config_schema) as [key, schema]}
-                                {@const field = schema as any}
-                                <div class="space-y-2">
-                                    <label class="text-xs font-medium text-text-secondary ml-1" for="config-{key}">{field.title || key}</label>
-                                    <Input
-                                        id="config-{key}"
-                                        bind:value={dynamicConfig[key]}
-                                        placeholder={field.description || ""}
-                                        type={key.includes("key") || key.includes("passphrase") ? "password" : "text"}
-                                        class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm"
-                                    />
-                                </div>
-                            {/each}
-                        </div>
-                    {/if}
+                    <div class="space-y-2">
+                        <label class="text-xs font-medium text-text-secondary ml-1" for="capacity">Capacity (GB)</label>
+                        <Input id="capacity" type="number" bind:value={newMedia.capacity_gb} class="h-10 bg-bg-primary/50 border-border-color font-mono" />
+                        <p class="text-[10px] text-text-secondary leading-tight opacity-60">Auto-detected when possible. You can manually reduce this to reserve space.</p>
+                    </div>
                 </div>
 
-                <footer class="flex gap-3 pt-4 border-t border-border-color">
-                    <Button variant="outline" class="flex-1 h-10" onclick={() => showRegisterDialog = false}>Cancel</Button>
-                    <Button variant="default" class="flex-[2] h-10" onclick={handleRegister}>Register media</Button>
-                </footer>
-            </Card>
-        </div>
-    {/if}
+                <div class="space-y-2">
+                    <label class="text-xs font-medium text-text-secondary ml-1" for="location">Physical location</label>
+                    <div class="relative">
+                        <MapPin size={16} class="absolute left-4 top-3 text-text-secondary opacity-50" />
+                        <Input id="location" bind:value={newMedia.location} placeholder="Cabinet A, Shelf 2" class="h-10 bg-bg-primary/50 pl-12 border-border-color font-mono text-sm" />
+                    </div>
+                </div>
+
+                <!-- Dynamic Provider Config Fields -->
+                {#if activeProvider}
+                    <div class="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
+                        {#each Object.entries(activeProvider.config_schema) as [key, schema]}
+                            {@const field = schema as any}
+                            <div class="space-y-2">
+                                <label class="text-xs font-medium text-text-secondary ml-1" for="config-{key}">{field.title || key}</label>
+                                <Input
+                                    id="config-{key}"
+                                    bind:value={dynamicConfig[key]}
+                                    placeholder={field.description || ""}
+                                    type={key.includes("key") || key.includes("passphrase") ? "password" : "text"}
+                                    class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm"
+                                />
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
+
+            <footer class="flex gap-3 pt-4 border-t border-border-color">
+                <Button variant="outline" class="flex-1 h-10" onclick={() => showRegisterDialog = false}>Cancel</Button>
+                <Button variant="default" class="flex-[2] h-10" onclick={handleRegister}>Register media</Button>
+            </footer>
+        </Card>
+    </Dialog>
 
     <!-- Edit Dialog -->
-    {#if editingMedia}
-        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6" onmousedown={() => editingMedia = null}>
-            <Card class="w-[600px] max-h-[90vh] overflow-y-auto bg-bg-secondary border-border-color shadow-2xl p-8 flex flex-col gap-6 animate-in zoom-in-95 duration-300" onmousedown={(e) => e.stopPropagation()}>
+    <Dialog show={!!editingMedia} onClose={() => editingMedia = null} ariaLabelledBy="edit-title">
+        {#if editingMedia}
+            <Card class="w-[600px] max-h-[90vh] overflow-y-auto p-8 flex flex-col gap-6 shadow-2xl">
                 <header class="flex justify-between items-start">
                     <div>
-                        <h2 class="text-xl font-bold text-text-primary flex items-center gap-3">
+                        <h2 id="edit-title" class="text-xl font-bold text-text-primary flex items-center gap-3">
                             <Edit3 size={20} class="text-blue-500" />
                             Edit media config
                         </h2>
@@ -975,6 +974,6 @@
                     </Button>
                 </footer>
             </Card>
-        </div>
-    {/if}
+        {/if}
+    </Dialog>
 </div>

@@ -18,6 +18,7 @@
     import { Button } from '$lib/components/ui/button';
     import PageHeader from '$lib/components/ui/PageHeader.svelte';
     import SectionHeader from '$lib/components/ui/SectionHeader.svelte';
+    import EmptyState from '$lib/components/ui/EmptyState.svelte';
     import { Card } from '$lib/components/ui/card';
     import { ScrollArea } from '$lib/components/ui/scroll-area';
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
@@ -189,20 +190,17 @@
     </PageHeader>
 
     {#if (manifest?.total_files || 0) === 0 && !loading}
-        <div class="flex-1 flex flex-col items-center justify-center p-12 text-center animate-in fade-in zoom-in duration-500">
-            <div class="max-w-2xl flex flex-col items-center">
-                <div class="w-24 h-24 bg-bg-tertiary rounded-full flex items-center justify-center mb-8 border-2 border-dashed border-border-color opacity-50">
-                    <History size={48} class="text-text-secondary" strokeWidth={1} />
-                </div>
-                <h2 class="text-xl font-bold text-text-primary">Recovery queue is empty</h2>
-                <p class="text-sm mt-4 text-text-secondary leading-relaxed opacity-60">
-                    You haven't selected any files for restoration yet. Use the Index Browser to find and queue the items you need to recover from your archives.
-                </p>
-                <Button variant="default" class="mt-8 px-8 shadow-lg shadow-blue-500/20" href="/index-browser">
+        <EmptyState
+            icon={History}
+            title="Recovery queue is empty"
+            description="You haven't selected any files for restoration yet. Use the Index Browser to find and queue the items you need to recover from your archives."
+        >
+            {#snippet action()}
+                <Button variant="default" class="px-8 shadow-lg shadow-blue-500/20" href="/index-browser">
                     Browse virtual index <ArrowRight size={14} class="ml-2" />
                 </Button>
-            </div>
-        </div>
+            {/snippet}
+        </EmptyState>
     {:else}
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 min-h-0">
             <!-- RECOVERY STRUCTURE TREE -->

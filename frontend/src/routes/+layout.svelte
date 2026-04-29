@@ -159,10 +159,10 @@
 		<!-- Dynamic Scan Status Overlay (Global) -->
 		<ScanStatusOverlay />
 
-		<div class="flex-1 overflow-y-auto p-8 lg:p-10 relative">
+		<div class="flex-1 overflow-y-auto overflow-x-hidden p-8 lg:p-10 relative">
 			<!-- Animated Background Glow -->
-			<div class="absolute -top-24 -right-24 w-96 h-96 bg-blue-600/5 rounded-full blur-[120px] pointer-events-none"></div>
-			<div class="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-600/5 rounded-full blur-[120px] pointer-events-none"></div>
+			<div class="absolute -top-24 -right-24 w-96 h-96 bg-blue-600/5 rounded-full blur-[120px] pointer-events-none overflow-hidden"></div>
+			<div class="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-600/5 rounded-full blur-[120px] pointer-events-none overflow-hidden"></div>
 
 			{@render children()}
 		</div>

@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import ContextMenu from './ui/ContextMenu.svelte';
+    import EmptyState from './ui/EmptyState.svelte';
     import { FolderSearch, ExternalLink, ChevronLeft } from 'lucide-svelte';
     import type { TreemapItem } from '$lib/types';
 
@@ -135,9 +136,10 @@
         {/each}
 
         {#if currentItems.length === 0}
-            <div class="absolute inset-0 flex items-center justify-center opacity-20">
-                <span class="text-sm font-medium">No nested data</span>
-            </div>
+            <EmptyState
+                title="No nested data"
+                class="absolute inset-0 p-0"
+            />
         {/if}
     </div>
 </div>

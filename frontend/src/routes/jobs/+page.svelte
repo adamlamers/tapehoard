@@ -18,6 +18,7 @@
     import SectionHeader from '$lib/components/ui/SectionHeader.svelte';
     import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
     import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
+    import EmptyState from '$lib/components/ui/EmptyState.svelte';
     import JobDetailModal from '$lib/components/JobDetailModal.svelte';
     import {
         listJobsSystemJobsGet,
@@ -214,10 +215,11 @@
                         </div>
                     </Card>
                 {:else}
-                    <div class="py-12 border-2 border-dashed border-border-color rounded-2xl flex flex-col items-center justify-center opacity-20">
-                        <Activity size={40} class="mb-2 text-blue-500" />
-                        <p class="text-xs font-medium">No active operations</p>
-                    </div>
+                    <EmptyState
+                        icon={Activity}
+                        title="No active operations"
+                        description="There are currently no tasks running on this station."
+                    />
                 {/each}
             </div>
         </section>
