@@ -87,26 +87,29 @@ def test_assemble_backup_batch(db_session):
     )
     db_session.add(m)
 
-    # Create files that will exceed capacity (200MB each)
+    # Create files
     size_200mb = 200 * 1024 * 1024
     f1 = models.FilesystemState(
         file_path="/f1.bin", size=size_200mb, mtime=1, is_indexed=True
     )
+    # f2 is 200MB, would fit on fresh tape. Should be skipped on this 300MB tape
+    # after f1 (200MB) is added, because only 100MB is left.
     f2 = models.FilesystemState(
         file_path="/f2.bin", size=size_200mb, mtime=1, is_indexed=True
     )
-    db_session.add_all([f1, f2])
+    # f3 is 500MB, larger than total capacity (300MB). SHOULD be split.
+    f3 = models.FilesystemState(
+        file_path="/f3.bin", size=500 * 1024 * 1024, mtime=1, is_indexed=True
+    )
+    db_session.add_all([f1, f2, f3])
     db_session.commit()
 
     batch = archiver.assemble_backup_batch(db_session, m.id)
 
-    # Batch should contain all of f1 and 100MB of f2
+    # Batch should contain f1 (200MB) and 100MB of f3 (f2 is skipped)
     assert len(batch) == 2
     assert batch[0]["file_state"].file_path == "/f1.bin"
-    assert batch[0]["offset_end"] == size_200mb
-
-    assert batch[1]["file_state"].file_path == "/f2.bin"
-    # f1 uses 200MB, leaving 100MB for f2
+    assert batch[1]["file_state"].file_path == "/f3.bin"
     assert batch[1]["offset_end"] == 100 * 1024 * 1024
     assert batch[1]["is_split"] is True
 

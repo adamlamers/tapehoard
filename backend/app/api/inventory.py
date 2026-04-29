@@ -92,6 +92,7 @@ def list_storage_fleet(refresh: bool = False, db_session: Session = Depends(get_
         provider = archiver_manager._get_storage_provider(media)
         is_online = False
         hardware_identified = False
+        needs_registration = False
         host_free_bytes = None
         host_total_bytes = None
         live_info = None
@@ -115,6 +116,7 @@ def list_storage_fleet(refresh: bool = False, db_session: Session = Depends(get_
 
                 # Always populate live_info using the unified interface
                 live_info = provider.get_live_info(force=refresh)
+                needs_registration = live_info.get("needs_registration", False)
 
                 # For HDD providers, also grab host-level capacity if possible
                 if is_online and media.media_type == "hdd":
@@ -150,6 +152,7 @@ def list_storage_fleet(refresh: bool = False, db_session: Session = Depends(get_
                 config=final_config,
                 is_online=is_online,
                 is_identified=hardware_identified,
+                needs_registration=needs_registration,
                 priority_index=media.priority_index,
                 host_free_bytes=host_free_bytes,
                 host_total_bytes=host_total_bytes,
@@ -544,6 +547,56 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
         ],
         "directories": convert_tree_to_list(nested_dir_map, 10),
     }
+
+
+@router.get("/detect")
+def detect_unregistered_media(db_session: Session = Depends(get_db)):
+    """Scans all configured hardware providers for newly inserted, unregistered media."""
+    from app.services.archiver import archiver_manager
+
+    # 1. Get all unique device paths from existing media
+    registered_devices = db_session.query(models.StorageMedia.extra_config).all()
+    device_paths = set()
+    for (cfg_json,) in registered_devices:
+        if cfg_json:
+            try:
+                cfg = json.loads(cfg_json)
+                if "device_path" in cfg:
+                    device_paths.add(cfg["device_path"])
+            except Exception:
+                pass
+
+    # 2. Add default paths if not already in the set
+    device_paths.add("/dev/nst0")
+
+    detected = []
+    for path in device_paths:
+        # Create a temporary mock media record to get a provider instance
+        mock_media = models.StorageMedia(
+            media_type="lto_tape",
+            extra_config=json.dumps({"device_path": path, "compression": True}),
+        )
+        provider = archiver_manager._get_storage_provider(mock_media)
+        if provider and provider.check_online(force=True):
+            live = provider.get_live_info(force=True)
+            if live.get("identity"):
+                # Check if this identity is already in the DB
+                exists = (
+                    db_session.query(models.StorageMedia)
+                    .filter(models.StorageMedia.identifier == live["identity"])
+                    .first()
+                )
+                if not exists:
+                    detected.append(
+                        {
+                            "identifier": live["identity"],
+                            "media_type": provider.provider_id,
+                            "device_path": path,
+                            "live_info": live,
+                        }
+                    )
+
+    return detected
 
 
 @router.get("/browse")

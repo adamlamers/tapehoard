@@ -87,6 +87,14 @@ class AbstractStorageProvider(ABC):
         """
         raise NotImplementedError("This provider does not support random access.")
 
+    def get_utilization(self) -> Optional[float]:
+        """
+        Returns the actual hardware utilization as a float between 0.0 and 1.0.
+        Used for intelligent 'full' detection on hardware that supports it (like LTO MAM).
+        Returns None if not supported by the hardware/provider.
+        """
+        return None
+
     @abstractmethod
     def finalize_media(self, media_id: str):
         """Finalizes the media (e.g., writing index, ejecting)"""

@@ -44,6 +44,10 @@ check:
     @echo "Running frontend checks..."
     cd frontend && npm run check
 
+# Run all tests and linting
+test: lint pytest check
+    @echo "Running tests..."
+
 # Auto-format all code (Ruff Format)
 format:
     @echo "Formatting Python (Ruff)..."

@@ -449,6 +449,10 @@ export type MediaSchema = {
      */
     is_identified?: boolean;
     /**
+     * Needs Registration
+     */
+    needs_registration?: boolean;
+    /**
      * Priority Index
      */
     priority_index?: number;

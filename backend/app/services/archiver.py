@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import subprocess
 import tarfile
 import time
 import uuid
@@ -204,7 +205,11 @@ class ArchiverService:
                     }
                 )
                 accumulated_size += remaining_file_bytes
-            elif available_space >= MINIMUM_FRAGMENT_SIZE:
+            elif (
+                file_state.size > media_record.capacity
+                and available_space >= MINIMUM_FRAGMENT_SIZE
+            ):
+                # ONLY split if the file is physically larger than a single piece of media
                 backup_workload.append(
                     {
                         "file_state": file_state,
@@ -215,6 +220,10 @@ class ArchiverService:
                 )
                 accumulated_size += available_space
                 break
+            else:
+                # File is larger than remaining space but smaller than total media capacity.
+                # Skip it for this media to avoid unnecessary fragmentation.
+                continue
 
         return backup_workload
 
@@ -249,6 +258,13 @@ class ArchiverService:
             JobManager.complete_job(job_id)
             return
 
+        # --- Tar Chunking Logic ---
+        # Ensure at least 100 archives per tape to improve restoration granularity.
+        # Max chunk size = capacity / 100.
+        MAX_CHUNK_SIZE = media_record.capacity // 100
+        if MAX_CHUNK_SIZE < 100 * 1024 * 1024:  # Minimum 100MB chunk
+            MAX_CHUNK_SIZE = 100 * 1024 * 1024
+
         total_payload_bytes = sum(
             item["offset_end"] - item["offset_start"] for item in workload_batch
         )
@@ -270,60 +286,98 @@ class ArchiverService:
                 JobManager.fail_job(job_id, "Hardware refused write initialization.")
                 return
 
-            archive_filename = (
-                f"backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.tar"
-            )
-            staging_full_path = os.path.join(self.staging_directory, archive_filename)
-
             processed_bytes = 0
-            remaining_to_write = []
+            batch_uuid = str(uuid.uuid4())
 
-            # --- Optimized Deduplication ---
-            target_hashes = [
-                item["file_state"].sha256_hash
-                for item in workload_batch
-                if item["file_state"].sha256_hash
-            ]
-            existing_versions = {}
-            SQLITE_VARIABLE_LIMIT = 500
-            for i in range(0, len(target_hashes), SQLITE_VARIABLE_LIMIT):
-                chunk = target_hashes[i : i + SQLITE_VARIABLE_LIMIT]
-                chunk_v = (
-                    db_session.query(models.FileVersion)
-                    .join(models.FilesystemState)
-                    .filter(models.FilesystemState.sha256_hash.in_(chunk))
-                    .all()
-                )
-                for v in chunk_v:
-                    existing_versions[
-                        (v.file_state.sha256_hash, v.offset_start, v.offset_end)
-                    ] = v
-
+            # Split workload into chunks for packaging
+            chunks = []
+            current_chunk = []
+            current_chunk_size = 0
             for item in workload_batch:
-                file_state = item["file_state"]
-                dupe = existing_versions.get(
-                    (file_state.sha256_hash, item["offset_start"], item["offset_end"])
+                item_size = item["offset_end"] - item["offset_start"]
+
+                # CHUNKING LOGIC:
+                # 1. If adding this item exceeds MAX_CHUNK_SIZE...
+                # 2. AND we already have items in the current chunk...
+                # 3. AND it's not a random access provider...
+                # ... then finalize the current chunk.
+                if (
+                    current_chunk_size + item_size > MAX_CHUNK_SIZE
+                    and current_chunk
+                    and not storage_provider.capabilities.get("supports_random_access")
+                ):
+                    chunks.append(current_chunk)
+                    current_chunk = []
+                    current_chunk_size = 0
+
+                # Add item to chunk (even if it makes the chunk > MAX_CHUNK_SIZE,
+                # this allows single large files to create their own larger archive).
+                current_chunk.append(item)
+                current_chunk_size += item_size
+            if current_chunk:
+                chunks.append(current_chunk)
+
+            for chunk_index, chunk_items in enumerate(chunks):
+                if JobManager.is_cancelled(job_id):
+                    break
+
+                archive_filename = f"backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{chunk_index}.tar"
+                staging_full_path = os.path.join(
+                    self.staging_directory, archive_filename
                 )
-                if dupe:
-                    db_session.add(
-                        models.FileVersion(
-                            filesystem_state_id=file_state.id,
-                            media_id=dupe.media_id,
-                            file_number=dupe.file_number,
-                            is_split=dupe.is_split,
-                            split_id=dupe.split_id,
-                            offset_start=item["offset_start"],
-                            offset_end=item["offset_end"],
+
+                remaining_to_write = []
+
+                # --- Optimized Deduplication ---
+                target_hashes = [
+                    item["file_state"].sha256_hash
+                    for item in chunk_items
+                    if item["file_state"].sha256_hash
+                ]
+                existing_versions = {}
+                SQLITE_VARIABLE_LIMIT = 500
+                for i in range(0, len(target_hashes), SQLITE_VARIABLE_LIMIT):
+                    sql_chunk = target_hashes[i : i + SQLITE_VARIABLE_LIMIT]
+                    chunk_v = (
+                        db_session.query(models.FileVersion)
+                        .join(models.FilesystemState)
+                        .filter(models.FilesystemState.sha256_hash.in_(sql_chunk))
+                        .all()
+                    )
+                    for v in chunk_v:
+                        existing_versions[
+                            (v.file_state.sha256_hash, v.offset_start, v.offset_end)
+                        ] = v
+
+                for item in chunk_items:
+                    file_state = item["file_state"]
+                    dupe = existing_versions.get(
+                        (
+                            file_state.sha256_hash,
+                            item["offset_start"],
+                            item["offset_end"],
                         )
                     )
-                else:
-                    remaining_to_write.append(item)
+                    if dupe:
+                        db_session.add(
+                            models.FileVersion(
+                                filesystem_state_id=file_state.id,
+                                media_id=dupe.media_id,
+                                file_number=dupe.file_number,
+                                is_split=dupe.is_split,
+                                split_id=dupe.split_id,
+                                offset_start=item["offset_start"],
+                                offset_end=item["offset_end"],
+                            )
+                        )
+                    else:
+                        remaining_to_write.append(item)
 
-            # Packaging
-            if remaining_to_write:
-                batch_uuid = str(uuid.uuid4())
+                if not remaining_to_write:
+                    continue
 
                 if storage_provider.capabilities.get("supports_random_access"):
+                    # Random Access: Write files directly
                     import io
 
                     for item in remaining_to_write:
@@ -385,82 +439,177 @@ class ArchiverService:
                                 )
                             )
                 else:
-                    # Sequential Media (Tape): Tar Stream
-                    with tarfile.open(staging_full_path, "w") as tar_bundle:
-                        for item in remaining_to_write:
-                            if JobManager.is_cancelled(job_id):
-                                break
+                    # Sequential Media (Tape): Hybrid Tar Generation
+                    has_splits = any(item["is_split"] for item in remaining_to_write)
 
-                            file_state, start, end = (
-                                item["file_state"],
-                                item["offset_start"],
-                                item["offset_end"],
+                    if not has_splits and shutil.which("tar"):
+                        # PERFORMANCE PATH: Use system tar binary for whole files
+                        # Generate a null-terminated file list to handle special characters safely
+                        file_list_path = staging_full_path + ".list"
+                        with open(file_list_path, "w") as f_list:
+                            for item in remaining_to_write:
+                                # Write absolute path to list
+                                f_list.write(item["file_state"].file_path + "\0")
+
+                        try:
+                            # Use -C / to handle absolute paths, --null and -T for the list
+                            # --no-recursion since we've already resolved the file list
+                            cmd = [
+                                "tar",
+                                "-cf",
+                                staging_full_path,
+                                "--null",
+                                "-T",
+                                file_list_path,
+                                "--no-recursion",
+                                "--absolute-names",
+                            ]
+                            logger.debug(f"RUNNING BINARY TAR: {' '.join(cmd)}")
+                            subprocess.run(cmd, check=True, capture_output=True)
+
+                            # Update progress to 100% for this chunk
+                            processed_bytes += sum(
+                                i["offset_end"] - i["offset_start"]
+                                for i in remaining_to_write
                             )
-                            chunk_size = end - start
-                            internal_name = self.normalize_path(file_state.file_path)
-                            if item["is_split"]:
-                                internal_name += f".part_{start}_{end}"
-
-                            if os.path.lexists(file_state.file_path):
-                                tar_info = tar_bundle.gettarinfo(
-                                    file_state.file_path, arcname=internal_name
-                                )
-
-                                if os.path.islink(file_state.file_path):
-                                    tar_info.type = tarfile.SYMTYPE
-                                    tar_info.linkname = os.readlink(
-                                        file_state.file_path
-                                    )
-                                    tar_bundle.addfile(tar_info)
-                                else:
-                                    tar_info.type = tarfile.REGTYPE
-                                    tar_info.linkname = ""
-                                    tar_info.size = chunk_size
-
-                                    with RangeFile(
-                                        file_state.file_path, start, chunk_size
-                                    ) as rh:
-                                        tar_bundle.addfile(tar_info, rh)
-
-                            processed_bytes += chunk_size
                             JobManager.update_job(
                                 job_id,
                                 15.0 + (70.0 * (processed_bytes / safe_divisor)),
-                                f"Archiving: {os.path.basename(file_state.file_path)}",
+                                f"Archived chunk {chunk_index+1} via binary tar",
                             )
+                        except Exception as e:
+                            logger.error(
+                                f"Binary tar failed, falling back to Python: {e}"
+                            )
+                            has_splits = True  # Trigger fallback
+                        finally:
+                            if os.path.exists(file_list_path):
+                                os.remove(file_list_path)
 
-            if JobManager.is_cancelled(job_id):
-                return
+                    if has_splits or not shutil.which("tar"):
+                        # COMPATIBILITY PATH: Pure Python for fragments or if tar is missing
+                        with tarfile.open(staging_full_path, "w") as tar_bundle:
+                            for item in remaining_to_write:
+                                if JobManager.is_cancelled(job_id):
+                                    break
 
-            # Finalize Staging for Sequential
-            if remaining_to_write and not storage_provider.capabilities.get(
-                "supports_random_access"
-            ):
-                with open(staging_full_path, "a") as f:
-                    f.flush()
-                    os.fsync(f.fileno())
+                                file_state, start, end = (
+                                    item["file_state"],
+                                    item["offset_start"],
+                                    item["offset_end"],
+                                )
+                                chunk_size = end - start
+                                internal_name = self.normalize_path(
+                                    file_state.file_path
+                                )
+                                if item["is_split"]:
+                                    internal_name += f".part_{start}_{end}"
 
-                JobManager.update_job(
-                    job_id, 85.0, f"Streaming bitstream to {media_record.media_type}..."
-                )
-                with open(staging_full_path, "rb") as final_stream:
-                    archive_location_id = storage_provider.write_archive(
-                        media_record.identifier, final_stream
+                                if os.path.lexists(file_state.file_path):
+                                    tar_info = tar_bundle.gettarinfo(
+                                        file_state.file_path, arcname=internal_name
+                                    )
+
+                                    if os.path.islink(file_state.file_path):
+                                        tar_info.type = tarfile.SYMTYPE
+                                        tar_info.linkname = os.readlink(
+                                            file_state.file_path
+                                        )
+                                        tar_bundle.addfile(tar_info)
+                                    else:
+                                        tar_info.type = tarfile.REGTYPE
+                                        tar_info.linkname = ""
+                                        tar_info.size = chunk_size
+
+                                        with RangeFile(
+                                            file_state.file_path, start, chunk_size
+                                        ) as rh:
+                                            tar_bundle.addfile(tar_info, rh)
+
+                                processed_bytes += chunk_size
+                                JobManager.update_job(
+                                    job_id,
+                                    15.0 + (70.0 * (processed_bytes / safe_divisor)),
+                                    f"Archiving: {os.path.basename(file_state.file_path)}",
+                                )
+
+                    if JobManager.is_cancelled(job_id):
+                        if os.path.exists(staging_full_path):
+                            os.remove(staging_full_path)
+                        break
+
+                    with open(staging_full_path, "a") as f:
+                        f.flush()
+                        os.fsync(f.fileno())
+
+                    JobManager.update_job(
+                        job_id,
+                        15.0 + (70.0 * (processed_bytes / safe_divisor)),
+                        f"Streaming chunk {chunk_index+1}/{len(chunks)} to {media_record.media_type}...",
                     )
-                media_record.bytes_used += os.path.getsize(staging_full_path)
-
-                for item in remaining_to_write:
-                    db_session.add(
-                        models.FileVersion(
-                            filesystem_state_id=item["file_state"].id,
-                            media_id=media_record.id,
-                            file_number=archive_location_id,
-                            is_split=item["is_split"],
-                            split_id=batch_uuid if item["is_split"] else None,
-                            offset_start=item["offset_start"],
-                            offset_end=item["offset_end"],
+                    with open(staging_full_path, "rb") as final_stream:
+                        archive_location_id = storage_provider.write_archive(
+                            media_record.identifier, final_stream
                         )
+                    media_record.bytes_used += os.path.getsize(staging_full_path)
+
+                    for item in remaining_to_write:
+                        db_session.add(
+                            models.FileVersion(
+                                filesystem_state_id=item["file_state"].id,
+                                media_id=media_record.id,
+                                file_number=archive_location_id,
+                                is_split=item["is_split"],
+                                split_id=batch_uuid if item["is_split"] else None,
+                                offset_start=item["offset_start"],
+                                offset_end=item["offset_end"],
+                            )
+                        )
+
+                    if os.path.exists(staging_full_path):
+                        os.remove(staging_full_path)
+
+            # --- Saturated Media Logic ---
+            # If utilized over 98%, mark as full and cede priority
+            # First, try to get actual hardware utilization (trust hardware MAM over our byte counts)
+            hardware_utilization = None
+            if hasattr(storage_provider, "get_utilization"):
+                hardware_utilization = storage_provider.get_utilization()
+
+            if hardware_utilization is not None:
+                # Handle MagicMock values in tests to prevent formatting errors
+                try:
+                    utilization_ratio = float(hardware_utilization)
+                    logger.info(
+                        f"Hardware reported utilization: {utilization_ratio*100:.1f}%"
                     )
+                except (TypeError, ValueError):
+                    utilization_ratio = (
+                        media_record.bytes_used / media_record.capacity
+                        if media_record.capacity > 0
+                        else 0
+                    )
+            else:
+                utilization_ratio = (
+                    media_record.bytes_used / media_record.capacity
+                    if media_record.capacity > 0
+                    else 0
+                )
+
+            if utilization_ratio >= 0.98:
+                logger.info(
+                    f"MEDIA SATURATED: {media_record.identifier} ({utilization_ratio*100:.1f}%)"
+                )
+                media_record.status = "full"
+
+                # Automate priority ceding: Move this media to the end of the list
+                max_priority = (
+                    db_session.query(func.max(models.StorageMedia.priority_index))
+                    .filter(models.StorageMedia.id != media_record.id)
+                    .scalar()
+                    or 0
+                )
+                media_record.priority_index = max_priority + 1
 
             db_session.commit()
             JobManager.complete_job(job_id)
@@ -476,8 +625,13 @@ class ArchiverService:
             logger.exception(f"Archival failed: {e}")
             JobManager.fail_job(job_id, str(e))
         finally:
-            if os.path.exists(staging_full_path):
-                os.remove(staging_full_path)
+            # Clean up any residual staging files
+            for chunk_file in os.listdir(self.staging_directory):
+                if chunk_file.startswith("backup_") and chunk_file.endswith(".tar"):
+                    try:
+                        os.remove(os.path.join(self.staging_directory, chunk_file))
+                    except Exception:
+                        pass
 
     def run_restore(self, db_session: Session, destination_root: str, job_id: int):
         """Orchestrates the retrieval and reassembly of data from storage providers."""

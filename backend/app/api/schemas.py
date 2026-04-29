@@ -38,6 +38,7 @@ class MediaSchema(BaseModel):
     config: Dict[str, Any]
     is_online: bool = False
     is_identified: bool = False
+    needs_registration: bool = False
     priority_index: int = 0
     host_free_bytes: Optional[int] = None
     host_total_bytes: Optional[int] = None

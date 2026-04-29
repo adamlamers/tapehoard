@@ -23,6 +23,12 @@ class LTOProvider(AbstractStorageProvider):
             "title": "Device Path",
             "description": "e.g., /dev/nst0",
         },
+        "compression": {
+            "type": "boolean",
+            "title": "Hardware Compression",
+            "description": "Enable LTO hardware-level compression (default: True).",
+            "default": True,
+        },
         "encryption_key": {
             "type": "string",
             "title": "Hardware Encryption Key",
@@ -36,6 +42,7 @@ class LTOProvider(AbstractStorageProvider):
 
     def __init__(self, config: Dict[str, Any]):
         self.device_path = config.get("device_path", "/dev/nst0")
+        self.compression = config.get("compression", True)
         self.encryption_key = config.get("encryption_key")
 
         # Initialize LKG entry if not exists
@@ -231,18 +238,30 @@ class LTOProvider(AbstractStorageProvider):
 
     def get_live_info(self, force: bool = False) -> Dict[str, Any]:
         """Performs a single-pass discovery of all hardware metrics to ensure consistency."""
+        prev_online = LTOProvider._lkg_state[self.device_path]["online"]
+        prev_barcode = LTOProvider._lkg_state[self.device_path]["mam"].get("barcode")
+
         self.check_online(force=force)
         # Since check_online throttles and sets online/last_check, we follow its lead
         mam = self.get_mam_info(force=force)
         drive = self.get_drive_info()
 
         identity = mam.get("barcode") or mam.get("serial")
+        is_online = LTOProvider._lkg_state[self.device_path]["online"]
+
+        # Detection logic for state changes (Hardware Awareness)
+        needs_registration = False
+        if not prev_online and is_online:
+            if identity and not prev_barcode:
+                logger.info(f"DETECTED TAPE INSERTION: {identity}")
+                needs_registration = True
 
         return {
-            "online": LTOProvider._lkg_state[self.device_path]["online"],
+            "online": is_online,
             "drive": drive,
             "tape": mam,
             "identity": identity,
+            "needs_registration": needs_registration,
         }
 
     def get_name(self) -> str:
@@ -334,6 +353,18 @@ class LTOProvider(AbstractStorageProvider):
             logger.error(f"Tape command 'mt {command}' failed: {e.stderr.decode()}")
             raise
 
+    def _setup_compression(self):
+        """Configures hardware compression on the drive using mt"""
+        if not os.path.exists(self.device_path):
+            return
+
+        try:
+            mode = "compression 1" if self.compression else "compression 0"
+            self._run_mt(mode)
+            logger.info(f"LTO Hardware Compression set to: {self.compression}")
+        except Exception as e:
+            logger.error(f"Failed to set hardware compression: {e}")
+
     def _setup_encryption(self):
         """Configures hardware encryption on the drive using stenc"""
         if not os.path.exists(self.device_path):
@@ -385,6 +416,7 @@ class LTOProvider(AbstractStorageProvider):
 
         try:
             self._setup_encryption()
+            self._setup_compression()
             self._run_mt("rewind")
             cmd = ["tar", "-xf", self.device_path, "-O", ".tapehoard_label"]
             self._log_command(cmd)
@@ -461,6 +493,7 @@ class LTOProvider(AbstractStorageProvider):
 
         # Ensure encryption key is loaded before appending
         self._setup_encryption()
+        self._setup_compression()
         self._run_mt("eod")
         return True
 
@@ -493,12 +526,24 @@ class LTOProvider(AbstractStorageProvider):
         proc.wait()
         return file_num
 
+    def get_utilization(self) -> Optional[float]:
+        """Calculates actual hardware utilization from MAM capacity attributes."""
+        # Force a fresh MAM read to get the most accurate current state after a write
+        mam = self.get_mam_info(force=True)
+        if "max_capacity_mib" in mam and "remaining_capacity_mib" in mam:
+            max_cap = mam["max_capacity_mib"]
+            rem_cap = mam["remaining_capacity_mib"]
+            if max_cap > 0:
+                return (max_cap - rem_cap) / max_cap
+        return None
+
     def finalize_media(self, media_id: str):
         self._run_mt("offline")
 
     def read_archive(self, media_id: str, location_id: str) -> BinaryIO:
         # Ensure encryption key is loaded before reading
         self._setup_encryption()
+        self._setup_compression()
         self._run_mt("rewind")
         try:
             loc_int = int(location_id)

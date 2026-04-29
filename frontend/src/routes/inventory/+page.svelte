@@ -215,6 +215,22 @@
         if (pollInterval) clearInterval(pollInterval);
     });
 
+    $effect(() => {
+        const needsReg = mediaList.find(m => m.is_online && m.needs_registration);
+        if (needsReg) {
+            toast.info(`New media detected: ${needsReg.identifier}. Please register or initialize it.`, {
+                action: {
+                    label: 'Register',
+                    onClick: () => {
+                        newMedia.media_type = needsReg.media_type;
+                        newMedia.identifier = needsReg.identifier;
+                        showRegisterDialog = true;
+                    }
+                }
+            });
+        }
+    });
+
     function handleDndConsider(e: CustomEvent) {
         const activeItems = e.detail.items;
         const inactiveItems = mediaList.filter(m => m.status !== 'active' || (m.capacity > 0 && (m.bytes_used / m.capacity) >= 0.98));
@@ -456,7 +472,7 @@
             {#if media.is_online}
                 {#if !media.is_identified}
                     <Button variant="outline" size="sm" class="h-7 text-[10px] border-orange-500/30 text-orange-400 hover:bg-orange-500/10" onclick={() => handleInitialize(media.id, media.identifier)}>Initialize</Button>
-                {:else if media.status === 'active'}
+                {:else if media.status === 'active' && (media.bytes_used / (media.capacity || 1)) < 0.98}
                     <Button variant="default" size="sm" class="h-7 text-[10px] bg-blue-600 hover:bg-blue-500" onclick={() => handleStartBackup(media.id, media.identifier)}>Archive</Button>
                 {/if}
             {/if}
@@ -881,15 +897,27 @@
                     <div class="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
                         {#each Object.entries(activeProvider.config_schema) as [key, schema]}
                             {@const field = schema as any}
-                            <div class="space-y-2">
-                                <label class="text-xs font-medium text-text-secondary ml-1" for="config-{key}">{field.title || key}</label>
-                                <Input
-                                    id="config-{key}"
-                                    bind:value={dynamicConfig[key]}
-                                    placeholder={field.description || ""}
-                                    type={key.includes("key") || key.includes("passphrase") ? "password" : "text"}
-                                    class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm"
-                                />
+                            <div class="space-y-2 flex flex-col justify-center">
+                                {#if field.type === 'boolean'}
+                                    <div class="flex items-center gap-3 h-10 px-1">
+                                        <input
+                                            id="config-{key}"
+                                            type="checkbox"
+                                            bind:checked={dynamicConfig[key]}
+                                            class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20"
+                                        />
+                                        <label class="text-xs font-medium text-text-secondary cursor-pointer" for="config-{key}">{field.title || key}</label>
+                                    </div>
+                                {:else}
+                                    <label class="text-xs font-medium text-text-secondary ml-1" for="config-{key}">{field.title || key}</label>
+                                    <Input
+                                        id="config-{key}"
+                                        bind:value={dynamicConfig[key]}
+                                        placeholder={field.description || ""}
+                                        type={key.includes("key") || key.includes("passphrase") ? "password" : "text"}
+                                        class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm"
+                                    />
+                                {/if}
                             </div>
                         {/each}
                     </div>
@@ -940,14 +968,26 @@
                         <div class="grid grid-cols-1 gap-4">
                             {#each Object.entries(schema) as [key, entry]}
                                 {@const field = entry as any}
-                                <div class="space-y-2">
-                                    <label class="text-xs font-medium text-text-secondary ml-1" for="edit-config-{key}">{field.title || key}</label>
-                                    <Input
-                                        id="edit-config-{key}"
-                                        bind:value={editingMedia.config[key]}
-                                        type={key.includes("key") || key.includes("passphrase") ? "password" : "text"}
-                                        class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm"
-                                    />
+                                <div class="space-y-2 flex flex-col justify-center">
+                                    {#if field.type === 'boolean'}
+                                        <div class="flex items-center gap-3 h-10 px-1">
+                                            <input
+                                                id="edit-config-{key}"
+                                                type="checkbox"
+                                                bind:checked={(editingMedia.config[key] as any)}
+                                                class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20"
+                                            />
+                                            <label class="text-xs font-medium text-text-secondary cursor-pointer" for="edit-config-{key}">{field.title || key}</label>
+                                        </div>
+                                    {:else}
+                                        <label class="text-xs font-medium text-text-secondary ml-1" for="edit-config-{key}">{field.title || key}</label>
+                                        <Input
+                                            id="edit-config-{key}"
+                                            bind:value={editingMedia.config[key]}
+                                            type={key.includes("key") || key.includes("passphrase") ? "password" : "text"}
+                                            class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm"
+                                        />
+                                    {/if}
                                 </div>
                             {/each}
                         </div>
