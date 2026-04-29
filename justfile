@@ -89,3 +89,16 @@ docker-up:
 docker-down:
     @echo "Stopping TapeHoard stack..."
     cd docker && docker-compose down
+
+# --- End-to-End Testing ---
+
+# Run the backend in test mode
+e2e-server:
+    @echo "Starting Backend in Test Mode..."
+    cd backend && DATABASE_URL="sqlite:///test.db" TAPEHOARD_TEST_MODE="true" uv run alembic upgrade head
+    cd backend && DATABASE_URL="sqlite:///test.db" TAPEHOARD_TEST_MODE="true" uv run uvicorn app.main:app --host 0.0.0.0 --port 8001
+
+# Run playwright tests
+e2e:
+    @echo "Running Playwright E2E Tests..."
+    cd frontend && npx playwright test

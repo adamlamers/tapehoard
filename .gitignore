@@ -61,3 +61,23 @@ yarn-error.log*
 /staging/
 /source_data/
 /config/
+
+# Testing & Coverage
+.coverage
+coverage.xml
+
+# OpenAPI client errors
+openapi-ts-error-*.log
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# SQLite WAL and SHM
+*-shm
+*-wal
+file:memdb*
+
+# Docker DB
+docker/db/

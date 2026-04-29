@@ -88,6 +88,7 @@ class ArchiverService:
 
     def _get_storage_provider(self, media_record: models.StorageMedia):
         """Initializes the appropriate hardware provider based on media type."""
+        import os
 
         provider_map = {
             LTOProvider.provider_id: LTOProvider,
@@ -99,6 +100,11 @@ class ArchiverService:
             "cloud": CloudStorageProvider,
             "s3": CloudStorageProvider,
         }
+
+        if os.environ.get("TAPEHOARD_TEST_MODE") == "true":
+            from app.providers.mock import MockLTOProvider
+
+            provider_map[MockLTOProvider.provider_id] = MockLTOProvider
 
         provider_cls = provider_map.get(media_record.media_type)
         if not provider_cls:

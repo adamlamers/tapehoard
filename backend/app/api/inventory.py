@@ -61,8 +61,14 @@ def list_storage_providers():
     from app.providers.cloud import CloudStorageProvider
     from app.providers.hdd import OfflineHDDProvider
     from app.providers.tape import LTOProvider
+    import os
 
     providers = [LTOProvider, OfflineHDDProvider, CloudStorageProvider]
+
+    if os.environ.get("TAPEHOARD_TEST_MODE") == "true":
+        from app.providers.mock import MockLTOProvider
+
+        providers.append(MockLTOProvider)
 
     return [
         StorageProviderSchema(
