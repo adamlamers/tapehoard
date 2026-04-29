@@ -29,6 +29,10 @@
         EyeOff
     } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
+    import PageHeader from '$lib/components/ui/PageHeader.svelte';
+    import SectionHeader from '$lib/components/ui/SectionHeader.svelte';
+    import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
+    import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
     import { Card } from '$lib/components/ui/card';
     import { Input } from '$lib/components/ui/input';
     import { cn } from '$lib/utils';
@@ -367,98 +371,96 @@
 {/snippet}
 
 {#snippet mediaRow(media: MediaSchema)}
-    <td class="px-6 py-4">
+    <td class="px-6 py-3">
         {#if media.status === 'active' && mediaList.filter(m => m.status === 'active')[0]?.id === media.id}
              <div class="flex items-center gap-2">
                 <Star size={12} class="text-yellow-500" fill="currentColor" />
-                <span class="text-3xs font-black text-yellow-500/80 uppercase tracking-tighter">Priority 1</span>
+                <span class="text-[10px] font-semibold text-yellow-500/80">Priority 1</span>
             </div>
         {:else}
-            <span class="text-3xs font-bold text-text-secondary opacity-20 mono">#{media.priority_index}</span>
+            <span class="text-[10px] font-medium text-text-secondary opacity-20 mono">#{media.priority_index}</span>
         {/if}
     </td>
-    <td class="px-2 py-4">
+    <td class="px-2 py-3">
         <div class="flex justify-center">
             {#if media.is_online}
                 {#if media.is_identified}
-                    <div class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]" title="Hardware Verified & Online"></div>
+                    <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]" title="Hardware verified & online"></div>
                 {:else}
-                    <div class="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.6)] animate-pulse" title="Hardware Present but Uninitialized"></div>
+                    <div class="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.6)] animate-pulse" title="Hardware present but uninitialized"></div>
                 {/if}
             {:else}
-                <div class="w-2.5 h-2.5 rounded-full bg-text-secondary/10 border border-text-secondary/20" title="Offline"></div>
+                <div class="w-2 h-2 rounded-full bg-text-secondary/10 border border-text-secondary/20" title="Offline"></div>
             {/if}
         </div>
     </td>
-    <td class="px-6 py-4">
+    <td class="px-6 py-3">
         <div class="flex flex-col min-w-0">
-            <span class="text-xs font-black text-text-primary uppercase tracking-widest truncate">{media.identifier}</span>
-            <div class="mt-1 flex flex-col gap-1">
+            <span class="text-sm font-semibold text-text-primary truncate">{media.identifier}</span>
+            <div class="mt-0.5 flex flex-col gap-0.5">
                 {#if (media.media_type === 'local_hdd' || media.media_type === 'hdd') && media.config?.mount_path}
-                    <div class="flex items-center gap-1.5 text-text-secondary/50 text-4xs font-mono truncate">
+                    <div class="flex items-center gap-1.5 text-text-secondary/50 text-[10px] mono truncate">
                         <Monitor size={10} /> {media.config.mount_path}
                     </div>
                 {:else if media.media_type === 's3_compat' && media.config?.bucket_name}
-                    <div class="flex items-center gap-1.5 text-text-secondary/50 text-4xs font-mono truncate">
+                    <div class="flex items-center gap-1.5 text-text-secondary/50 text-[10px] mono truncate">
                         <Globe size={10} /> {media.config.bucket_name}
                     </div>
                 {/if}
                 <div class="flex gap-2 mt-0.5">
                     {#if media.status === 'failed'}
-                        <span class="text-5xs font-black uppercase tracking-tighter text-error-color bg-error-color/10 px-1 rounded border border-error-color/20">HARDWARE FAILURE</span>
+                        <StatusBadge variant="error">Hardware failure</StatusBadge>
                     {:else if media.status === 'retired'}
-                        <span class="text-5xs font-black uppercase tracking-tighter text-text-secondary bg-bg-primary px-1 rounded border border-border-color">RETIRED</span>
+                        <StatusBadge variant="neutral">Retired</StatusBadge>
                     {/if}
 
                     {#if media.config?.encryption_key || media.config?.encryption_passphrase}
-                        <span class="text-5xs font-black uppercase tracking-tighter text-blue-400 bg-blue-500/10 px-1 rounded flex items-center gap-1 border border-blue-500/20">
-                            <ShieldCheck size={8} /> ENCRYPTED
-                        </span>
+                        <StatusBadge variant="info">
+                            <ShieldCheck size={8} /> Encrypted
+                        </StatusBadge>
                     {/if}
                 </div>
             </div>
         </div>
     </td>
-    <td class="px-6 py-4">
+    <td class="px-6 py-3">
         <div class="flex flex-col">
-            <span class="text-3xs font-bold uppercase text-text-secondary">{media.media_type}</span>
-            <div class="flex items-center gap-2 mt-1">
-                <span class="text-3xs font-medium text-text-secondary/40">{media.generation_tier || 'Generic'}</span>
+            <span class="text-xs font-medium text-text-secondary">{media.media_type}</span>
+            <div class="flex items-center gap-2 mt-0.5">
+                <span class="text-[10px] font-medium text-text-secondary/40">{media.generation_tier || 'Generic'}</span>
                 {#if (media.media_type === 'local_hdd' || media.media_type === 'hdd') && media.config?.device_uuid}
-                    <span class="text-4xs font-mono text-text-secondary/30 truncate max-w-[80px]">{media.config.device_uuid}</span>
+                    <span class="text-[10px] mono text-text-secondary/30 truncate max-w-[80px]">{media.config.device_uuid}</span>
                 {/if}
             </div>
         </div>
     </td>
-    <td class="px-6 py-4">
+    <td class="px-6 py-3">
         <div class="flex items-center gap-1.5 text-text-secondary">
             <MapPin size={12} class="opacity-40" />
-            <span class="text-2xs font-bold uppercase tracking-tight">{media.location || 'Unknown'}</span>
+            <span class="text-xs font-medium">{media.location || 'Unknown'}</span>
         </div>
     </td>
-    <td class="px-6 py-4">
-        <div class="flex flex-col w-32 gap-1.5">
-            <div class="flex justify-between items-end text-3xs">
-                <span class="font-black text-text-primary mono">{formatSize(media.bytes_used)}</span>
-                <span class="text-text-secondary opacity-40 font-bold tracking-tighter uppercase">{Math.round((media.bytes_used / media.capacity) * 100)}%</span>
+    <td class="px-6 py-3">
+        <div class="flex flex-col w-32 gap-1">
+            <div class="flex justify-between items-end text-xs">
+                <span class="font-medium text-text-primary mono">{formatSize(media.bytes_used)}</span>
+                <span class="text-text-secondary opacity-40 font-medium">{Math.round((media.bytes_used / (media.capacity || 1)) * 100)}%</span>
             </div>
-            <div class="h-1.5 bg-bg-primary rounded-full overflow-hidden border border-border-color/30 flex">
-                <div class="h-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]" style="width: {(media.bytes_used / media.capacity) * 100}%"></div>
-            </div>
-            <span class="text-5xs text-text-secondary opacity-30 font-bold uppercase tracking-widest text-right">CAP: {formatSize(media.capacity)}</span>
+            <ProgressBar value={Math.round((media.bytes_used / (media.capacity || 1)) * 100)} size="sm" />
+            <span class="text-[9px] text-text-secondary opacity-30 font-medium text-right">CAP: {formatSize(media.capacity)}</span>
         </div>
     </td>
-    <td class="px-6 py-4 text-right">
+    <td class="px-6 py-3 text-right">
         <div class="flex justify-end gap-1">
             {#if media.is_online}
                 {#if !media.is_identified}
-                    <Button variant="outline" size="sm" class="h-8 text-4xs font-black uppercase tracking-widest border-orange-500/30 text-orange-400 hover:bg-orange-500/10" onclick={() => handleInitialize(media.id, media.identifier)}>Initialize</Button>
+                    <Button variant="outline" size="sm" class="h-7 text-[10px] border-orange-500/30 text-orange-400 hover:bg-orange-500/10" onclick={() => handleInitialize(media.id, media.identifier)}>Initialize</Button>
                 {:else if media.status === 'active'}
-                    <Button variant="default" size="sm" class="h-8 text-4xs font-black uppercase tracking-widest bg-blue-600 hover:bg-blue-500" onclick={() => handleStartBackup(media.id, media.identifier)}>Archive</Button>
+                    <Button variant="default" size="sm" class="h-7 text-[10px] bg-blue-600 hover:bg-blue-500" onclick={() => handleStartBackup(media.id, media.identifier)}>Archive</Button>
                 {/if}
             {/if}
-            <Button variant="ghost" size="icon" class="h-8 w-8 text-text-secondary hover:text-text-primary hover:bg-white/5" onclick={() => openEdit(media)}><Edit3 size={14} /></Button>
-            <Button variant="ghost" size="icon" class="h-8 w-8 text-text-secondary hover:text-error-color hover:bg-error-color/10" onclick={() => handleDelete(media.id)}><Trash2 size={14} /></Button>
+            <Button variant="ghost" size="icon" class="h-7 w-7 text-text-secondary hover:text-text-primary hover:bg-white/5" onclick={() => openEdit(media)}><Edit3 size={12} /></Button>
+            <Button variant="ghost" size="icon" class="h-7 w-7 text-text-secondary hover:text-error-color hover:bg-error-color/10" onclick={() => handleDelete(media.id)}><Trash2 size={12} /></Button>
         </div>
     </td>
 {/snippet}
@@ -467,53 +469,42 @@
     <title>Media Inventory - TapeHoard</title>
 </svelte:head>
 
-<div class="flex flex-col h-full gap-8 animate-in fade-in duration-700 overflow-y-auto p-1">
-    <header class="flex justify-between items-center bg-bg-secondary px-8 py-6 rounded-xl border border-border-color shadow-2xl relative overflow-hidden shrink-0">
-        <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent pointer-events-none"></div>
-        <div class="relative z-10">
-            <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
-                <Library class="text-blue-500" size={28} />
-                Physical Inventory
-            </h1>
-            <p class="text-xs font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
-                Fleet Management & Hardware Status
-            </p>
-        </div>
-
-        <div class="flex items-center gap-4 relative z-10">
+<div class="flex flex-col h-full gap-6 animate-in fade-in duration-700 overflow-y-auto p-1">
+    <PageHeader
+        title="Physical inventory"
+        description="Fleet management & hardware status"
+        icon={Library}
+    >
+        {#snippet actions()}
             {#if mediaList.some(m => m.status === 'active' && (m.bytes_used / m.capacity) < 0.98)}
-                <Button variant="default" size="lg" class="px-8 h-12 font-black uppercase tracking-widest text-2xs shadow-lg shadow-blue-500/10 bg-blue-600 hover:bg-blue-500" onclick={handleAutoArchive}>
-                    <PlayCircle size={18} class="mr-2" /> Auto Archive
+                <Button variant="default" class="bg-blue-600 hover:bg-blue-700" onclick={handleAutoArchive}>
+                    <PlayCircle size={16} class="mr-2" /> Auto archive
                 </Button>
             {/if}
-            <Button variant="default" size="lg" class="px-8 h-12 font-black uppercase tracking-widest text-2xs shadow-lg shadow-blue-500/10" onclick={() => showRegisterDialog = true}>
-                <Plus size={18} class="mr-2" /> Register New Media
+            <Button variant="default" onclick={() => showRegisterDialog = true}>
+                <Plus size={16} class="mr-2" /> Register media
             </Button>
-        </div>
-    </header>
+        {/snippet}
+    </PageHeader>
 
     <div class="space-y-12">
         <!-- DISCOVERED HARDWARE SECTION -->
         {#if filteredDiscoveredAssets.length > 0}
-            <section class="space-y-6">
-                <div class="flex items-center gap-3 px-2">
-                    <div class="p-1.5 bg-action-color/10 rounded-md text-action-color"><Cpu size={16} /></div>
-                    <h2 class="text-2xs font-black uppercase tracking-[0.2em] text-text-primary">Discovered Unregistered Drives</h2>
-                    <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent"></div>
-                </div>
+            <section class="space-y-4">
+                <SectionHeader title="Discovered unregistered drives" icon={Cpu} iconColor="text-action-color" />
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {#each filteredDiscoveredAssets as asset}
-                        <Card class="p-5 bg-bg-secondary border-dashed border-2 border-border-color hover:border-action-color/50 transition-all group">
+                        <Card class="p-4 bg-bg-secondary border-dashed border-2 border-border-color hover:border-action-color/50 transition-all group">
                             <div class="flex items-start gap-4">
-                                <div class="p-3 bg-action-color/10 rounded-xl text-action-color border border-action-color/20">
+                                <div class="p-2.5 bg-action-color/10 rounded-xl text-action-color border border-action-color/20">
                                     {@render ConfigIcon(asset.type === 'tape' ? 'lto_tape' : 'local_hdd')}
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <h3 class="text-sm font-black text-text-primary uppercase tracking-tight truncate">{asset.identifier}</h3>
+                                    <h3 class="text-sm font-bold text-text-primary truncate">{asset.identifier}</h3>
                                     <div class="flex items-center gap-1.5 mt-0.5 opacity-60">
                                         <Cpu size={10} class="text-action-color" />
-                                        <span class="text-4xs text-text-secondary font-black uppercase tracking-widest truncate mono">
+                                        <span class="text-xs text-text-secondary truncate mono">
                                             {#if asset.type === 'tape'}
                                                 {asset.device_path}
                                             {:else}
@@ -523,23 +514,23 @@
                                     </div>
 
                                     {#if asset.type === 'tape' && asset.hardware_info}
-                                        <div class="mt-3 space-y-2 border-t border-border-color/30 pt-3">
+                                        <div class="mt-3 space-y-1.5 border-t border-border-color/30 pt-3">
                                             {#if asset.hardware_info.drive}
-                                                <div class="text-5xs font-bold text-blue-400/80 uppercase">
+                                                <div class="text-[10px] font-medium text-blue-400/80">
                                                     Drive: {asset.hardware_info.drive.vendor} {asset.hardware_info.drive.model} ({asset.hardware_info.drive.firmware})
                                                 </div>
                                             {/if}
                                             {#if asset.hardware_info.tape}
                                                 <div class="flex flex-wrap gap-1">
-                                                    <span class="text-6xs font-black bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary uppercase">MFR: {asset.hardware_info.tape.manufacturer}</span>
-                                                    <span class="text-6xs font-black bg-blue-500/10 px-1 rounded border border-blue-500/20 text-blue-400 uppercase">{asset.hardware_info.tape.generation_label || asset.hardware_info.tape.generation}</span>
+                                                    <span class="text-[9px] font-medium bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary">MFR: {asset.hardware_info.tape.manufacturer}</span>
+                                                    <span class="text-[9px] font-medium bg-blue-500/10 px-1 rounded border border-blue-500/20 text-blue-400">{asset.hardware_info.tape.generation_label || asset.hardware_info.tape.generation}</span>
                                                 </div>
                                             {/if}
                                         </div>
                                     {/if}
 
                                     <div class="mt-4 flex gap-2">
-                                        <Button variant="default" size="sm" class="h-8 text-4xs font-black uppercase tracking-widest flex-1" onclick={() => {
+                                        <Button variant="default" size="sm" class="h-8 text-xs flex-1" onclick={() => {
                                             newMedia.media_type = asset.type === 'tape' ? 'lto_tape' : 'local_hdd';
                                             newMedia.identifier = asset.identifier === 'Unrecognized Disk' ? '' : asset.identifier;
 
@@ -554,8 +545,8 @@
                                                 dynamicConfig.device_path = asset.device_path;
                                             }
                                             showRegisterDialog = true;
-                                        }}>Add Media</Button>
-                                        <Button variant="outline" size="sm" class="h-8 text-4xs font-black uppercase tracking-widest border-border-color/60 text-text-secondary hover:bg-white/5" onclick={() => handleIgnoreAsset(asset.identifier)}>Ignore</Button>
+                                        }}>Add media</Button>
+                                        <Button variant="outline" size="sm" class="h-8 text-xs border-border-color/60 text-text-secondary hover:bg-white/5" onclick={() => handleIgnoreAsset(asset.identifier)}>Ignore</Button>
                                     </div>
                                 </div>
                             </div>
@@ -569,85 +560,81 @@
         <section class="space-y-12">
             <!-- Hardware Status -->
             {#if mediaList.some(m => m.is_online && (m.media_type === 'lto_tape' || m.media_type === 'tape'))}
-                <div class="space-y-6">
-                    <div class="flex items-center gap-3 px-2">
-                        <div class="p-1.5 bg-blue-500/10 rounded-md text-blue-500"><Cpu size={16} /></div>
-                        <h2 class="text-2xs font-black uppercase tracking-[0.2em] text-text-primary">Live Hardware Status</h2>
-                        <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent"></div>
-                    </div>
+                <div class="space-y-4">
+                    <SectionHeader title="Live hardware status" icon={Cpu} iconColor="text-blue-500" />
 
                     <div class="grid grid-cols-1 gap-6">
                         {#each mediaList.filter(m => m.is_online && (m.media_type === 'lto_tape' || m.media_type === 'tape')) as media}
                             {#if media.live_info}
                                 {@const info = media.live_info as any}
                                 <Card class="bg-bg-secondary border-blue-500/30 shadow-2xl relative overflow-hidden">
-                                    <div class="p-8 flex flex-col lg:flex-row gap-12">
+                                    <div class="p-6 flex flex-col lg:flex-row gap-8">
                                         <!-- Drive Info -->
-                                        <div class="flex-1 space-y-6">
+                                        <div class="flex-1 space-y-4">
                                             <div>
-                                                <div class="text-4xs font-black uppercase tracking-[0.2em] text-text-secondary opacity-50 mb-3 flex items-center gap-2">
-                                                    <Cpu size={12} /> Physical Tape Drive
+                                                <div class="text-[10px] font-medium text-text-secondary opacity-50 mb-2 flex items-center gap-2">
+                                                    <Cpu size={12} /> Physical tape drive
                                                 </div>
                                                 <div class="flex items-center gap-4">
-                                                    <div class="flex items-baseline gap-3">
-                                                        <h3 class="text-3xl font-black text-text-primary tracking-tighter uppercase">{info.drive?.vendor || 'Unknown'}</h3>
-                                                        <span class="text-xl font-bold text-text-secondary opacity-40">{info.drive?.model || 'Generic LTO'}</span>
+                                                    <div class="flex items-baseline gap-2">
+                                                        <h3 class="text-2xl font-bold text-text-primary tracking-tight">{info.drive?.vendor || 'Unknown'}</h3>
+                                                        <span class="text-lg font-medium text-text-secondary opacity-40">{info.drive?.model || 'Generic LTO'}</span>
                                                     </div>
-                                                    <div class="flex items-center gap-2 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20">
-                                                        <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse"></div>
-                                                        <span class="text-4xs font-black uppercase tracking-widest text-blue-400">Drive Online</span>
-                                                    </div>
+                                                    <StatusBadge variant="blue">
+                                                        <div class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse"></div>
+                                                        Online
+                                                    </StatusBadge>
                                                 </div>
-                                                <div class="mt-2 flex items-center gap-4 text-3xs font-mono text-text-secondary/60">
-                                                    <span>FIRMWARE: <span class="text-text-primary font-bold">{info.drive?.firmware || 'N/A'}</span></span>
+                                                <div class="mt-2 flex items-center gap-4 text-xs font-mono text-text-secondary/60">
+                                                    <span>FIRMWARE: <span class="text-text-primary">{info.drive?.firmware || 'N/A'}</span></span>
                                                     <span class="h-3 w-px bg-border-color"></span>
-                                                    <span>DEVICE: <span class="text-text-primary font-bold">{media.config?.device_path || '/dev/nst0'}</span></span>
+                                                    <span>DEVICE: <span class="text-text-primary">{media.config?.device_path || '/dev/nst0'}</span></span>
                                                 </div>
                                             </div>
 
                                             <!-- Live Performance / Health Dashboard -->
-                                            <div class="grid grid-cols-2 gap-4 pt-6 border-t border-border-color/30">
-                                                <div class="bg-bg-primary/50 p-4 rounded-xl border border-border-color/50">
-                                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-2">Session Performance</span>
-                                                    <div class="space-y-3">
-                                                        <div class="flex justify-between items-center text-3xs">
-                                                            <span class="text-text-secondary font-bold uppercase tracking-tighter flex items-center gap-1.5"><ArrowUp size={10} class="text-blue-400" /> WRITTEN</span>
-                                                            <span class="text-text-primary font-black mono">{(info.tape?.session_mib_written || 0).toLocaleString()} MiB</span>
+                                            <div class="grid grid-cols-2 gap-4 pt-4 border-t border-border-color/30">
+                                                <div class="bg-bg-primary/50 p-3 rounded-xl border border-border-color/50">
+                                                    <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-2">Session performance</span>
+                                                    <div class="space-y-2">
+                                                        <div class="flex justify-between items-center text-xs">
+                                                            <span class="text-text-secondary flex items-center gap-1.5"><ArrowUp size={10} class="text-blue-400" /> Written</span>
+                                                            <span class="text-text-primary font-medium mono">{(info.tape?.session_mib_written || 0).toLocaleString()} MiB</span>
                                                         </div>
-                                                        <div class="flex justify-between items-center text-3xs">
-                                                            <span class="text-text-secondary font-bold uppercase tracking-tighter flex items-center gap-1.5"><ArrowDown size={10} class="text-success-color" /> READ</span>
-                                                            <span class="text-text-primary font-black mono">{(info.tape?.session_mib_read || 0).toLocaleString()} MiB</span>
+                                                        <div class="flex justify-between items-center text-xs">
+                                                            <span class="text-text-secondary flex items-center gap-1.5"><ArrowDown size={10} class="text-success-color" /> Read</span>
+                                                            <span class="text-text-primary font-medium mono">{(info.tape?.session_mib_read || 0).toLocaleString()} MiB</span>
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                <div class="bg-bg-primary/50 p-4 rounded-xl border border-border-color/50">
-                                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-2">Hardware Health</span>
+                                                <div class="bg-bg-primary/50 p-3 rounded-xl border border-border-color/50">
+                                                    <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-2">Hardware health</span>
                                                     {#if info.tape?.alerts && info.tape.alerts.length > 0}
                                                         <div class="space-y-1">
                                                             {#each info.tape.alerts as alert}
-                                                                <div class="flex items-center gap-2 text-4xs font-black text-orange-400 uppercase tracking-tighter">
+                                                                <div class="flex items-center gap-2 text-[10px] font-semibold text-orange-400">
                                                                     <ShieldAlert size={10} /> {alert}
                                                                 </div>
                                                             {/each}
                                                         </div>
                                                     {:else}
-                                                        <div class="flex items-center gap-2 text-3xs font-black text-success-color uppercase tracking-tighter">
-                                                            <ShieldCheck size={14} /> System Healthy
+                                                        <div class="flex items-center gap-2 text-xs font-semibold text-success-color">
+                                                            <ShieldCheck size={14} /> System healthy
                                                         </div>
-                                                        <span class="text-5xs text-text-secondary opacity-40 uppercase font-bold block mt-1">No active TapeAlerts</span>
+                                                        <span class="text-[10px] text-text-secondary opacity-40 block mt-1">No active TapeAlerts</span>
                                                     {/if}
                                                 </div>
                                             </div>
 
-                                            <div class="grid grid-cols-2 gap-8 pt-4">
+                                            <div class="grid grid-cols-2 gap-8 pt-2">
                                                 <div>
-                                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Assigned ID</span>
-                                                    <span class="text-lg font-black text-text-primary mono tracking-tighter">{media.identifier}</span>
+                                                    <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Assigned ID</span>
+                                                    <span class="text-base font-bold text-text-primary mono">{media.identifier}</span>
                                                 </div>
                                                 <div>
-                                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Load Count</span>
-                                                    <span class="text-lg font-black text-text-primary mono tracking-tighter flex items-center gap-2">
+                                                    <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Load count</span>
+                                                    <span class="text-base font-bold text-text-primary mono flex items-center gap-2">
                                                         <RotateCw size={14} class="text-blue-500 opacity-50" />
                                                         {info.tape?.load_count || '0'}
                                                     </span>
@@ -656,46 +643,44 @@
                                         </div>
 
                                         <!-- Media/MAM Info -->
-                                        <div class="flex-1 bg-bg-primary/30 rounded-2xl p-6 border border-border-color/50 relative">
-                                            <div class="text-4xs font-black uppercase tracking-[0.2em] text-text-secondary opacity-50 mb-6 flex items-center justify-between">
-                                                <div class="flex items-center gap-2"><Database size={12} /> Medium Metadata (MAM)</div>
-                                                <span class="text-blue-400 font-black tracking-widest font-mono">{info.tape?.barcode || 'NO BARCODE'}</span>
+                                        <div class="flex-1 bg-bg-primary/30 rounded-xl p-5 border border-border-color/50 relative">
+                                            <div class="text-[10px] font-medium text-text-secondary opacity-50 mb-5 flex items-center justify-between">
+                                                <div class="flex items-center gap-2"><Database size={12} /> Medium metadata (MAM)</div>
+                                                <span class="text-blue-400 font-medium mono">{info.tape?.barcode || 'NO BARCODE'}</span>
                                             </div>
 
-                                            <div class="grid grid-cols-2 gap-y-6 gap-x-12">
+                                            <div class="grid grid-cols-2 gap-y-5 gap-x-8">
                                                 <div>
-                                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Manufacturer</span>
-                                                    <span class="text-xs font-bold text-text-primary uppercase tracking-wider">{info.tape?.manufacturer || 'Unknown'}</span>
+                                                    <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Manufacturer</span>
+                                                    <span class="text-xs font-semibold text-text-primary">{info.tape?.manufacturer || 'Unknown'}</span>
                                                 </div>
                                                 <div>
-                                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Media Serial</span>
-                                                    <span class="text-xs font-bold text-text-primary mono">{info.tape?.serial || 'N/A'}</span>
+                                                    <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Media serial</span>
+                                                    <span class="text-xs font-semibold text-text-primary mono">{info.tape?.serial || 'N/A'}</span>
                                                 </div>
                                                 <div>
-                                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">LTO Generation</span>
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-3xs font-black border border-blue-500/20">
+                                                    <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">LTO generation</span>
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[10px] font-semibold border border-blue-500/20">
                                                         {info.tape?.generation_label || info.tape?.generation || 'LTO'}
                                                     </span>
                                                 </div>
                                                 <div>
-                                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Manufacture Date</span>
-                                                    <span class="text-xs font-bold text-text-primary mono">{info.tape?.manufacture_date || 'N/A'}</span>
+                                                    <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Manufacture date</span>
+                                                    <span class="text-xs font-semibold text-text-primary mono">{info.tape?.manufacture_date || 'N/A'}</span>
                                                 </div>
 
-                                                <div class="col-span-2 space-y-4 pt-2">
+                                                <div class="col-span-2 space-y-3 pt-1">
                                                     <!-- Capacity Utilization -->
                                                     {#if info.tape?.remaining_capacity_mib !== undefined && info.tape?.max_capacity_mib}
                                                         {@const used_mib = info.tape.max_capacity_mib - info.tape.remaining_capacity_mib}
                                                         {@const perc = Math.min(100, Math.round((used_mib / info.tape.max_capacity_mib) * 100))}
                                                         <div>
-                                                            <div class="flex justify-between items-end mb-2">
-                                                                <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40">Physical Capacity Utilization</span>
-                                                                <span class="text-3xs font-black text-blue-400 mono">{perc}%</span>
+                                                            <div class="flex justify-between items-end mb-1.5">
+                                                                <span class="text-[10px] font-medium text-text-secondary opacity-40">Physical capacity utilization</span>
+                                                                <span class="text-xs font-bold text-blue-400 mono">{perc}%</span>
                                                             </div>
-                                                            <div class="h-2 bg-bg-primary rounded-full overflow-hidden border border-border-color/30 flex">
-                                                                <div class="h-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] transition-all duration-1000" style="width: {perc}%"></div>
-                                                            </div>
-                                                            <div class="flex justify-between mt-1 text-5xs font-bold text-text-secondary/50 mono uppercase">
+                                                            <ProgressBar value={perc} size="sm" />
+                                                            <div class="flex justify-between mt-1 text-[9px] font-medium text-text-secondary/50 mono">
                                                                 <span>Used: {(used_mib / 1024).toFixed(1)} GiB</span>
                                                                 <span>Free: {(info.tape.remaining_capacity_mib / 1024).toFixed(1)} GiB</span>
                                                             </div>
@@ -703,8 +688,8 @@
                                                     {/if}
 
                                                     <div>
-                                                        <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Inserted Tape Identifier</span>
-                                                        <div class="bg-bg-secondary p-3 rounded-lg border border-border-color font-mono text-xs text-text-primary italic shadow-inner">
+                                                        <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-1">Inserted tape identifier</span>
+                                                        <div class="bg-bg-secondary p-2.5 rounded-lg border border-border-color font-mono text-xs text-text-primary italic shadow-inner">
                                                             "{info.tape?.barcode || 'NO BARCODE'}"
                                                         </div>
                                                     </div>
@@ -720,37 +705,33 @@
             {/if}
 
             <!-- Active Media -->
-            <div class="space-y-6">
-                <div class="flex items-center gap-3 px-2">
-                    <div class="p-1.5 bg-blue-500/10 rounded-md text-blue-500"><Database size={16} /></div>
-                    <h2 class="text-2xs font-black uppercase tracking-[0.2em] text-text-primary">Active Archive Media</h2>
-                    <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent"></div>
-                </div>
+            <div class="space-y-4">
+                <SectionHeader title="Active archive media" icon={Database} iconColor="text-blue-500" />
 
                 <Card class="bg-bg-secondary border-border-color shadow-2xl overflow-hidden flex flex-col">
-                    <div class="px-6 py-3 bg-bg-tertiary/30 border-b border-border-color flex items-center justify-end gap-6">
+                    <div class="px-6 py-2.5 bg-bg-tertiary/30 border-b border-border-color flex items-center justify-end gap-6">
                         <div class="flex items-center gap-2">
                             <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
-                            <span class="text-4xs font-black uppercase tracking-widest text-text-secondary opacity-70">Identified & Online</span>
+                            <span class="text-[10px] font-medium text-text-secondary opacity-70">Identified & online</span>
                         </div>
-                        <div class="h-4 w-px bg-border-color mx-2"></div>
+                        <div class="h-3 w-px bg-border-color mx-2"></div>
                         <div class="flex items-center gap-2">
                             <Star size={10} class="text-yellow-500" fill="currentColor" />
-                            <span class="text-4xs font-black uppercase tracking-widest text-text-secondary opacity-70">Next Archival Target</span>
+                            <span class="text-[10px] font-medium text-text-secondary opacity-70">Next archival target</span>
                         </div>
                     </div>
 
                     <table class="w-full border-collapse">
                         <thead>
                             <tr class="bg-bg-tertiary/50 border-b border-border-color">
-                                <th class="px-6 py-4 w-12 text-center text-3xs font-black uppercase tracking-widest text-text-secondary">DRAG</th>
-                                <th class="px-6 py-4 w-12 text-center text-3xs font-black uppercase tracking-widest text-text-secondary">#</th>
-                                <th class="px-2 py-4 w-12 text-center text-3xs font-black uppercase tracking-widest text-text-secondary">Stat</th>
-                                <th class="px-6 py-4 text-left text-3xs font-black uppercase tracking-widest text-text-secondary">Identity</th>
-                                <th class="px-6 py-4 text-left text-3xs font-black uppercase tracking-widest text-text-secondary">Type & Tier</th>
-                                <th class="px-6 py-4 text-left text-3xs font-black uppercase tracking-widest text-text-secondary">Location</th>
-                                <th class="px-6 py-4 text-left text-3xs font-black uppercase tracking-widest text-text-secondary">Utilization</th>
-                                <th class="px-6 py-4 text-right text-3xs font-black uppercase tracking-widest text-text-secondary">Actions</th>
+                                <th class="px-6 py-3 w-12 text-center text-xs font-semibold text-text-secondary">Drag</th>
+                                <th class="px-6 py-3 w-12 text-center text-xs font-semibold text-text-secondary">#</th>
+                                <th class="px-2 py-3 w-12 text-center text-xs font-semibold text-text-secondary">Stat</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary">Identity</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary">Type & tier</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary">Location</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary">Utilization</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold text-text-secondary">Actions</th>
                             </tr>
                         </thead>
                         <tbody
@@ -769,7 +750,7 @@
                                     {@render mediaRow(media)}
                                 </tr>
                             {:else}
-                                <tr><td colspan="8" class="px-8 py-24 text-center opacity-20"><Database size={48} class="mx-auto mb-3" /><p class="text-sm font-black uppercase tracking-[0.2em]">No Active Archive Media</p></td></tr>
+                                <tr><td colspan="8" class="px-8 py-24 text-center opacity-20"><Database size={48} class="mx-auto mb-3" /><p class="text-sm font-medium">No active archive media</p></td></tr>
                             {/each}
                         </tbody>
                     </table>
@@ -778,25 +759,21 @@
 
             <!-- Fully Utilized Media -->
             {#if mediaList.some(m => m.status === 'active' && m.capacity > 0 && (m.bytes_used / m.capacity) >= 0.98)}
-                <div class="space-y-6">
-                    <div class="flex items-center gap-3 px-2">
-                        <div class="p-1.5 bg-success-color/10 rounded-md text-success-color"><ShieldCheck size={16} /></div>
-                        <h2 class="text-2xs font-black uppercase tracking-[0.2em] text-text-primary opacity-80">Fully Utilized Media</h2>
-                        <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent opacity-50"></div>
-                    </div>
+                <div class="space-y-4">
+                    <SectionHeader title="Fully utilized media" icon={ShieldCheck} iconColor="text-success-color" />
 
                     <Card class="bg-bg-secondary/80 border border-border-color/80 rounded-xl overflow-hidden shadow-xl">
                         <table class="w-full border-collapse">
                             <thead>
                                 <tr class="bg-bg-tertiary/30 border-b border-border-color/50">
-                                    <th class="px-6 py-4 w-12 text-center text-3xs font-black uppercase tracking-widest text-text-secondary opacity-60">SORT</th>
-                                    <th class="px-6 py-4 w-12 text-center text-3xs font-black uppercase tracking-widest text-text-secondary opacity-60">#</th>
-                                    <th class="px-2 py-4 w-12 text-center text-3xs font-black uppercase tracking-widest text-text-secondary opacity-60">Stat</th>
-                                    <th class="px-6 py-4 text-left text-3xs font-black uppercase tracking-widest text-text-secondary opacity-60">Identity</th>
-                                    <th class="px-6 py-4 text-left text-3xs font-black uppercase tracking-widest text-text-secondary opacity-60">Type & Tier</th>
-                                    <th class="px-6 py-4 text-left text-3xs font-black uppercase tracking-widest text-text-secondary opacity-60">Location</th>
-                                    <th class="px-6 py-4 text-left text-3xs font-black uppercase tracking-widest text-text-secondary opacity-60">Utilization</th>
-                                    <th class="px-6 py-4 text-right text-3xs font-black uppercase tracking-widest text-text-secondary opacity-60">Actions</th>
+                                    <th class="px-6 py-3 w-12 text-center text-xs font-semibold text-text-secondary opacity-60">Sort</th>
+                                    <th class="px-6 py-3 w-12 text-center text-xs font-semibold text-text-secondary opacity-60">#</th>
+                                    <th class="px-2 py-3 w-12 text-center text-xs font-semibold text-text-secondary opacity-60">Stat</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary opacity-60">Identity</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary opacity-60">Type & tier</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary opacity-60">Location</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary opacity-60">Utilization</th>
+                                    <th class="px-6 py-3 text-right text-xs font-semibold text-text-secondary opacity-60">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-border-color/30">
@@ -816,25 +793,21 @@
 
             <!-- Retired & Failed Media -->
             {#if mediaList.some(m => m.status !== 'active')}
-                <div class="space-y-6">
-                    <div class="flex items-center gap-3 px-2">
-                        <div class="p-1.5 bg-error-color/10 rounded-md text-error-color"><ShieldAlert size={16} /></div>
-                        <h2 class="text-2xs font-black uppercase tracking-[0.2em] text-text-primary opacity-60">Retired & Failed Media</h2>
-                        <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent opacity-30"></div>
-                    </div>
+                <div class="space-y-4">
+                    <SectionHeader title="Retired & failed media" icon={ShieldAlert} iconColor="text-error-color" />
 
                     <Card class="bg-bg-secondary/60 border border-border-color/60 rounded-xl overflow-hidden shadow-xl grayscale-[0.5] opacity-80">
                         <table class="w-full border-collapse">
                             <thead>
                                 <tr class="bg-bg-tertiary/20 border-b border-border-color/40">
-                                    <th class="px-6 py-4 w-12 text-center text-3xs font-black uppercase tracking-widest text-text-secondary opacity-40">SORT</th>
-                                    <th class="px-6 py-4 w-12 text-center text-3xs font-black uppercase tracking-widest text-text-secondary opacity-40">#</th>
-                                    <th class="px-2 py-4 w-12 text-center text-3xs font-black uppercase tracking-widest text-text-secondary opacity-40">Stat</th>
-                                    <th class="px-6 py-4 text-left text-3xs font-black uppercase tracking-widest text-text-secondary opacity-40">Identity</th>
-                                    <th class="px-6 py-4 text-left text-3xs font-black uppercase tracking-widest text-text-secondary opacity-40">Type & Tier</th>
-                                    <th class="px-6 py-4 text-left text-3xs font-black uppercase tracking-widest text-text-secondary opacity-40">Location</th>
-                                    <th class="px-6 py-4 text-left text-3xs font-black uppercase tracking-widest text-text-secondary opacity-40">Utilization</th>
-                                    <th class="px-6 py-4 text-right text-3xs font-black uppercase tracking-widest text-text-secondary opacity-40">Actions</th>
+                                    <th class="px-6 py-3 w-12 text-center text-xs font-semibold text-text-secondary opacity-40">Sort</th>
+                                    <th class="px-6 py-3 w-12 text-center text-xs font-semibold text-text-secondary opacity-40">#</th>
+                                    <th class="px-2 py-3 w-12 text-center text-xs font-semibold text-text-secondary opacity-40">Stat</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary opacity-40">Identity</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary opacity-40">Type & tier</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary opacity-40">Location</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-text-secondary opacity-40">Utilization</th>
+                                    <th class="px-6 py-3 text-right text-xs font-semibold text-text-secondary opacity-40">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-border-color/20">
@@ -857,18 +830,18 @@
     <!-- Registration Dialog -->
     {#if showRegisterDialog}
         <div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6" onmousedown={() => showRegisterDialog = false}>
-            <Card class="w-[700px] max-h-[90vh] overflow-y-auto bg-bg-secondary border-border-color shadow-2xl p-10 flex flex-col gap-8 animate-in zoom-in-95 duration-300" onmousedown={(e) => e.stopPropagation()}>
+            <Card class="w-[700px] max-h-[90vh] overflow-y-auto bg-bg-secondary border-border-color shadow-2xl p-8 flex flex-col gap-6 animate-in zoom-in-95 duration-300" onmousedown={(e) => e.stopPropagation()}>
                 <header class="flex justify-between items-start">
                     <div>
-                        <h2 class="text-2xl font-black text-text-primary uppercase tracking-tighter">Add New Media</h2>
-                        <p class="text-2xs font-bold text-text-secondary uppercase tracking-widest mt-1 opacity-60">Add physical storage locations for your backups.</p>
+                        <h2 class="text-xl font-bold text-text-primary">Add new media</h2>
+                        <p class="text-sm text-text-secondary mt-1 opacity-60">Add physical storage locations for your backups.</p>
                     </div>
-                    <Button variant="ghost" size="icon" class="hover:bg-white/5" onclick={() => showRegisterDialog = false}><X size={24} /></Button>
+                    <Button variant="ghost" size="icon" class="hover:bg-white/5" onclick={() => showRegisterDialog = false}><X size={20} /></Button>
                 </header>
 
                 <div class="grid grid-cols-3 gap-4">
                     {#each providersList as provider}
-                        <button class={cn("flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all", newMedia.media_type === provider.provider_id ? "bg-blue-500/10 border-blue-500 text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.15)]" : "bg-bg-primary/50 border-border-color text-text-secondary hover:border-text-secondary/30")}
+                        <button class={cn("flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all", newMedia.media_type === provider.provider_id ? "bg-blue-500/10 border-blue-500 text-blue-400 shadow-lg shadow-blue-500/10" : "bg-bg-primary/50 border-border-color text-text-secondary hover:border-text-secondary/30")}
                             onclick={() => {
                                 newMedia.media_type = provider.provider_id;
                                 if (provider.provider_id === 'lto_tape') newMedia.location = 'Storage Shelf';
@@ -877,7 +850,7 @@
                             }}
                         >
                             {@render ConfigIcon(provider.provider_id)}
-                            <span class="text-3xs font-black uppercase tracking-widest">{provider.name}</span>
+                            <span class="text-xs font-semibold">{provider.name}</span>
                         </button>
                     {/each}
                 </div>
@@ -885,21 +858,21 @@
                 <div class="space-y-6">
                     <div class="grid grid-cols-2 gap-6">
                         <div class="space-y-2">
-                            <label class="text-3xs font-black uppercase tracking-widest text-text-secondary ml-1" for="identifier">Identifier (Barcode/SN)</label>
-                            <Input id="identifier" bind:value={newMedia.identifier} placeholder="BUP-00001" class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                            <label class="text-xs font-medium text-text-secondary ml-1" for="identifier">Identifier (Barcode/SN)</label>
+                            <Input id="identifier" bind:value={newMedia.identifier} placeholder="BUP-00001" class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
                         </div>
                         <div class="space-y-2">
-                            <label class="text-3xs font-black uppercase tracking-widest text-text-secondary ml-1" for="capacity">Capacity (GB)</label>
-                            <Input id="capacity" type="number" bind:value={newMedia.capacity_gb} class="h-12 bg-bg-primary/50 border-border-color font-mono" />
-                            <p class="text-4xs text-text-secondary leading-tight opacity-60">Auto-detected when possible. You can manually reduce this to reserve space.</p>
+                            <label class="text-xs font-medium text-text-secondary ml-1" for="capacity">Capacity (GB)</label>
+                            <Input id="capacity" type="number" bind:value={newMedia.capacity_gb} class="h-10 bg-bg-primary/50 border-border-color font-mono" />
+                            <p class="text-[10px] text-text-secondary leading-tight opacity-60">Auto-detected when possible. You can manually reduce this to reserve space.</p>
                         </div>
                     </div>
 
                     <div class="space-y-2">
-                        <label class="text-3xs font-black uppercase tracking-widest text-text-secondary ml-1" for="location">Physical Location</label>
+                        <label class="text-xs font-medium text-text-secondary ml-1" for="location">Physical location</label>
                         <div class="relative">
-                            <MapPin size={16} class="absolute left-4 top-3.5 text-text-secondary opacity-50" />
-                            <Input id="location" bind:value={newMedia.location} placeholder="Cabinet A, Shelf 2" class="h-12 bg-bg-primary/50 pl-12 border-border-color font-mono text-sm" />
+                            <MapPin size={16} class="absolute left-4 top-3 text-text-secondary opacity-50" />
+                            <Input id="location" bind:value={newMedia.location} placeholder="Cabinet A, Shelf 2" class="h-10 bg-bg-primary/50 pl-12 border-border-color font-mono text-sm" />
                         </div>
                     </div>
 
@@ -909,13 +882,13 @@
                             {#each Object.entries(activeProvider.config_schema) as [key, schema]}
                                 {@const field = schema as any}
                                 <div class="space-y-2">
-                                    <label class="text-3xs font-black uppercase tracking-widest text-text-secondary ml-1" for="config-{key}">{field.title || key}</label>
+                                    <label class="text-xs font-medium text-text-secondary ml-1" for="config-{key}">{field.title || key}</label>
                                     <Input
                                         id="config-{key}"
                                         bind:value={dynamicConfig[key]}
                                         placeholder={field.description || ""}
                                         type={key.includes("key") || key.includes("passphrase") ? "password" : "text"}
-                                        class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm"
+                                        class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm"
                                     />
                                 </div>
                             {/each}
@@ -924,8 +897,8 @@
                 </div>
 
                 <footer class="flex gap-3 pt-4 border-t border-border-color">
-                    <Button variant="outline" class="flex-1 h-12 font-black uppercase tracking-widest text-2xs" onclick={() => showRegisterDialog = false}>Cancel</Button>
-                    <Button variant="default" class="flex-[2] h-12 font-black uppercase tracking-widest text-2xs" onclick={handleRegister}>Register Media</Button>
+                    <Button variant="outline" class="flex-1 h-10" onclick={() => showRegisterDialog = false}>Cancel</Button>
+                    <Button variant="default" class="flex-[2] h-10" onclick={handleRegister}>Register media</Button>
                 </footer>
             </Card>
         </div>
@@ -934,16 +907,16 @@
     <!-- Edit Dialog -->
     {#if editingMedia}
         <div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6" onmousedown={() => editingMedia = null}>
-            <Card class="w-[600px] max-h-[90vh] overflow-y-auto bg-bg-secondary border-border-color shadow-2xl p-10 flex flex-col gap-8 animate-in zoom-in-95 duration-300" onmousedown={(e) => e.stopPropagation()}>
+            <Card class="w-[600px] max-h-[90vh] overflow-y-auto bg-bg-secondary border-border-color shadow-2xl p-8 flex flex-col gap-6 animate-in zoom-in-95 duration-300" onmousedown={(e) => e.stopPropagation()}>
                 <header class="flex justify-between items-start">
                     <div>
-                        <h2 class="text-2xl font-black text-text-primary uppercase tracking-tighter flex items-center gap-3">
-                            <Edit3 size={24} class="text-blue-500" />
-                            Edit Media Config
+                        <h2 class="text-xl font-bold text-text-primary flex items-center gap-3">
+                            <Edit3 size={20} class="text-blue-500" />
+                            Edit media config
                         </h2>
-                        <p class="text-2xs font-bold text-text-secondary uppercase tracking-widest mt-1 opacity-60">Update hardware paths and physical location.</p>
+                        <p class="text-sm text-text-secondary mt-1 opacity-60">Update hardware paths and physical location.</p>
                     </div>
-                    <Button variant="ghost" size="icon" class="hover:bg-white/5" onclick={() => editingMedia = null}><X size={24} /></Button>
+                    <Button variant="ghost" size="icon" class="hover:bg-white/5" onclick={() => editingMedia = null}><X size={20} /></Button>
                 </header>
 
                 <div class="space-y-6">
@@ -952,14 +925,14 @@
                             {@render ConfigIcon(editingMedia.media_type)}
                         </div>
                         <div>
-                            <span class="text-xs font-black text-text-primary uppercase tracking-widest">{editingMedia.identifier}</span>
-                            <span class="text-3xs text-text-secondary block opacity-60 uppercase">{editingMedia.media_type} &bull; {editingMedia.generation_tier}</span>
+                            <span class="text-sm font-semibold text-text-primary">{editingMedia.identifier}</span>
+                            <span class="text-xs text-text-secondary block opacity-60">{editingMedia.media_type} &bull; {editingMedia.generation_tier}</span>
                         </div>
                     </div>
 
                     <div class="space-y-2 animate-in fade-in duration-300">
-                        <label class="text-3xs font-black uppercase tracking-widest text-text-secondary ml-1" for="edit-location">Physical Location</label>
-                        <Input id="edit-location" bind:value={editingMedia.location} class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                        <label class="text-xs font-medium text-text-secondary ml-1" for="edit-location">Physical location</label>
+                        <Input id="edit-location" bind:value={editingMedia.location} class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
                     </div>
 
                     <!-- Dynamic Config for Edit -->
@@ -969,12 +942,12 @@
                             {#each Object.entries(schema) as [key, entry]}
                                 {@const field = entry as any}
                                 <div class="space-y-2">
-                                    <label class="text-3xs font-black uppercase tracking-widest text-text-secondary ml-1" for="edit-config-{key}">{field.title || key}</label>
+                                    <label class="text-xs font-medium text-text-secondary ml-1" for="edit-config-{key}">{field.title || key}</label>
                                     <Input
                                         id="edit-config-{key}"
                                         bind:value={editingMedia.config[key]}
                                         type={key.includes("key") || key.includes("passphrase") ? "password" : "text"}
-                                        class="h-12 bg-bg-primary/50 border-border-color font-mono text-sm"
+                                        class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm"
                                     />
                                 </div>
                             {/each}
@@ -982,11 +955,11 @@
                     {/if}
 
                     <div class="space-y-2">
-                        <label class="text-3xs font-black uppercase tracking-widest text-text-secondary ml-1" for="edit-status">Status</label>
+                        <label class="text-xs font-medium text-text-secondary ml-1" for="edit-status">Status</label>
                         <select
                             id="edit-status"
                             bind:value={editingMedia.status}
-                            class="w-full h-12 bg-bg-primary border border-border-color rounded-xl px-4 text-sm font-bold text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
+                            class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
                         >
                             <option value="active">Active</option>
                             <option value="retired">Retired</option>
@@ -996,9 +969,9 @@
                 </div>
 
                 <footer class="flex gap-3 pt-4 border-t border-border-color">
-                    <Button variant="outline" class="flex-1 h-12 font-black uppercase tracking-widest text-2xs" onclick={() => editingMedia = null}>Cancel</Button>
-                    <Button variant="default" class="flex-[2] h-12 font-black uppercase tracking-widest text-2xs" onclick={handleUpdate}>
-                        <Save size={18} class="mr-2" /> Save Changes
+                    <Button variant="outline" class="flex-1 h-10" onclick={() => editingMedia = null}>Cancel</Button>
+                    <Button variant="default" class="flex-[2] h-10" onclick={handleUpdate}>
+                        <Save size={16} class="mr-2" /> Save changes
                     </Button>
                 </footer>
             </Card>

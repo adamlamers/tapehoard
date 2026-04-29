@@ -111,20 +111,20 @@
     {#if zoomStack.length > 0}
         <div class="flex items-center gap-2 px-1">
             <button
-                class="flex items-center gap-1 text-3xs font-black uppercase tracking-[0.2em] text-blue-400 hover:text-blue-300 transition-colors"
+                class="flex items-center gap-1 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors"
                 onclick={popZoom}
             >
                 <ChevronLeft size={14} /> Back
             </button>
             <div class="h-1 w-1 rounded-full bg-border-color"></div>
-            <span class="text-3xs font-bold uppercase tracking-widest text-text-secondary opacity-60 truncate">
+            <span class="text-xs font-medium text-text-secondary opacity-60 truncate">
                 Focusing: {currentTitle}
             </span>
             <button
-                class="ml-auto text-4xs font-black uppercase tracking-widest text-text-secondary hover:text-error-color opacity-40 hover:opacity-100 transition-all"
+                class="ml-auto text-xs font-medium text-text-secondary hover:text-error-color opacity-40 hover:opacity-100 transition-all"
                 onclick={resetZoom}
             >
-                Reset View
+                Reset view
             </button>
         </div>
     {/if}
@@ -136,7 +136,7 @@
 
         {#if currentItems.length === 0}
             <div class="absolute inset-0 flex items-center justify-center opacity-20">
-                <span class="text-xs font-black uppercase tracking-[0.2em]">No nested data</span>
+                <span class="text-sm font-medium">No nested data</span>
             </div>
         {/if}
     </div>
@@ -155,7 +155,7 @@
     >
         {#if w > 40 && h > 16}
             <div class={`px-1 py-0.5 shrink-0 ${depth === 0 ? 'bg-black/10' : ''}`}>
-                <span class={`font-black uppercase tracking-widest truncate w-full block text-4xs drop-shadow-md ${depth === 0 ? 'text-white/90' : 'text-white/40'}`}>
+                <span class={`font-medium truncate w-full block text-[10px] drop-shadow-md ${depth === 0 ? 'text-white/90' : 'text-white/40'}`}>
                     {item.label}
                 </span>
             </div>
@@ -169,7 +169,7 @@
             </div>
         {:else if w > 40 && h > 20}
             <div class="flex-1 flex items-center justify-center p-1">
-                <span class="text-white/80 font-bold mono text-5xs sm:text-4xs truncate w-full text-center drop-shadow-md">
+                <span class="text-white/80 font-medium mono text-[9px] truncate w-full text-center drop-shadow-md">
                     {formatSize(item.value)}
                 </span>
             </div>
@@ -179,28 +179,28 @@
 
 <!-- Common Context Menu -->
 <ContextMenu bind:show={showMenu} x={menuX} y={menuY}>
-    <div class="flex flex-col">
+    <div class="flex flex-col p-1">
         <div class="px-3 py-2 border-b border-border-color/50 mb-1">
-            <p class="text-4xs font-black uppercase text-text-secondary tracking-widest truncate max-w-[200px]">
+            <p class="text-xs font-semibold text-text-primary truncate max-w-[200px]">
                 {contextItem?.label}
             </p>
         </div>
 
         {#if contextItem?.children?.length}
             <button
-                class="flex items-center gap-3 px-3 py-2 text-3xs font-bold uppercase tracking-wider text-text-primary hover:bg-blue-500/10 hover:text-blue-400 rounded-lg transition-all text-left"
-                onclick={() => { handleLeftClick(contextItem!); showMenu = false; }}
+                class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-text-primary hover:bg-blue-500/10 hover:text-blue-400 rounded-lg transition-all text-left"
+                onclick={(e) => { handleLeftClick(e, contextItem!); showMenu = false; }}
             >
-                <FolderSearch size={14} /> Focus Directory
+                <FolderSearch size={14} /> Focus directory
             </button>
         {/if}
 
         {#if onSelect && (contextItem?.fullPath || contextItem?.label)}
             <button
-                class="flex items-center gap-3 px-3 py-2 text-3xs font-bold uppercase tracking-wider text-text-primary hover:bg-success-color/10 hover:text-success-color rounded-lg transition-all text-left"
+                class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-text-primary hover:bg-success-color/10 hover:text-success-color rounded-lg transition-all text-left"
                 onclick={() => { onSelect!(contextItem?.fullPath || contextItem!.label); showMenu = false; }}
             >
-                <ExternalLink size={14} /> View in Filesystem
+                <ExternalLink size={14} /> View in filesystem
             </button>
         {/if}
     </div>

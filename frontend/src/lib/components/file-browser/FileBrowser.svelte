@@ -400,7 +400,7 @@
                                                         <button
                                                                 class={cn(
                                                                         "px-2 py-0.5 rounded-md text-[13px] transition-colors hover:bg-white/5 whitespace-nowrap cursor-pointer",
-                                                                        i === breadcrumbs.length - 1 ? "text-text-primary font-bold" : "text-text-secondary hover:text-text-primary"
+                                                                        i === breadcrumbs.length - 1 ? "text-text-primary font-medium" : "text-text-secondary hover:text-text-primary"
                                                                 )}
                                                                 onclick={(e) => { e.stopPropagation(); navigateTo(crumb.path); }}
                                                         >
@@ -442,7 +442,7 @@
                 <!-- ZONE B: NAVIGATION PANE -->
                 <aside class="flex w-72 shrink-0 flex-col border-r border-border-color bg-bg-secondary/50">
                         <ScrollArea class="flex-1 p-2">
-                                <div class="px-3 py-1 text-2xs font-bold uppercase text-text-secondary/60 mb-2">
+                                <div class="px-3 py-1 text-xs font-medium text-text-secondary/60 mb-2">
                                         Navigation
                                 </div>
                                 <FileBrowserTreeItem node={activeRoot} selectedPath={currentPath} onSelect={navigateTo} isSpecial={true} {mode} />
@@ -464,7 +464,7 @@
 
                                                 <div class="flex flex-auto min-w-[300px] items-center h-full relative group/col">
                                                         <button
-                                                                class="flex w-full items-center justify-between text-2xs font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
+                                                                class="flex w-full items-center justify-between text-xs font-medium text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
                                                                 onclick={() => toggleSort("name")}
                                                         >
                                                                 Name
@@ -481,7 +481,7 @@
 
                                                 <div class="flex items-center h-full relative group/col shrink-0" style="width: {mtimeWidth}px">
                                                         <button
-                                                                class="flex w-full items-center justify-between text-2xs font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
+                                                                class="flex w-full items-center justify-between text-xs font-medium text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
                                                                 onclick={() => toggleSort("mtime")}
                                                         >
                                                                 Date modified
@@ -499,7 +499,7 @@
 
                                                 <div class="flex items-center h-full relative group/col shrink-0" style="width: {typeWidth}px">
                                                         <button
-                                                                class="flex w-full items-center justify-between text-2xs font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
+                                                                class="flex w-full items-center justify-between text-xs font-medium text-text-secondary hover:bg-white/5 px-4 h-full transition-colors"
                                                                 onclick={() => toggleSort("type")}
                                                         >
                                                                 Type
@@ -517,7 +517,7 @@
 
                                                 <div class="flex items-center h-full relative group/col shrink-0" style="width: {sizeWidth}px">
                                                         <button
-                                                                class="flex w-full items-center justify-between text-2xs font-semibold text-text-secondary hover:bg-white/5 px-4 h-full transition-colors text-right"
+                                                                class="flex w-full items-center justify-between text-xs font-medium text-text-secondary hover:bg-white/5 px-4 h-full transition-colors text-right"
                                                                 onclick={() => toggleSort("size")}
                                                         >
                                                                 Size
@@ -541,7 +541,7 @@
                                                 {#if filteredFiles.length === 0}
                                                         <div class="flex h-full flex-col items-center justify-center p-12 text-center opacity-30">
                                                                 <Search size={48} class="mb-4" strokeWidth={1}></Search>
-                                                                <p class="text-sm font-medium uppercase tracking-widest">Folder is empty</p>
+                                                                <p class="text-sm font-medium">Folder is empty</p>
                                                         </div>
                                                 {:else}
                                                         {#each filteredFiles as item (item.path)}
@@ -565,14 +565,14 @@
 
         <!-- ZONE D: STATUS BAR -->
         <div
-                class="flex h-8 shrink-0 items-center justify-between border-t border-border-color bg-bg-tertiary px-6 text-3xs font-medium text-text-secondary"
+                class="flex h-8 shrink-0 items-center justify-between border-t border-border-color bg-bg-tertiary px-6 text-xs font-medium text-text-secondary"
         >
                 <div class="flex items-center gap-4">
                         <span>{filteredFiles.length} items</span>
                         <div class="h-3 w-px bg-border-color/40"></div>
                         {#if selectedPaths.size > 0}
                                 <span class="text-text-primary">
-                                        {selectedPaths.size} items selected
+                                        {selectedPaths.size} selected
                                 </span>
                         {/if}
                 </div>

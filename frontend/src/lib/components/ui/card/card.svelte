@@ -6,7 +6,7 @@
 </script>
 
 <div
-	class={cn("rounded-lg border bg-card text-card-foreground shadow-sm", className)}
+	class={cn("rounded-xl border border-border-color bg-bg-secondary text-text-primary shadow-xl", className)}
 	{...rest}
 >
 	{@render children?.()}

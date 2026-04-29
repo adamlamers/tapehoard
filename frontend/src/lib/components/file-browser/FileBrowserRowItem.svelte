@@ -192,7 +192,7 @@
                                         class={cn(
                                                 "truncate text-[13px] transition-colors",
                                                 !item.ignored
-                                                        ? "text-success-color font-bold"
+                                                        ? "text-success-color font-medium"
                                                         : isSelected
                                                                 ? "text-text-primary font-medium"
                                                                 : "text-text-secondary group-hover:text-text-primary",
@@ -205,7 +205,7 @@
                                         {#if item.media && item.media.length > 0}
                                                 <div class="flex gap-1 overflow-hidden shrink-0">
                                                         {#each item.media as m}
-                                                                <span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-4xs px-1.5 py-0.5 rounded border border-blue-500/20 font-bold uppercase tracking-wider">
+                                                                <span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[10px] px-1.5 py-0.5 rounded border border-blue-500/20 font-medium">
                                                                         <CassetteTape size={10} />
                                                                         {m}
                                                                 </span>

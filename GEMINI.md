@@ -73,6 +73,19 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
 *   **Direct Terminology:** Use technical terms like "Backup Manager", "System Status", "Archive Index". Avoid marketing fluff.
 *   **Layout:** Natural page scrolling only. No sticky headers.
 *   **Navigation:** The FileBrowser must maintain internal back/forward history separate from browser page navigation.
+*   **Refined Industrial Design Paradigm:**
+    *   **Scale:** Standard root font size is **16px**.
+    *   **Typography:** Transition from aggressive all-caps and heavy weights to **Sentence case** and **font-medium** for general UI text. Reserve `font-bold` for primary headers and high-impact dashboard metrics.
+    *   **Modular Components:** Use standardized layout components to maintain visual consistency:
+        *   `PageHeader`: Centralized logic for page titles, descriptions, and action buttons.
+        *   `SectionHeader`: Standardized "Industrial" divider (Icon + Title + Gradient Line).
+        *   `StatCard`: Modular metric tiles with consistent scaling and alignment for big numbers.
+        *   `ProgressBar`: Unified utilization and task indicators with industrial glow effects.
+        *   `StatusBadge`: Centralized state indicators (Success, Error, Warning, Neutral, Blue) with consistent padding.
+        *   `Card`: Unified **p-5** padding, **rounded-xl** borders, and **shadow-xl** for all content containers.
+        *   `Button`: Standardized high-density **h-9 px-4** sizing (or **h-11** for primary CTAs) with `font-medium` sentence-case labels.
+    *   **High Density:** Maintain maximum information density without sacrificing legibility by utilizing high-density typography classes (`text-4xs` to `text-6xs`) for metadata and technical labels.
+    *   **Color Strategy:** Use low-opacity backgrounds (e.g., `bg-blue-500/10`) and subtle borders (`border-blue-500/20`) for interactive elements and badges to preserve the "professional terminal" aesthetic.
 
 ### API & Type Safety
 *   **Explicit Response Models:** All FastAPI endpoints MUST explicitly declare a `response_model`. This is critical for generating accurate OpenAPI specs and strictly typed TypeScript SDKs for the frontend.

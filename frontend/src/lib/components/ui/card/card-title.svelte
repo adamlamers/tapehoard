@@ -6,7 +6,7 @@
 </script>
 
 <h3
-	class={cn("text-2xl font-semibold leading-none tracking-tight", className)}
+	class={cn("text-base font-bold leading-none tracking-tight", className)}
 	{...rest}
 >
 	{@render children?.()}

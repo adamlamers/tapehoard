@@ -16,6 +16,8 @@
         Library
     } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
+    import PageHeader from '$lib/components/ui/PageHeader.svelte';
+    import SectionHeader from '$lib/components/ui/SectionHeader.svelte';
     import { Card } from '$lib/components/ui/card';
     import { ScrollArea } from '$lib/components/ui/scroll-area';
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
@@ -167,32 +169,24 @@
 </svelte:head>
 
 <div class="flex flex-col gap-6 h-full overflow-hidden animate-in fade-in duration-700">
-    <!-- Header -->
-    <header class="flex justify-between items-center bg-bg-secondary px-8 py-5 rounded-xl border border-border-color shadow-2xl relative overflow-hidden shrink-0">
-        <div class="absolute inset-0 bg-gradient-to-r from-success-color/5 to-transparent pointer-events-none"></div>
-        <div class="relative z-10">
-            <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
-                <History class="text-success-color" size={28} />
-                Data Recovery
-            </h1>
-            <p class="text-xs font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
-                Recovery Queue & Physical Media Manifest
-            </p>
-        </div>
-
-        <div class="flex gap-3 z-10">
-            <Button variant="outline" class="h-10 px-6 font-black uppercase tracking-widest text-3xs border-border-color hover:bg-error-color/5 hover:text-error-color hover:border-error-color/30" onclick={clearCart} disabled={(manifest?.total_files || 0) === 0}>
-                <Trash2 size={14} class="mr-2" /> Clear Queue
+    <PageHeader
+        title="Data recovery"
+        description="Recovery queue & physical media manifest"
+        icon={History}
+    >
+        {#snippet actions()}
+            <Button variant="outline" onclick={clearCart} disabled={(manifest?.total_files || 0) === 0}>
+                <Trash2 size={14} class="mr-2" /> Clear queue
             </Button>
-            <Button variant="default" class="h-10 px-6 font-black uppercase tracking-widest text-3xs bg-success-color hover:bg-success-color/90" disabled={(manifest?.total_files || 0) === 0 || !selectedDest || restoring} onclick={initiateRestore}>
+            <Button variant="default" class="bg-success-color hover:bg-success-color/90 border-none" disabled={(manifest?.total_files || 0) === 0 || !selectedDest || restoring} onclick={initiateRestore}>
                 {#if restoring}
                     <RotateCw size={14} class="mr-2 animate-spin" /> Starting...
                 {:else}
-                    <ShieldCheck size={14} class="mr-2" /> Initiate Recovery
+                    <ShieldCheck size={14} class="mr-2" /> Initiate recovery
                 {/if}
             </Button>
-        </div>
-    </header>
+        {/snippet}
+    </PageHeader>
 
     {#if (manifest?.total_files || 0) === 0 && !loading}
         <div class="flex-1 flex flex-col items-center justify-center p-12 text-center animate-in fade-in zoom-in duration-500">
@@ -200,12 +194,12 @@
                 <div class="w-24 h-24 bg-bg-tertiary rounded-full flex items-center justify-center mb-8 border-2 border-dashed border-border-color opacity-50">
                     <History size={48} class="text-text-secondary" strokeWidth={1} />
                 </div>
-                <h2 class="text-2xl font-black uppercase tracking-tighter text-text-primary">Recovery Queue is Empty</h2>
-                <p class="text-2xs font-bold uppercase tracking-[0.2em] mt-4 text-text-secondary leading-loose opacity-60">
+                <h2 class="text-xl font-bold text-text-primary">Recovery queue is empty</h2>
+                <p class="text-sm mt-4 text-text-secondary leading-relaxed opacity-60">
                     You haven't selected any files for restoration yet. Use the Index Browser to find and queue the items you need to recover from your archives.
                 </p>
-                <Button variant="default" class="mt-10 h-12 px-10 font-black uppercase tracking-widest text-2xs shadow-lg shadow-blue-500/20" href="/index-browser">
-                    Browse Virtual Index <ArrowRight size={14} class="ml-2" />
+                <Button variant="default" class="mt-8 px-8 shadow-lg shadow-blue-500/20" href="/index-browser">
+                    Browse virtual index <ArrowRight size={14} class="ml-2" />
                 </Button>
             </div>
         </div>
@@ -231,32 +225,29 @@
             <aside class="flex flex-col gap-6 min-h-0 overflow-y-auto pr-2 pb-4">
                 <!-- Queue Summary -->
                 <Card class="p-6 bg-gradient-to-br from-bg-secondary to-bg-tertiary border-border-color shadow-xl">
-                    <h3 class="text-3xs font-black uppercase tracking-widest text-text-secondary mb-4 opacity-50">Queue Statistics</h3>
+                    <span class="text-xs font-medium text-text-secondary mb-4 opacity-50 block">Queue statistics</span>
                     <div class="grid grid-cols-2 gap-4">
                         <div class="p-4 bg-bg-primary/40 border border-border-color/40 rounded-xl">
-                            <span class="text-4xs font-black uppercase tracking-widest text-text-secondary block mb-1">Total Files</span>
-                            <span class="text-xl font-black text-text-primary mono">{manifest?.total_files || 0}</span>
+                            <span class="text-[10px] font-medium text-text-secondary block mb-1">Total files</span>
+                            <span class="text-xl font-bold text-text-primary mono">{manifest?.total_files || 0}</span>
                         </div>
                         <div class="p-4 bg-bg-primary/40 border border-border-color/40 rounded-xl">
-                            <span class="text-4xs font-black uppercase tracking-widest text-text-secondary block mb-1">Recovery Size</span>
-                            <span class="text-xl font-black text-text-primary mono">{formatSize(manifest?.total_size || 0)}</span>
+                            <span class="text-[10px] font-medium text-text-secondary block mb-1">Recovery size</span>
+                            <span class="text-xl font-bold text-text-primary mono">{formatSize(manifest?.total_size || 0)}</span>
                         </div>
                     </div>
                 </Card>
 
                 <!-- DESTINATION SELECTOR -->
                 <Card class="bg-bg-secondary border-border-color shadow-xl overflow-hidden">
-                    <div class="p-5 border-b border-border-color bg-bg-tertiary/30 flex items-center gap-3">
-                        <MapPin size={16} class="text-success-color" />
-                        <h2 class="text-xs font-black uppercase tracking-widest text-text-primary">Recovery Target</h2>
-                    </div>
+                    <SectionHeader title="Recovery target" icon={MapPin} iconColor="text-success-color" class="p-4 bg-bg-tertiary/30 border-b border-border-color" />
                     <div class="p-5 space-y-4">
                         <div class="space-y-2">
-                            <label for="destination" class="text-3xs font-black uppercase tracking-widest text-text-secondary opacity-50 ml-1">Restore to Host Path</label>
+                            <label for="destination" class="text-xs font-medium text-text-secondary opacity-50 ml-1">Restore to host path</label>
                             <select
                                 id="destination"
                                 bind:value={selectedDest}
-                                class="w-full h-12 bg-bg-primary border border-border-color rounded-xl px-4 text-sm font-bold text-text-primary outline-none focus:ring-2 focus:ring-success-color/20 transition-all appearance-none cursor-pointer"
+                                class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-success-color/20 transition-all appearance-none cursor-pointer"
                             >
                                 {#each restoreDests as dest}
                                     <option value={dest}>{dest}</option>
@@ -266,7 +257,7 @@
                                 {/if}
                             </select>
                         </div>
-                        <p class="text-3xs text-text-secondary leading-relaxed italic opacity-60">
+                        <p class="text-xs text-text-secondary leading-relaxed italic opacity-60">
                             Files will be restored into this directory, maintaining their original folder structure.
                         </p>
                     </div>
@@ -274,10 +265,7 @@
 
                 <!-- MEDIA MANIFEST -->
                 <Card class="bg-bg-secondary border-border-color shadow-xl flex flex-col min-h-0">
-                    <div class="p-5 border-b border-border-color bg-bg-tertiary/30 flex items-center gap-3">
-                        <Database size={16} class="text-blue-400" />
-                        <h2 class="text-xs font-black uppercase tracking-widest text-text-primary">Physical Manifest</h2>
-                    </div>
+                    <SectionHeader title="Physical manifest" icon={Database} iconColor="text-blue-400" class="p-4 bg-bg-tertiary/30 border-b border-border-color" />
 
                     <div class="p-5 space-y-3 flex-1 overflow-y-auto">
                         {#each manifest?.media_required || [] as media}
@@ -289,18 +277,18 @@
                                 </div>
                                 <div class="flex-1">
                                     <div class="flex justify-between items-center">
-                                        <span class="text-sm font-black text-text-primary mono">{media.identifier}</span>
-                                        <span class="text-4xs font-black uppercase text-blue-400">{media.media_type}</span>
+                                        <span class="text-sm font-bold text-text-primary mono">{media.identifier}</span>
+                                        <span class="text-[10px] font-medium text-blue-400">{media.media_type}</span>
                                     </div>
                                     <div class="flex gap-3 mt-1">
-                                        <span class="text-3xs font-bold text-text-secondary opacity-60 uppercase">{media.file_count} Files</span>
-                                        <span class="text-3xs font-bold text-text-secondary opacity-60 uppercase border-l border-border-color pl-3">{formatSize(media.total_size)}</span>
+                                        <span class="text-[10px] font-medium text-text-secondary opacity-60">{media.file_count} files</span>
+                                        <span class="text-[10px] font-medium text-text-secondary opacity-60 border-l border-border-color pl-3">{formatSize(media.total_size)}</span>
                                     </div>
                                 </div>
                             </div>
                         {:else}
                             <div class="py-12 text-center opacity-20 border-2 border-dashed border-border-color rounded-xl">
-                                <p class="text-3xs font-black uppercase tracking-widest">No Media Required</p>
+                                <p class="text-xs font-medium">No media required</p>
                             </div>
                         {/each}
                     </div>

@@ -15,6 +15,7 @@
         ArrowRight
     } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
+    import PageHeader from '$lib/components/ui/PageHeader.svelte';
     import { Card } from '$lib/components/ui/card';
     import { ScrollArea } from '$lib/components/ui/scroll-area';
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
@@ -258,30 +259,24 @@
 </svelte:head>
 
 <div class="flex flex-col gap-6 h-full overflow-hidden">
-    <!-- INTEGRATED HEADER -->
-    <header class="flex justify-between items-center bg-bg-secondary px-6 py-4 rounded-xl border border-border-color shadow-2xl relative overflow-hidden shrink-0">
-        <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent pointer-events-none"></div>
-        <div class="relative z-10">
-            <h1 class="text-xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
-                <Library class="text-blue-500" size={24} />
-                Archive Index
-            </h1>
-            <p class="text-4xs font-bold uppercase tracking-[0.2em] text-text-secondary mt-1 opacity-80">
-                A view of what is stored where on archive media
-            </p>
-        </div>
-
-        {#if restoreCartItems.length > 0}
-            <div class="flex items-center gap-3 z-10 animate-in fade-in zoom-in duration-300">
-                <span class="text-5xs font-black uppercase tracking-widest text-text-secondary bg-bg-primary px-3 py-1.5 rounded-full border border-border-color">
-                    {restoreCartItems.length} items in queue
-                </span>
-                <Button variant="default" class="bg-success-color hover:bg-success-color/90 text-white font-black uppercase tracking-widest text-4xs px-4 h-9 shadow-lg shadow-success-color/20" href="/restores">
-                    Review Recovery Manifest
-                </Button>
-            </div>
-        {/if}
-    </header>
+    <PageHeader
+        title="Archive index"
+        description="A view of what is stored where on archive media"
+        icon={Library}
+    >
+        {#snippet actions()}
+            {#if restoreCartItems.length > 0}
+                <div class="flex items-center gap-3 z-10 animate-in fade-in zoom-in duration-300">
+                    <span class="text-5xs font-bold text-text-secondary bg-bg-primary px-3 py-1.5 rounded-full border border-border-color">
+                        {restoreCartItems.length} items in queue
+                    </span>
+                    <Button variant="default" class="bg-success-color hover:bg-success-color/90 text-white" href="/restores">
+                        Review recovery manifest
+                    </Button>
+                </div>
+            {/if}
+        {/snippet}
+    </PageHeader>
 
     <div class="flex gap-6 flex-1 min-h-0 animate-in fade-in slide-in-from-bottom-2 duration-500 overflow-hidden">
         <!-- Virtual FS Browser -->
@@ -308,21 +303,21 @@
                 <Card class="flex-1 overflow-hidden flex flex-col bg-bg-secondary border-border-color shadow-2xl relative">
                     <div class="p-5 border-b border-border-color bg-bg-tertiary/30">
                         <div class="flex justify-between items-start mb-3">
-                            <div class="p-2.5 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20">
+                            <div class="p-2 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20">
                                 {#if selectedItemMetadata.type === 'directory'}
-                                    <Folder size={20} />
+                                    <Folder size={18} />
                                 {:else}
-                                    <FileText size={20} />
+                                    <FileText size={18} />
                                 {/if}
                             </div>
                             <button class="text-text-secondary hover:text-text-primary transition-colors" onclick={() => selectedItemMetadata = null}>
                                 <X size={18} />
                             </button>
                         </div>
-                        <h3 class="text-base font-black text-text-primary leading-tight truncate" title={selectedItemMetadata.path}>
+                        <h3 class="text-sm font-bold text-text-primary leading-tight truncate" title={selectedItemMetadata.path}>
                             {selectedItemMetadata.path.split('/').pop()}
                         </h3>
-                        <p class="text-5xs mono text-text-secondary mt-1 opacity-60 truncate italic">{selectedItemMetadata.path}</p>
+                        <p class="text-5xs mono text-text-secondary mt-1 opacity-50 truncate italic">{selectedItemMetadata.path}</p>
                     </div>
 
                     <ScrollArea class="flex-1">
@@ -330,19 +325,19 @@
                             <!-- Core Stats -->
                             <div class="grid grid-cols-2 gap-4">
                                 <div class="space-y-1">
-                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-50 block">
+                                    <span class="text-5xs font-medium text-text-secondary opacity-50 block uppercase tracking-wider">
                                         {selectedItemMetadata.type === 'directory' ? 'Aggregate Size' : 'File Size'}
                                     </span>
-                                    <span class="text-xs font-bold text-text-primary mono">{formatSize(selectedItemMetadata.size)}</span>
+                                    <span class="text-xs font-semibold text-text-primary mono">{formatSize(selectedItemMetadata.size)}</span>
                                 </div>
                                 <div class="space-y-1">
-                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-50 block">Last Indexed</span>
-                                    <span class="text-xs font-bold text-text-primary mono">{formatLocalDate(selectedItemMetadata.last_seen_timestamp)}</span>
+                                    <span class="text-5xs font-medium text-text-secondary opacity-50 block uppercase tracking-wider">Last Indexed</span>
+                                    <span class="text-xs font-semibold text-text-primary mono">{formatLocalDate(selectedItemMetadata.last_seen_timestamp)}</span>
                                 </div>
                                 {#if selectedItemMetadata.type === 'directory'}
                                     <div class="space-y-1 col-span-2">
-                                        <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-50 block">Child Count</span>
-                                        <span class="text-xs font-bold text-text-primary mono">{selectedItemMetadata.child_count?.toLocaleString()} Indexed Files</span>
+                                        <span class="text-5xs font-medium text-text-secondary opacity-50 block uppercase tracking-wider">Child Count</span>
+                                        <span class="text-xs font-semibold text-text-primary mono">{selectedItemMetadata.child_count?.toLocaleString()} Indexed Files</span>
                                     </div>
                                 {/if}
                             </div>
@@ -350,7 +345,7 @@
                             {#if selectedItemMetadata.type === 'file'}
                                 <!-- Hash -->
                                 <div class="space-y-2">
-                                    <span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-50 block">SHA-256 Fingerprint</span>
+                                    <span class="text-5xs font-medium text-text-secondary opacity-50 block uppercase tracking-wider">SHA-256 Fingerprint</span>
                                     <div class="bg-bg-primary p-2.5 rounded-lg border border-border-color/50 break-all mono text-5xs text-blue-400/80 leading-relaxed">
                                         {selectedItemMetadata.sha256_hash || 'Pending computation...'}
                                     </div>
@@ -360,17 +355,17 @@
                                 <div class="space-y-3">
                                     <div class="flex items-center gap-2">
                                         <ShieldCheck size={12} class="text-success-color" />
-                                        <span class="text-5xs font-black uppercase tracking-widest text-text-primary">Storage Locations</span>
+                                        <span class="text-5xs font-bold uppercase tracking-wider text-text-primary">Storage Locations</span>
                                     </div>
 
                                     <div class="space-y-2">
                                         {#each selectedItemMetadata.versions || [] as version}
                                             <div class="bg-bg-primary/50 border border-border-color rounded-lg p-2.5 group hover:border-blue-500/30 transition-all">
                                                 <div class="flex justify-between items-center mb-1.5">
-                                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-5xs font-black border border-blue-500/20">
+                                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-5xs font-bold border border-blue-500/20">
                                                         {(version as any).media_id || (version as any).media_identifier}
                                                     </span>
-                                                    <span class="text-6xs font-bold text-text-secondary opacity-40 uppercase tracking-tighter">
+                                                    <span class="text-6xs font-medium text-text-secondary opacity-40 uppercase tracking-tighter">
                                                         {(version as any).media_type}
                                                     </span>
                                                 </div>
@@ -387,7 +382,7 @@
                                             </div>
                                         {:else}
                                             <div class="py-6 text-center border-2 border-dashed border-border-color rounded-xl opacity-30">
-                                                <p class="text-5xs font-black uppercase tracking-widest">No versions stored on media.</p>
+                                                <p class="text-5xs font-bold uppercase tracking-wider">No versions stored on media.</p>
                                             </div>
                                         {/each}
                                     </div>
@@ -398,19 +393,19 @@
 
                     {#if selectedItemMetadata.type === 'file' && (selectedItemMetadata.versions?.length ?? 0) > 0}
                         <div class="p-5 bg-bg-tertiary/30 border-t border-border-color mt-auto">
-                            <Button class="w-full h-10 font-black uppercase tracking-widest text-4xs shadow-lg shadow-blue-500/10" onclick={() => handleToggleCart({path: selectedItemMetadata?.path || '', type: 'file', name: '', media: (selectedItemMetadata?.versions || []).map((v: any) => v.media_id || v.media_identifier), selected: selectedItemMetadata?.selected} as FileItem)}>
+                            <Button class="w-full h-9 font-semibold text-xs shadow-lg shadow-blue-500/10" onclick={() => handleToggleCart({path: selectedItemMetadata?.path || '', type: 'file', name: '', media: (selectedItemMetadata?.versions || []).map((v: any) => v.media_id || v.media_identifier), selected: selectedItemMetadata?.selected} as FileItem)}>
                                 <ShieldCheck size={14} class="mr-2" />
-                                {selectedItemMetadata.selected ? 'Remove from Queue' : 'Add to Recovery Queue'}
+                                {selectedItemMetadata.selected ? 'Remove from recovery queue' : 'Add to recovery queue'}
                             </Button>
                         </div>
                     {:else if selectedItemMetadata.type === 'directory' && (selectedItemMetadata.child_count || 0) > 0}
                         <div class="p-5 bg-bg-tertiary/30 border-t border-border-color mt-auto">
-                            <Button variant="outline" class={cn("w-full h-10 font-black uppercase tracking-widest text-4xs", "border-success-color/30 text-success-color hover:bg-success-color/10")} onclick={() => handleToggleDirectoryCart(selectedItemMetadata?.path || '')} disabled={selectedItemMetadata.selected}>
+                            <Button variant="outline" class={cn("w-full h-9 font-semibold text-xs", "border-success-color/30 text-success-color hover:bg-success-color/10")} onclick={() => handleToggleDirectoryCart(selectedItemMetadata?.path || '')} disabled={selectedItemMetadata.selected}>
                                 <ListPlus size={14} class="mr-2" />
                                 {#if selectedItemMetadata.selected}
-                                    Folder Fully Queued
+                                    Folder fully queued
                                 {:else}
-                                    Add Folder to Recovery Queue
+                                    Add folder to recovery queue
                                 {/if}
                             </Button>
                         </div>
@@ -419,7 +414,7 @@
             {:else}
                 <div class="flex-1 border-2 border-dashed border-border-color rounded-xl flex flex-col items-center justify-center p-8 text-center opacity-20">
                     <Library size={40} class="mb-3 text-blue-500" />
-                    <p class="text-4xs font-black uppercase tracking-widest leading-relaxed">
+                    <p class="text-4xs font-bold uppercase tracking-wider leading-relaxed">
                         Select an item from the index<br>to view detailed metadata and<br>storage locations.
                     </p>
                 </div>

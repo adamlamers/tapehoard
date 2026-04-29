@@ -6,7 +6,7 @@
 </script>
 
 <p
-	class={cn("text-sm text-muted-foreground", className)}
+	class={cn("text-xs text-text-secondary", className)}
 	{...rest}
 >
 	{@render children?.()}

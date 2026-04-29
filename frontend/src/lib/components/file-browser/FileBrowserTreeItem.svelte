@@ -140,7 +140,7 @@
                                         <Folder size={14} />
                                 {/if}
                         </div>
-                        <span class="text-2xs font-bold truncate">
+                        <span class="text-[13px] font-medium truncate">
                                 {node.name === "ROOT" ? "Virtual Root" : node.name}
                         </span>
                 </div>

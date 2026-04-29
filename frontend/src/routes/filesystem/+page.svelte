@@ -2,6 +2,7 @@
     import { onMount, onDestroy } from 'svelte';
     import { Save, FolderTree, Database, HardDrive, LayoutGrid, RotateCw, Activity, FileCheck, ArrowRight } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
+    import PageHeader from '$lib/components/ui/PageHeader.svelte';
     import { Card } from '$lib/components/ui/card';
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
     import type { FileItem } from '$lib/types';
@@ -199,37 +200,30 @@
 </svelte:head>
 
 <div class="flex flex-col gap-6 h-full animate-in fade-in duration-700">
-    <header class="flex justify-between items-start bg-bg-secondary px-6 py-5 rounded-xl border border-border-color shadow-2xl relative overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent pointer-events-none"></div>
-        <div class="relative z-10">
-            <h1 class="text-xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
-                <FolderTree class="text-blue-500" size={24} />
-                Live Filesystem
-            </h1>
-            <p class="text-4xs font-bold uppercase tracking-[0.2em] text-text-secondary mt-1 opacity-80">
-                Define backup rules & browse physical storage
-            </p>
-        </div>
-
-        <div class="flex items-center gap-2 relative z-10">
+    <PageHeader
+        title="Live filesystem"
+        description="Define backup rules & browse physical storage"
+        icon={FolderTree}
+    >
+        {#snippet actions()}
             {#if hasChanges}
                 <div class="mr-3 px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 rounded-lg animate-pulse">
-                    <span class="text-5xs font-black text-blue-400 uppercase tracking-[0.2em]">{pendingChanges.size} Pending Changes</span>
+                    <span class="text-5xs font-bold text-blue-400 uppercase tracking-wider">{pendingChanges.size} Pending changes</span>
                 </div>
             {/if}
             <Button
                 variant={hasChanges ? "default" : "outline"}
-                class={cn("h-9 px-4 font-black uppercase tracking-widest text-4xs transition-all duration-500 shadow-lg",
-                    hasChanges ? "bg-blue-600 hover:bg-blue-700 border-none scale-105" : "border-border-color opacity-50")}
+                class={cn("transition-all duration-500 shadow-lg",
+                    hasChanges ? "scale-105" : "opacity-50")}
                 onclick={commitChanges}
                 disabled={!hasChanges || committing}
             >
                 <Save size={14} class="mr-2" />
-                {committing ? 'Committing...' : 'Commit Rules'}
+                {committing ? 'Committing...' : 'Commit rules'}
             </Button>
             <Button
                 variant="outline"
-                class={cn("h-9 px-4 font-black uppercase tracking-widest text-4xs border-border-color hover:border-blue-500/30 transition-all",
+                class={cn("transition-all",
                     scanRunning && "text-blue-500 border-blue-500/20 bg-blue-500/5")}
                 onclick={startScan}
                 disabled={scanRunning}
@@ -239,11 +233,11 @@
                     Scanning...
                 {:else}
                     <Activity size={14} class="mr-2" />
-                    Quick Scan
+                    Quick scan
                 {/if}
             </Button>
-        </div>
-    </header>
+        {/snippet}
+    </PageHeader>
 
     <Card class="flex-1 min-h-[600px] bg-bg-secondary border-border-color shadow-2xl flex flex-col relative overflow-hidden">
         <div class="flex-1 flex flex-col min-h-0">

@@ -14,6 +14,10 @@
     } from 'lucide-svelte';
     import { Card } from '$lib/components/ui/card';
     import { Button } from '$lib/components/ui/button';
+    import PageHeader from '$lib/components/ui/PageHeader.svelte';
+    import SectionHeader from '$lib/components/ui/SectionHeader.svelte';
+    import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
+    import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
     import JobDetailModal from '$lib/components/JobDetailModal.svelte';
     import {
         listJobsSystemJobsGet,
@@ -121,12 +125,12 @@
         return `${minutes}m ${remSeconds}s`;
     }
 
-    function getStatusColor(status: string) {
+    function getStatusVariant(status: string) {
         switch (status) {
-            case 'COMPLETED': return 'text-success-color bg-success-color/5 border-success-color/20';
-            case 'RUNNING': return 'text-blue-500 bg-blue-500/5 border-blue-500/20';
-            case 'FAILED': return 'text-error-color bg-error-color/5 border-error-color/20';
-            default: return 'text-text-secondary bg-bg-primary/50 border-border-color/50';
+            case 'COMPLETED': return 'success';
+            case 'RUNNING': return 'blue';
+            case 'FAILED': return 'error';
+            default: return 'neutral';
         }
     }
 
@@ -151,94 +155,76 @@
     <JobDetailModal jobId={selectedJobId} onClear={() => selectedJobId = null} />
 {/if}
 
-<div class="flex flex-col gap-8 animate-in fade-in duration-700">
-    <!-- HEADER -->
-    <header class="flex justify-between items-center bg-bg-secondary px-8 py-5 rounded-xl border border-border-color shadow-2xl relative overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent pointer-events-none"></div>
-        <div class="relative z-10">
-            <h1 class="text-2xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
-                <Activity class="text-blue-500" size={28} />
-                Jobs
-            </h1>
-            <p class="text-xs font-bold uppercase tracking-widest text-text-secondary mt-1 opacity-80">
-                Real-time task monitoring & operational history
-            </p>
-        </div>
-
-        <div class="flex items-center gap-4 z-10">
-            <div class="flex items-center gap-2 px-4 py-2 bg-bg-primary/50 rounded-lg border border-border-color shadow-inner">
+<div class="flex flex-col gap-6 animate-in fade-in duration-700">
+    <PageHeader
+        title="Jobs"
+        description="Real-time task monitoring & operational history"
+        icon={Activity}
+    >
+        {#snippet actions()}
+            <div class="flex items-center gap-2 px-3 py-1.5 bg-bg-primary/50 rounded-lg border border-border-color shadow-inner">
                 <div class="w-2 h-2 rounded-full bg-blue-500 {activeJobs.length > 0 ? 'animate-pulse' : 'opacity-20'}"></div>
-                <span class="text-3xs font-black uppercase tracking-widest text-text-secondary">
-                    {activeJobs.length} Active Tasks
+                <span class="text-[10px] font-medium text-text-secondary uppercase tracking-wider">
+                    {activeJobs.length} active
                 </span>
             </div>
-            <Button variant="outline" size="icon" class="h-10 w-10 border-border-color" onclick={loadInitialJobs} disabled={loading}>
-                <RotateCw size={18} class={loading ? 'animate-spin' : ''} />
+            <Button variant="outline" size="icon" onclick={loadInitialJobs} disabled={loading}>
+                <RotateCw size={16} class={loading ? 'animate-spin' : ''} />
             </Button>
-        </div>
-    </header>
+        {/snippet}
+    </PageHeader>
 
-    <div class="space-y-12">
+    <div class="space-y-10">
         <!-- ACTIVE TASKS SECTION -->
-        <section class="space-y-6">
-            <div class="flex items-center gap-3 px-2">
-                <div class="p-1.5 bg-blue-500/10 rounded-md text-blue-500"><Play size={16} /></div>
-                <h2 class="text-2xs font-black uppercase tracking-[0.2em] text-text-primary">Running Operations</h2>
-                <div class="h-px flex-1 bg-gradient-to-r from-border-color/60 to-transparent"></div>
-            </div>
+        <section class="space-y-4">
+            <SectionHeader title="Running operations" icon={Play} iconColor="text-blue-500" />
 
             <div class="grid grid-cols-1 gap-4">
                 {#each activeJobs as job (job.id)}
-                    <Card class="p-6 bg-bg-secondary border-border-color hover:border-blue-500/30 transition-all group overflow-hidden relative">
-                        <div class="flex flex-col lg:flex-row lg:items-center gap-8 relative z-10">
+                    <Card class="hover:border-blue-500/30 transition-all group overflow-hidden relative">
+                        <div class="p-5 flex flex-col lg:flex-row lg:items-center gap-8 relative z-10">
                             <div class="flex items-center gap-4 min-w-[200px]" onclick={() => openJobDetail(job.id)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && openJobDetail(job.id)}>
-                                <div class="p-3 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20 shadow-inner">
-                                    {#if job.job_type === 'SCAN'} <Search size={22} /> {:else if job.job_type === 'BACKUP'} <Play size={22} /> {:else} <RotateCw size={22} /> {/if}
+                                <div class="p-2.5 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20 shadow-inner">
+                                    {#if job.job_type === 'SCAN'} <Search size={20} /> {:else if job.job_type === 'BACKUP'} <Play size={20} /> {:else} <RotateCw size={20} /> {/if}
                                 </div>
                                 <div>
-                                    <h3 class="font-black text-text-primary uppercase tracking-tighter text-lg leading-none mb-2">{job.job_type} #{job.id}</h3>
-                                    <span class="px-2 py-0.5 rounded-full border text-4xs font-black uppercase tracking-widest {getStatusColor(job.status)}">{job.status}</span>
+                                    <h3 class="font-bold text-text-primary text-base leading-none mb-2">{job.job_type.charAt(0) + job.job_type.slice(1).toLowerCase()} #{job.id}</h3>
+                                    <StatusBadge variant={getStatusVariant(job.status)}>{job.status}</StatusBadge>
                                 </div>
                             </div>
 
-                            <div class="flex-1 space-y-3">
+                            <div class="flex-1 space-y-2.5">
                                 <div class="flex justify-between items-end">
-                                    <span class="text-3xs font-black uppercase tracking-widest text-text-secondary truncate max-w-[400px]">
+                                    <span class="text-xs font-medium text-text-secondary truncate max-w-[400px]">
                                         {job.current_task || 'Starting task...'}
                                     </span>
-                                    <span class="text-xs font-bold mono text-text-primary">{job.progress.toFixed(1)}%</span>
+                                    <span class="text-xs font-semibold mono text-text-primary">{job.progress.toFixed(1)}%</span>
                                 </div>
-                                <div class="w-full bg-bg-primary h-2 rounded-full border border-border-color overflow-hidden">
-                                    <div class="bg-blue-500 h-full transition-all duration-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]" style="width: {job.progress}%"></div>
-                                </div>
+                                <ProgressBar value={job.progress} size="md" showGlow={true} />
                             </div>
 
                             <div class="grid grid-cols-2 gap-8 shrink-0">
-                                <div><span class="text-4xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Duration</span><span class="text-xs font-bold mono text-text-primary">{formatDuration(job.started_at)}</span></div>
-                                <div><span class="text-4xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-1">Created</span><span class="text-xs font-bold mono text-text-primary">{formatLocalTime(job.created_at)}</span></div>
+                                <div><span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Duration</span><span class="text-xs font-medium mono text-text-primary">{formatDuration(job.started_at)}</span></div>
+                                <div><span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Created</span><span class="text-xs font-medium mono text-text-primary">{formatLocalTime(job.created_at)}</span></div>
                             </div>
 
-                            <Button variant="ghost" size="icon" class="h-10 w-10 text-error-color hover:bg-error-color/10" onclick={() => cancelJob(job.id)} title="Cancel Task">
-                                <StopCircle size={20} />
+                            <Button variant="ghost" size="icon" class="h-9 w-9 text-error-color hover:bg-error-color/10" onclick={() => cancelJob(job.id)} title="Cancel task">
+                                <StopCircle size={18} />
                             </Button>
                         </div>
                     </Card>
                 {:else}
                     <div class="py-12 border-2 border-dashed border-border-color rounded-2xl flex flex-col items-center justify-center opacity-20">
-                        <Activity size={48} class="mb-2" />
-                        <p class="text-3xs font-black uppercase tracking-widest">No active operations</p>
+                        <Activity size={40} class="mb-2 text-blue-500" />
+                        <p class="text-xs font-medium">No active operations</p>
                     </div>
                 {/each}
             </div>
         </section>
 
         <!-- HISTORICAL TASKS SECTION -->
-        <section class="space-y-6">
-            <div class="flex items-center gap-3 px-2">
-                <div class="p-1.5 bg-text-secondary/10 rounded-md text-text-secondary"><History size={16} /></div>
-                <h2 class="text-2xs font-black uppercase tracking-[0.2em] text-text-secondary">Execution History</h2>
-                <div class="h-px flex-1 bg-gradient-to-r from-border-color/30 to-transparent"></div>
-            </div>
+        <section class="space-y-4">
+            <SectionHeader title="Execution history" icon={History} iconColor="text-text-secondary" />
 
             <div class="grid grid-cols-1 gap-3">
                 {#each historicalJobs as job (job.id)}
@@ -250,15 +236,15 @@
 
                             <div class="flex-1">
                                 <div class="flex items-center gap-3">
-                                    <span class="text-sm font-black text-text-primary uppercase tracking-tight">{job.job_type} JOB #{job.id}</span>
-                                    <span class="px-2 py-0.5 rounded border text-5xs font-black uppercase tracking-widest {getStatusColor(job.status)}">{job.status}</span>
+                                    <span class="text-sm font-semibold text-text-primary uppercase tracking-tight">{job.job_type} JOB #{job.id}</span>
+                                    <StatusBadge variant={getStatusVariant(job.status)}>{job.status}</StatusBadge>
                                 </div>
-                                <p class="text-3xs text-text-secondary mt-1 opacity-60 truncate">{job.error_message || job.current_task || 'Finished successfully'}</p>
+                                <p class="text-xs text-text-secondary mt-1 opacity-60 truncate">{job.error_message || job.current_task || 'Finished successfully'}</p>
                             </div>
 
                             <div class="grid grid-cols-3 gap-12 shrink-0">
-                                <div><span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-0.5">Duration</span><span class="text-2xs font-bold mono text-text-primary">{formatDuration(job.started_at, job.completed_at)}</span></div>
-                                <div><span class="text-5xs font-black uppercase tracking-widest text-text-secondary opacity-40 block mb-0.5">Completed</span><span class="text-2xs font-bold mono text-text-primary">{formatLocalTime(job.completed_at)}</span></div>
+                                <div><span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Duration</span><span class="text-xs font-medium mono text-text-primary">{formatDuration(job.started_at, job.completed_at)}</span></div>
+                                <div><span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Completed</span><span class="text-xs font-medium mono text-text-primary">{formatLocalTime(job.completed_at)}</span></div>
                                 <div class="flex items-center justify-end">
                                     <Button variant="ghost" size="icon" class="h-8 w-8 opacity-20 group-hover:opacity-100" onclick={() => openJobDetail(job.id)}>
                                         <ExternalLink size={14} />
@@ -272,14 +258,14 @@
                 {#if jobs.length < totalJobs}
                     <Button
                         variant="outline"
-                        class="w-full h-12 mt-4 border-dashed border-2 border-border-color hover:border-action-color/50 text-text-secondary hover:text-action-color transition-all"
+                        class="w-full h-11 mt-4 border-dashed border-2 border-border-color hover:border-action-color/50 text-text-secondary hover:text-action-color transition-all"
                         onclick={loadMore}
                         disabled={loadingMore}
                     >
                         {#if loadingMore}
                             <RotateCw size={16} class="mr-2 animate-spin" /> Fetching more records...
                         {:else}
-                            <ChevronDown size={16} class="mr-2" /> Load More (Showing {jobs.length} of {totalJobs})
+                            <ChevronDown size={16} class="mr-2" /> Load more (Showing {jobs.length} of {totalJobs})
                         {/if}
                     </Button>
                 {/if}

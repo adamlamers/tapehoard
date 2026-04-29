@@ -20,8 +20,9 @@
         Terminal,
         Globe
     } from "lucide-svelte";
-    import { Card } from "$lib/components/ui/card";
     import { Button } from "$lib/components/ui/button";
+    import PageHeader from "$lib/components/ui/PageHeader.svelte";
+    import { Card } from "$lib/components/ui/card";
     import { Input } from "$lib/components/ui/input";
     import {
         getSystemSettingsSystemSettingsGet,
@@ -222,26 +223,21 @@
 </svelte:head>
 
 <div class="flex flex-col h-full gap-6 animate-in fade-in duration-700">
-    <header class="flex justify-between items-center bg-bg-secondary px-6 py-4 rounded-xl border border-border-color shadow-2xl relative overflow-hidden shrink-0">
-        <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent pointer-events-none"></div>
-        <div class="relative z-10">
-            <h1 class="text-xl font-black uppercase tracking-tighter text-text-primary flex items-center gap-3">
-                <Database class="text-blue-500" size={24} />
-                Station Settings
-            </h1>
-            <p class="text-4xs font-bold uppercase tracking-[0.2em] text-text-secondary mt-1 opacity-80">Configure archival logic & hardware</p>
-        </div>
-
-        <div class="z-10">
-            <Button variant="default" size="lg" class="px-6 h-10 font-black uppercase tracking-widest text-3xs shadow-lg shadow-blue-500/10" onclick={saveSettings} disabled={saving || !isDirty}>
+    <PageHeader
+        title="Station settings"
+        description="Configure archival logic & hardware"
+        icon={Database}
+    >
+        {#snippet actions()}
+            <Button variant="default" class="px-6 shadow-lg shadow-blue-500/10" onclick={saveSettings} disabled={saving || !isDirty}>
                 {#if saving}
                     <RotateCw size={14} class="mr-2 animate-spin" /> Saving...
                 {:else}
-                    <Save size={14} class="mr-2" /> Save Configuration
+                    <Save size={14} class="mr-2" /> Save configuration
                 {/if}
             </Button>
-        </div>
-    </header>
+        {/snippet}
+    </PageHeader>
 
     <div class="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden min-h-0">
         <!-- Sidebar Navigation -->

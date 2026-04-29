@@ -40,24 +40,31 @@
 	let isSidebarOpen = $state(true);
 	let showShortcuts = $state(false);
 
+	const currentPathname = $derived($page.url.pathname);
+
 	function handleGlobalKeyDown(e: KeyboardEvent) {
-		if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+		const target = e.target as HTMLElement;
+		if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
+
+		if (e.key === '?') {
 			showShortcuts = !showShortcuts;
 		}
+
 		if (showShortcuts && e.key === 'Escape') {
 			showShortcuts = false;
 		}
 
-		// Navigation Shortcuts (Single keys only, no modifiers)
-		if (!['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName) && !e.ctrlKey && !e.metaKey && !e.altKey) {
-			if (e.key === 'd') window.location.href = '/';
-			if (e.key === 'g') window.location.href = '/insights';
-			if (e.key === 'i') window.location.href = '/index-browser';
-			if (e.key === 't') window.location.href = '/filesystem';
-			if (e.key === 'a') window.location.href = '/jobs';
-			if (e.key === 'm') window.location.href = '/inventory';
-			if (e.key === 'r') window.location.href = '/restores';
-			if (e.key === 's') window.location.href = '/settings';
+		// Navigation Shortcuts
+		if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+			const key = e.key;
+			if (key === 'd') window.location.href = '/';
+			else if (key === 'g') window.location.href = '/insights';
+			else if (key === 'i') window.location.href = '/index-browser';
+			else if (key === 't') window.location.href = '/filesystem';
+			else if (key === 'a') window.location.href = '/jobs';
+			else if (key === 'm') window.location.href = '/inventory';
+			else if (key === 'r') window.location.href = '/restores';
+			else if (key === 's') window.location.href = '/settings';
 		}
 	}
 </script>
@@ -89,7 +96,6 @@
 				{/if}
 			</div>
 		</div>
-
 		<!-- Nav Links -->
 		<nav class="flex-1 overflow-y-auto px-4 py-6 space-y-1 scrollbar-hide">
 			{#each navItems as item}
@@ -97,19 +103,21 @@
 					href={item.href}
 					class={cn(
 						"flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 group relative",
-						$page.url.pathname === item.href
+						currentPathname === item.href
 							? "bg-blue-600 text-white shadow-xl shadow-blue-600/20"
 							: "text-text-secondary hover:bg-white/5 hover:text-text-primary"
 					)}
 				>
-					<item.icon size={18} class={cn("transition-transform duration-300 group-hover:scale-110", $page.url.pathname === item.href ? "text-white" : "opacity-60 group-hover:opacity-100")} />
+					<div class={cn("transition-transform duration-300 group-hover:scale-110", currentPathname === item.href ? "text-white" : "opacity-60 group-hover:opacity-100")}>
+						<item.icon size={18} />
+					</div>
 					{#if isSidebarOpen}
-						<span class="text-xs font-semibold animate-in fade-in slide-in-from-left-2 duration-300">
+						<span class="text-sm font-medium animate-in fade-in slide-in-from-left-2 duration-500">
 							{item.name}
 						</span>
 					{/if}
 
-					{#if $page.url.pathname === item.href}
+					{#if currentPathname === item.href}
 						<div class="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-white rounded-l-full"></div>
 					{/if}
 				</a>
@@ -122,7 +130,7 @@
 				href="/settings"
 				class={cn(
 					"flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 group",
-					$page.url.pathname === '/settings'
+					currentPathname === '/settings'
 						? "bg-bg-tertiary text-text-primary border border-white/10"
 						: "text-text-secondary hover:bg-white/5 hover:text-text-primary"
 				)}
@@ -180,18 +188,18 @@
 			<div class="grid grid-cols-2 gap-x-12 gap-y-6">
 				<div class="space-y-4">
 					<h3 class="text-4xs font-bold uppercase text-text-secondary opacity-40">Navigation</h3>
-					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Overview</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">D</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Insights</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">G</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Archive Index</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">I</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Filesystem</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">T</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Jobs</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">A</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Overview</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">D</span></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Insights</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">G</span></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Archive Index</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">I</span></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Filesystem</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">T</span></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Jobs</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">A</span></div>
 				</div>
 				<div class="space-y-4">
 					<h3 class="text-4xs font-bold uppercase text-text-secondary opacity-40">Operations</h3>
-					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Media Inventory</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">M</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Data Recovery</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">R</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">System Settings</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">S</kbd></div>
-					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Command Help</span> <kbd class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">?</kbd></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Media Inventory</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">M</span></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Data Recovery</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">R</span></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">System Settings</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">S</span></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Command Help</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">?</span></div>
 				</div>
 			</div>
 
@@ -225,4 +233,3 @@
 		background: rgba(255, 255, 255, 0.1);
 	}
 </style>
-le>
