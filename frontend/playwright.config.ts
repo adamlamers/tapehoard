@@ -37,7 +37,7 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: [
     {
-      command: 'cd ../backend && rm -f e2e_test.db* && DATABASE_URL="sqlite:///e2e_test.db" TAPEHOARD_TEST_MODE="true" uv run alembic upgrade head && DATABASE_URL="sqlite:///e2e_test.db" TAPEHOARD_TEST_MODE="true" uv run uvicorn app.main:app --host 0.0.0.0 --port 8001',
+      command: 'cd ../backend && rm -f e2e_test.db* && DATABASE_URL="sqlite:///e2e_test.db" TAPEHOARD_TEST_MODE="true" uv run python -m app.start_test_server --host 0.0.0.0 --port 8001',
       url: 'http://localhost:8001/health',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,

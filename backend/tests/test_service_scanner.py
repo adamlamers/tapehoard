@@ -1,6 +1,11 @@
 import hashlib
 from datetime import datetime, timezone
-from app.services.scanner import ScannerService, JobManager
+from app.services.scanner import (
+    ScannerService,
+    JobManager,
+    _hash_file_batch_fast,
+    _FAST_HASH_BINARY,
+)
 from app.db import models
 
 
@@ -142,6 +147,9 @@ def test_run_hashing_mocked(db_session, mocker):
     """Tests the background hashing runner."""
     scanner = ScannerService()
 
+    # Disable fast hash so the test uses the Python hashlib fallback path
+    mocker.patch("app.services.scanner._FAST_HASH_BINARY", None)
+
     # Setup unindexed file
     f = models.FilesystemState(
         file_path="/data/hash.me", size=10, mtime=1, is_ignored=False
@@ -158,3 +166,44 @@ def test_run_hashing_mocked(db_session, mocker):
 
     db_session.refresh(f)
     assert f.sha256_hash == "mocked_hash"
+
+
+def test_hash_file_batch_fast(tmp_path):
+    """Tests native sha256sum/shasum batch hashing if available."""
+    if _FAST_HASH_BINARY is None:
+        # Skip if no native hash binary is available
+        return
+
+    # Create test files
+    files = {}
+    for i in range(5):
+        content = f"test content {i}".encode()
+        f = tmp_path / f"file_{i}.txt"
+        f.write_bytes(content)
+        files[str(f)] = hashlib.sha256(content).hexdigest()
+
+    # Hash via native binary
+    results = _hash_file_batch_fast(list(files.keys()), _FAST_HASH_BINARY)
+
+    assert len(results) == 5
+    for path, expected_hash in files.items():
+        assert results[path] == expected_hash
+
+
+def test_hash_file_batch_fast_empty():
+    """Tests that empty batch returns empty results."""
+    if _FAST_HASH_BINARY is None:
+        return
+
+    results = _hash_file_batch_fast([], _FAST_HASH_BINARY)
+    assert results == {}
+
+
+def test_hash_file_batch_fast_nonexistent():
+    """Tests that non-existent files are gracefully handled."""
+    if _FAST_HASH_BINARY is None:
+        return
+
+    results = _hash_file_batch_fast(["/nonexistent/path"], _FAST_HASH_BINARY)
+    # Non-existent files may or may not appear in results depending on binary behavior
+    assert isinstance(results, dict)

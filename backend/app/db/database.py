@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, StaticPool
 from sqlalchemy.orm import sessionmaker
 
 from typing import Dict, Any
@@ -8,22 +8,30 @@ from typing import Dict, Any
 # Using standard relative path, but easily overridden with env vars later
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///tapehoard.db")
 
-# connect_args={"check_same_thread": False} is required for SQLite in FastAPI
-engine_kwargs: Dict[str, Any] = {
-    "connect_args": {"check_same_thread": False, "timeout": 30}
-}
-
-# For testing environment, we want immediate visibility across sessions
-if (
-    "mode=memory" in SQLALCHEMY_DATABASE_URL
+# Detect in-memory SQLite variants
+_IS_IN_MEMORY = (
+    SQLALCHEMY_DATABASE_URL == "sqlite://"
     or SQLALCHEMY_DATABASE_URL == "sqlite:///:memory:"
-):
-    engine_kwargs["isolation_level"] = None
+)
 
-# Only apply pooling arguments for non-memory databases
-if SQLALCHEMY_DATABASE_URL != "sqlite:///:memory:":
+# Dependency mapping for FastAPI
+engine_kwargs: Dict[str, Any] = {}
+
+if _IS_IN_MEMORY:
+    # In-memory: use StaticPool so all connections share the same database
     engine_kwargs.update(
         {
+            "connect_args": {"check_same_thread": False},
+            "poolclass": StaticPool,
+            # isolation_level=None ensures changes are visible immediately
+            "isolation_level": None,
+        }
+    )
+else:
+    # File-based SQLite: standard settings with connection pooling
+    engine_kwargs.update(
+        {
+            "connect_args": {"check_same_thread": False, "timeout": 30},
             "pool_size": 20,
             "max_overflow": 10,
             "pool_timeout": 30,

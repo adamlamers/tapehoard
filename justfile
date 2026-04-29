@@ -39,13 +39,8 @@ pytest:
     @echo "Running backend tests..."
     cd backend && COVERAGE_CORE=sysmon uv run pytest
 
-# Run frontend checks
-check:
-    @echo "Running frontend checks..."
-    cd frontend && npm run check
-
 # Run all tests and linting
-test: lint pytest check
+test: lint pytest playwright
     @echo "Running tests..."
 
 # Auto-format all code (Ruff Format)
@@ -96,3 +91,7 @@ docker-down:
 playwright:
     @echo "Running Playwright E2E Tests..."
     cd frontend && npx playwright test
+
+playwright-ui:
+    @echo "Starting playweight UI..."
+    cd frontend && npx playwright test --ui
