@@ -200,3 +200,78 @@ def test_browse_queue_virtual_fs(client, db_session):
     response = client.get("/restores/queue/browse?path=/source/dir")
     assert response.status_code == 200
     assert response.json()[0]["name"] == "file.txt"
+
+
+def test_deleted_file_rejected_from_restore_queue(client, db_session):
+    """Tests that a deleted file cannot be added to the recovery queue."""
+    media = models.StorageMedia(
+        media_type="hdd", identifier="M1", capacity=1000, status="active"
+    )
+    db_session.add(media)
+    db_session.flush()
+
+    file_record = models.FilesystemState(
+        file_path="/data/deleted.txt", size=100, mtime=1000, is_deleted=True
+    )
+    db_session.add(file_record)
+    db_session.flush()
+
+    version = models.FileVersion(
+        filesystem_state_id=file_record.id,
+        media_id=media.id,
+        file_number="1",
+        offset_start=0,
+        offset_end=100,
+    )
+    db_session.add(version)
+    db_session.commit()
+
+    response = client.post(f"/restores/queue/file/{file_record.id}")
+    assert response.status_code == 400
+    assert "marked as deleted" in response.json()["detail"]
+
+
+def test_manifest_excludes_deleted_files(client, db_session):
+    """Tests that deleted files are excluded from the restore manifest."""
+    media = models.StorageMedia(
+        media_type="tape", identifier="T001", capacity=1000, status="active"
+    )
+    db_session.add(media)
+    db_session.flush()
+
+    active_file = models.FilesystemState(
+        file_path="/source/keep.bin", size=500, mtime=1, is_deleted=False
+    )
+    deleted_file = models.FilesystemState(
+        file_path="/source/gone.bin", size=500, mtime=1, is_deleted=True
+    )
+    db_session.add_all([active_file, deleted_file])
+    db_session.flush()
+
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=active_file.id,
+            media_id=media.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=500,
+        )
+    )
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=deleted_file.id,
+            media_id=media.id,
+            file_number="2",
+            offset_start=0,
+            offset_end=500,
+        )
+    )
+    db_session.add(models.RestoreCart(filesystem_state_id=active_file.id))
+    db_session.add(models.RestoreCart(filesystem_state_id=deleted_file.id))
+    db_session.commit()
+
+    response = client.get("/restores/manifest")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_files"] == 1
+    assert data["total_size"] == 500

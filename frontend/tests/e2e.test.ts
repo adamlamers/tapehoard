@@ -163,4 +163,68 @@ test.describe('TapeHoard Golden Path', () => {
         expect(fs.readFileSync(restoredFilePath, 'utf-8')).toBe('Hello world 2');
     }
   });
+
+  test('file deletion discrepancy workflow', async ({ page }) => {
+    page.on('console', msg => console.log('BROWSER CONSOLE:', msg.text()));
+    page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
+
+    console.log('Step 1: Create test file and scan');
+    const testFilePath = path.join(SOURCE_ROOT, 'discrepancy_test.txt');
+    fs.writeFileSync(testFilePath, 'will be deleted');
+
+    const requestContext = await page.context().request;
+    const scanResp = await requestContext.post(`${API_URL}/system/scan`);
+    expect(scanResp.ok()).toBe(true);
+
+    // Wait for scan to complete
+    await expect(async () => {
+      const statusResp = await requestContext.get(`${API_URL}/system/scan/status`);
+      const status = await statusResp.json();
+      expect(status.is_running).toBe(false);
+    }).toPass({ timeout: 20000 });
+
+    // Also wait for hashing to complete
+    await page.waitForTimeout(2000);
+
+    // Get the file ID from the metadata endpoint
+    const encodedPath = encodeURIComponent(testFilePath);
+    const metaResp = await requestContext.get(`${API_URL}/inventory/metadata?path=${encodedPath}`);
+    expect(metaResp.ok()).toBe(true);
+    const meta = await metaResp.json();
+    const fileId = meta.id;
+
+    // Mark the file as deleted via discrepancy API
+    const confirmResp = await requestContext.post(`${API_URL}/system/discrepancies/${fileId}/confirm`);
+    if (!confirmResp.ok()) {
+      const errBody = await confirmResp.json();
+      console.log('Confirm failed:', errBody);
+    }
+    expect(confirmResp.ok()).toBe(true);
+
+    // Verify it shows in discrepancies
+    const discrepanciesResp = await requestContext.get(`${API_URL}/system/discrepancies`);
+    const discrepancies = await discrepanciesResp.json();
+    const deletedItem = (discrepancies as Array<any>).find((d: any) => d.path === testFilePath);
+    expect(deletedItem).toBeDefined();
+    expect(deletedItem.is_deleted).toBe(true);
+
+    console.log('Step 2: Verify deleted file cannot be restored');
+    const restoreResp = await requestContext.post(`${API_URL}/restores/queue/file/${fileId}`);
+    expect(restoreResp.status()).toBe(400);
+    const restoreBody = await restoreResp.json();
+    expect(restoreBody.detail.toLowerCase()).toContain('deleted');
+
+    console.log('Step 3: Dismiss the discrepancy');
+    const dismissResp = await requestContext.post(`${API_URL}/system/discrepancies/${fileId}/dismiss`);
+    expect(dismissResp.ok()).toBe(true);
+
+    // Verify it's no longer in discrepancies
+    const afterDismissResp = await requestContext.get(`${API_URL}/system/discrepancies`);
+    const afterDismiss = await afterDismissResp.json();
+    const stillDeleted = (afterDismiss as Array<any>).find((d: any) => d.path === testFilePath);
+    expect(stillDeleted).toBeUndefined();
+
+    fs.rmSync(testFilePath, { force: true });
+    await requestContext.dispose();
+  });
 });
