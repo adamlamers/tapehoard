@@ -12,8 +12,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  /* Run tests serially to avoid DB conflicts */
+  workers: 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [['html', { open: 'never' }]],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
@@ -39,13 +39,13 @@ export default defineConfig({
     {
       command: 'cd ../backend && rm -f e2e_test.db* && DATABASE_URL="sqlite:///e2e_test.db" TAPEHOARD_TEST_MODE="true" uv run python -m app.start_test_server --host 0.0.0.0 --port 8001',
       url: 'http://localhost:8001/health',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 120 * 1000,
     },
     {
       command: 'VITE_API_URL=http://localhost:8001 npm run dev',
       url: 'http://localhost:5173',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 120 * 1000,
     },
   ],

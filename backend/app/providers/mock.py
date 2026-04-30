@@ -1,9 +1,25 @@
+import atexit
 import os
 import shutil
+import tempfile
 from typing import Any, BinaryIO, Dict, Optional
 from loguru import logger
 
 from .base import AbstractStorageProvider
+
+# Track auto-created temp dirs for cleanup at process exit
+_auto_temp_dirs: set = set()
+
+
+def _cleanup_temp_dirs():
+    for d in _auto_temp_dirs:
+        try:
+            shutil.rmtree(d, ignore_errors=True)
+        except Exception:
+            pass
+
+
+atexit.register(_cleanup_temp_dirs)
 
 
 class MockLTOProvider(AbstractStorageProvider):
@@ -19,27 +35,28 @@ class MockLTOProvider(AbstractStorageProvider):
         "device_path": {
             "type": "string",
             "title": "Mock Directory Path",
-            "description": "Path to a directory representing the tape drive (e.g., /tmp/mock_lto)",
-            "required": True,
-            "default": "/tmp/mock_lto",
+            "description": "Path to a directory representing the tape drive (optional — auto-created if omitted)",
+            "required": False,
         }
     }
 
     def __init__(self, config: Dict[str, Any]):
-        self.device_path = config.get("device_path", "/tmp/mock_lto")
+        provided_path = config.get("device_path")
+        if provided_path:
+            self.device_path: str = provided_path
+        else:
+            self.device_path = tempfile.mkdtemp(prefix="tapehoard_mock_lto_")
+            _auto_temp_dirs.add(self.device_path)
         os.makedirs(self.device_path, exist_ok=True)
-        # We store metadata in a .mam file inside the mock directory
         self.mam_path = os.path.join(self.device_path, ".mam")
 
     def get_name(self) -> str:
         return "Mock LTO Drive"
 
     def check_online(self, force: bool = False) -> bool:
-        # For testing, we consider it online if the directory exists
         return os.path.exists(self.device_path)
 
     def check_existing_data(self) -> bool:
-        # Check if there are archive files in the directory
         if not self.check_online():
             return False
         for f in os.listdir(self.device_path):
@@ -57,7 +74,6 @@ class MockLTOProvider(AbstractStorageProvider):
             return None
 
     def initialize_media(self, media_id: str) -> bool:
-        # Clear out the directory
         for item in os.listdir(self.device_path):
             item_path = os.path.join(self.device_path, item)
             if os.path.isfile(item_path):
@@ -65,7 +81,6 @@ class MockLTOProvider(AbstractStorageProvider):
             elif os.path.isdir(item_path):
                 shutil.rmtree(item_path)
 
-        # Write the new media_id
         with open(self.mam_path, "w") as f:
             f.write(media_id)
         return True
@@ -77,7 +92,6 @@ class MockLTOProvider(AbstractStorageProvider):
         if not self.prepare_for_write(media_id):
             raise Exception("Media mismatch")
 
-        # Determine the next file number
         file_num = 0
         while os.path.exists(os.path.join(self.device_path, f"archive_{file_num}.tar")):
             file_num += 1
@@ -90,7 +104,7 @@ class MockLTOProvider(AbstractStorageProvider):
         return str(file_num)
 
     def get_utilization(self) -> Optional[float]:
-        return 0.1  # Mock utilization
+        return 0.1
 
     def finalize_media(self, media_id: str):
         logger.info(f"Mock media {media_id} finalized")

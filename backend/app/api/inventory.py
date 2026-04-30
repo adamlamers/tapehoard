@@ -318,6 +318,16 @@ def initialize_storage_hardware(
 
     try:
         if storage_provider.initialize_media(media_record.identifier):
+            # Persist auto-generated device_path to DB so archiver finds the same dir
+            current_config = (
+                json.loads(media_record.extra_config)
+                if media_record.extra_config
+                else {}
+            )
+            if "device_path" not in current_config:
+                current_config["device_path"] = storage_provider.device_path
+                media_record.extra_config = json.dumps(current_config)
+                db_session.commit()
             return {"message": "Hardware initialization complete."}
     except PermissionError as pe:
         raise HTTPException(status_code=403, detail=str(pe))
