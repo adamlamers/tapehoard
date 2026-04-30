@@ -261,11 +261,15 @@ class ArchiverService:
         JobManager.update_job(
             job_id, 5.0, f"Calculating backup set for {media_record.identifier}..."
         )
+        JobManager.add_job_log(job_id, f"Starting backup to {media_record.identifier}")
 
         workload_batch = self.assemble_backup_batch(db_session, media_id)
         if not workload_batch:
+            JobManager.add_job_log(job_id, "No files require backup")
             JobManager.complete_job(job_id)
             return
+
+        JobManager.add_job_log(job_id, f"{len(workload_batch)} files queued for backup")
 
         # --- Tar Chunking Logic ---
         # Ensure at least 100 archives per tape to improve restoration granularity.
@@ -326,9 +330,17 @@ class ArchiverService:
             if current_chunk:
                 chunks.append(current_chunk)
 
+            JobManager.add_job_log(job_id, f"Packed into {len(chunks)} archive(s)")
+
             for chunk_index, chunk_items in enumerate(chunks):
                 if JobManager.is_cancelled(job_id):
                     break
+
+                chunk_num = chunk_index + 1
+                JobManager.add_job_log(
+                    job_id,
+                    f"Processing archive {chunk_num}/{len(chunks)} ({len(chunk_items)} files)",
+                )
 
                 archive_filename = f"backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{chunk_index}.tar"
                 staging_full_path = os.path.join(
@@ -613,11 +625,15 @@ class ArchiverService:
                     else 0
                 )
 
-            if utilization_ratio >= 0.98:
+            if utilization_ratio >= 0.98 and media_record.status == "active":
                 logger.info(
                     f"MEDIA SATURATED: {media_record.identifier} ({utilization_ratio*100:.1f}%)"
                 )
                 media_record.status = "full"
+
+                JobManager.add_job_log(
+                    job_id, f"Media {media_record.identifier} marked as full"
+                )
 
                 # Automate priority ceding: Move this media to the end of the list
                 max_priority = (
@@ -636,6 +652,9 @@ class ArchiverService:
                     f"Media record {media_record.id} was modified or deleted by another process; skipping final commit"
                 )
 
+            JobManager.add_job_log(
+                job_id, f"Backup complete. Utilization: {utilization_ratio*100:.1f}%"
+            )
             JobManager.complete_job(job_id)
             from app.services.notifications import notification_manager
 
@@ -661,6 +680,7 @@ class ArchiverService:
         """Orchestrates the retrieval and reassembly of data from storage providers."""
         JobManager.start_job(job_id)
         JobManager.update_job(job_id, 2.0, "Building recovery manifest...")
+        JobManager.add_job_log(job_id, "Starting restore")
 
         active_cart = (
             db_session.query(models.RestoreCart)
@@ -672,8 +692,11 @@ class ArchiverService:
             .all()
         )
         if not active_cart:
+            JobManager.add_job_log(job_id, "Restore queue is empty, nothing to do")
             JobManager.complete_job(job_id)
             return
+
+        JobManager.add_job_log(job_id, f"{len(active_cart)} items in restore queue")
 
         os.makedirs(destination_root, exist_ok=True)
 
@@ -709,6 +732,10 @@ class ArchiverService:
                 media_record = db_session.get(models.StorageMedia, media_id)
                 if not media_record:
                     continue
+                JobManager.add_job_log(
+                    job_id,
+                    f"Reading from {media_record.identifier} ({len(archive_groups)} archive(s))",
+                )
                 provider = self._get_storage_provider(media_record)
                 if not provider:
                     continue
@@ -875,6 +902,7 @@ class ArchiverService:
             if not JobManager.is_cancelled(job_id):
                 db_session.query(models.RestoreCart).delete()
                 db_session.commit()
+                JobManager.add_job_log(job_id, "Restore complete, queue cleared")
                 JobManager.complete_job(job_id)
 
         except Exception as e:

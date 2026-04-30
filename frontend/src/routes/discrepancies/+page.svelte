@@ -113,10 +113,23 @@
         return `${size.toFixed(1)} ${units[unitIndex]}`;
     }
 
+    function formatPath(path: string, maxLength = 70) {
+        if (path.length <= maxLength) return { head: path, tail: null };
+        const parts = path.split('/');
+        if (parts.length <= 3) return { head: path, tail: null };
+
+        const headParts = parts.slice(0, -2);
+        const tailParts = parts.slice(-2);
+        const head = headParts.join('/');
+        const tail = tailParts.join('/');
+
+        return { head, tail };
+    }
+
     onMount(loadDiscrepancies);
 
-    const deletedItems = $derived(discrepancies.filter(d => d.is_deleted));
-    const missingItems = $derived(discrepancies.filter(d => !d.is_deleted));
+    const missingItems = $derived(discrepancies.filter(d => d.is_deleted));
+    const pendingItems = $derived(discrepancies.filter(d => !d.is_deleted));
 </script>
 
 <svelte:head>
@@ -161,9 +174,9 @@
                             <FileX size={20} />
                         </div>
                         <div class="flex-1">
-                            <span class="text-xs text-text-secondary opacity-60 block mb-1">Confirmed deleted</span>
-                            <h4 class="text-2xl font-bold text-error-color mono tabular-nums">{deletedItems.length}</h4>
-                            <p class="text-[10px] font-medium text-text-secondary uppercase opacity-40 mt-1">Files marked as removed from disk</p>
+                            <span class="text-xs text-text-secondary opacity-60 block mb-1">Missing from disk</span>
+                            <h4 class="text-2xl font-bold text-error-color mono tabular-nums">{missingItems.length}</h4>
+                            <p class="text-[10px] font-medium text-text-secondary uppercase opacity-40 mt-1">Files the scanner did not find</p>
                         </div>
                     </div>
                 </Card>
@@ -174,9 +187,9 @@
                             <FileQuestion size={20} />
                         </div>
                         <div class="flex-1">
-                            <span class="text-xs text-text-secondary opacity-60 block mb-1">Missing from disk</span>
-                            <h4 class="text-2xl font-bold text-yellow-500 mono tabular-nums">{missingItems.length}</h4>
-                            <p class="text-[10px] font-medium text-text-secondary uppercase opacity-40 mt-1">Tracked files not found during scan</p>
+                            <span class="text-xs text-text-secondary opacity-60 block mb-1">Pending confirmation</span>
+                            <h4 class="text-2xl font-bold text-yellow-500 mono tabular-nums">{pendingItems.length}</h4>
+                            <p class="text-[10px] font-medium text-text-secondary uppercase opacity-40 mt-1">Tracked files not yet confirmed</p>
                         </div>
                     </div>
                 </Card>
@@ -198,28 +211,37 @@
                         </thead>
                         <tbody>
                             {#each discrepancies as item (item.id)}
+                                {@const path = formatPath(item.path)}
                                 <tr class="border-b border-border-color/10 hover:bg-white/[0.02] transition-colors group">
-                                    <td class="px-6 py-4">
+                                    <td class="px-6 py-4 align-top">
                                         {#if item.is_deleted}
-                                            <StatusBadge variant="error">Deleted</StatusBadge>
+                                            <StatusBadge variant="error">Missing</StatusBadge>
                                         {:else}
-                                            <StatusBadge variant="warning">Missing</StatusBadge>
+                                            <StatusBadge variant="warning">Pending</StatusBadge>
                                         {/if}
                                     </td>
-                                    <td class="px-6 py-4">
-                                        <div class="max-w-md">
-                                            <span class="text-sm font-medium text-text-primary mono truncate block" title={item.path}>
-                                                {item.path.split('/').pop()}
-                                            </span>
-                                            <span class="text-[10px] text-text-secondary opacity-40 mono truncate block" title={item.path}>
-                                                {item.path}
-                                            </span>
+                                    <td class="px-6 py-4 align-top">
+                                        <div class="max-w-[500px]">
+                                            {#if path.tail}
+                                                <div class="flex flex-col gap-0.5">
+                                                    <span class="text-xs font-medium text-text-secondary mono leading-tight" title={item.path}>
+                                                        {path.head}
+                                                    </span>
+                                                    <span class="text-sm font-medium text-text-primary mono leading-tight" title={item.path}>
+                                                        {path.tail}
+                                                    </span>
+                                                </div>
+                                            {:else}
+                                                <span class="text-sm font-medium text-text-primary mono truncate block" title={item.path}>
+                                                    {path.head}
+                                                </span>
+                                            {/if}
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 text-right">
+                                    <td class="px-6 py-4 text-right align-top">
                                         <span class="text-xs text-text-secondary mono">{formatSize(item.size)}</span>
                                     </td>
-                                    <td class="px-6 py-4">
+                                    <td class="px-6 py-4 align-top">
                                         <span class="text-xs text-text-secondary mono">
                                             {#if item.last_seen_timestamp}
                                                 {formatLocalDate(item.last_seen_timestamp)}
@@ -228,7 +250,7 @@
                                             {/if}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-center">
+                                    <td class="px-6 py-4 text-center align-top">
                                         {#if item.has_versions}
                                             <div class="inline-flex items-center gap-1.5 text-success-color">
                                                 <ShieldCheck size={14} />
@@ -241,8 +263,8 @@
                                             </div>
                                         {/if}
                                     </td>
-                                    <td class="px-6 py-4">
-                                        <div class="flex items-center justify-end gap-2">
+                                    <td class="px-6 py-4 align-top">
+                                        <div class="flex items-center justify-end gap-2 pt-1">
                                             {#if item.is_deleted}
                                                 <Button
                                                     variant="ghost"

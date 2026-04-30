@@ -15,13 +15,14 @@
         type ScanStatusSchema
     } from '$lib/api';
     import { toast } from "svelte-sonner";
-    import { cn } from "$lib/utils";
+    import { cn, formatLocalTime } from "$lib/utils";
     import { page } from '$app/state';
 
     // Current directory state
     let currentPath = $state('ROOT');
     let searchQuery = $state('');
     let files = $state<FileItem[]>([]);
+    let lastScanTime = $state<string | null>(null);
     let loading = $state(false);
     let searchLoading = $state(false);
     let committing = $state(false);
@@ -35,14 +36,14 @@
     let pendingChanges = $state<Map<string, boolean>>(new Map());
 
     async function loadFiles(path: string) {
-        if (searchQuery.trim().length >= 3) return; // Prevent loading path if searching
+        if (searchQuery.trim().length >= 3) return;
         loading = true;
         try {
             const response = await browseSystemPathSystemBrowseGet({
                 query: { path }
             });
             if (response.data) {
-                files = response.data.map((f: any) => ({
+                files = response.data.files.map((f: any) => ({
                     name: f.name,
                     path: f.path,
                     type: f.type as 'file' | 'directory' | 'link',
@@ -51,6 +52,7 @@
                     ignored: f.ignored ?? false,
                     sha256_hash: f.sha256_hash ?? null
                 }));
+                lastScanTime = response.data.last_scan_time ?? null;
             }
         } catch (error) {
             console.error("Failed to load files:", error);
@@ -193,6 +195,9 @@
     }
 
     const hasChanges = $derived(pendingChanges.size > 0);
+    const lastScanDisplay = $derived(
+        lastScanTime ? `Last scanned: ${formatLocalTime(lastScanTime)}` : 'Never scanned'
+    );
 </script>
 
 <svelte:head>
@@ -201,8 +206,8 @@
 
 <div class="flex flex-col gap-6 h-full animate-in fade-in duration-700">
     <PageHeader
-        title="Live filesystem"
-        description="Define backup rules & browse physical storage"
+        title="Indexed filesystem"
+        description={lastScanDisplay}
         icon={FolderTree}
     >
         {#snippet actions()}

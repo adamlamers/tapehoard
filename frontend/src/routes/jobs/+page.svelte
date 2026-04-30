@@ -24,12 +24,12 @@
         listJobsSystemJobsGet,
         getJobsCountSystemJobsCountGet,
         cancelJobSystemJobsJobIdCancelPost,
-        type JobSchema
+        type AppApiSystemJobSchema
     } from '$lib/api';
     import { cn, formatLocalTime, parseUTCDate } from '$lib/utils';
     import { toast } from 'svelte-sonner';
 
-    let jobs = $state<JobSchema[]>([]);
+    let jobs = $state<AppApiSystemJobSchema[]>([]);
     let totalJobs = $state(0);
     let loading = $state(true);
     let loadingMore = $state(false);
@@ -197,7 +197,7 @@
                             <div class="flex-1 space-y-2.5">
                                 <div class="flex justify-between items-end">
                                     <span class="text-xs font-medium text-text-secondary truncate max-w-[400px]">
-                                        {job.current_task || 'Starting task...'}
+                                        {job.latest_log || job.current_task || 'Starting task...'}
                                     </span>
                                     <span class="text-xs font-semibold mono text-text-primary">{job.progress.toFixed(1)}%</span>
                                 </div>
@@ -241,7 +241,7 @@
                                     <span class="text-sm font-semibold text-text-primary uppercase tracking-tight">{job.job_type} JOB #{job.id}</span>
                                     <StatusBadge variant={getStatusVariant(job.status)}>{job.status}</StatusBadge>
                                 </div>
-                                <p class="text-xs text-text-secondary mt-1 opacity-60 truncate">{job.error_message || job.current_task || 'Finished successfully'}</p>
+                                <p class="text-xs text-text-secondary mt-1 opacity-60 truncate">{job.latest_log || job.error_message || job.current_task || 'Finished successfully'}</p>
                             </div>
 
                             <div class="grid grid-cols-3 gap-12 shrink-0">

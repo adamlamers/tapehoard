@@ -1,9 +1,9 @@
 <script lang="ts">
-    import { X, Activity, Search, Play, RotateCw, Clock, CheckCircle2, AlertCircle, FileText, Database, HardDrive, MapPin, ExternalLink, ArrowRight } from 'lucide-svelte';
+    import { X, Activity, Search, Play, RotateCw, Clock, CheckCircle2, AlertCircle, FileText, Database, HardDrive, MapPin, ExternalLink, ArrowRight, Terminal } from 'lucide-svelte';
     import { Button } from './ui/button';
     import { Card } from './ui/card';
     import Dialog from './ui/Dialog.svelte';
-    import { getJobDetailSystemJobsJobIdGet, type JobSchema } from '$lib/api';
+    import { getJobDetailSystemJobsJobIdGet, getJobLogsSystemJobsJobIdLogsGet, type AppApiSystemJobSchema } from '$lib/api';
     import { cn, formatLocalTime, formatLocalDateTime, parseUTCDate } from '$lib/utils';
     import { onMount } from 'svelte';
 
@@ -12,16 +12,19 @@
         onClear: () => void;
     }>();
 
-    let job = $state<JobSchema | null>(null);
+    let job = $state<AppApiSystemJobSchema | null>(null);
+    let logs = $state<{ id: number; message: string; timestamp: string }[]>([]);
     let loading = $state(true);
 
     async function loadJob() {
         loading = true;
         try {
-            const response = await getJobDetailSystemJobsJobIdGet({
-                path: { job_id: jobId }
-            });
-            if (response.data) job = response.data;
+            const [jobRes, logsRes] = await Promise.all([
+                getJobDetailSystemJobsJobIdGet({ path: { job_id: jobId } }),
+                getJobLogsSystemJobsJobIdLogsGet({ path: { job_id: jobId } })
+            ]);
+            if (jobRes.data) job = jobRes.data;
+            if (logsRes.data) logs = logsRes.data;
         } catch (error) {
             console.error("Failed to load job details:", error);
         } finally {
@@ -40,6 +43,12 @@
         const minutes = Math.floor(seconds / 60);
         const remSeconds = seconds % 60;
         return `${minutes}m ${remSeconds}s`;
+    }
+
+    function formatLogTime(timestamp: string) {
+        const date = parseUTCDate(timestamp);
+        if (!date) return '--';
+        return date.toLocaleTimeString();
     }
 
     onMount(loadJob);
@@ -99,18 +108,26 @@
                     </div>
                 </div>
 
-                <!-- Final Status / Logs -->
+                <!-- Execution Log -->
                 <div class="space-y-4">
                     <div class="flex items-center gap-2 px-1">
-                        <FileText size={14} class="text-text-secondary opacity-50" />
+                        <Terminal size={14} class="text-text-secondary opacity-50" />
                         <h3 class="text-[10px] font-medium text-text-secondary uppercase tracking-wider">Execution log</h3>
                     </div>
 
-                    <div class={cn(
-                        "p-5 rounded-xl border mono text-xs leading-relaxed",
-                        job.status === 'FAILED' ? "bg-error-color/5 border-error-color/20 text-error-color/90" : "bg-bg-primary border-border-color/60 text-text-primary/80"
-                    )}>
-                        {#if job.error_message}
+                    {#if logs.length > 0}
+                        <div class="bg-bg-primary border border-border-color/60 rounded-xl overflow-hidden">
+                            <div class="max-h-[300px] overflow-y-auto font-mono text-xs p-4 space-y-1">
+                                {#each logs as log (log.id)}
+                                    <div class="flex gap-3 leading-relaxed">
+                                        <span class="text-text-secondary/40 shrink-0 select-none">{formatLogTime(log.timestamp)}</span>
+                                        <span class="text-text-primary/80 whitespace-pre-wrap break-words">{log.message}</span>
+                                    </div>
+                                {/each}
+                            </div>
+                        </div>
+                    {:else if job.error_message}
+                        <div class="p-5 rounded-xl border mono text-xs leading-relaxed bg-error-color/5 border-error-color/20 text-error-color/90">
                             <div class="flex gap-3 items-start">
                                 <AlertCircle size={16} class="shrink-0 mt-0.5" />
                                 <div>
@@ -118,7 +135,9 @@
                                     {job.error_message}
                                 </div>
                             </div>
-                        {:else}
+                        </div>
+                    {:else}
+                        <div class="p-5 rounded-xl border mono text-xs leading-relaxed bg-bg-primary border-border-color/60 text-text-primary/80">
                             <div class="flex gap-3 items-start text-success-color">
                                 <CheckCircle2 size={16} class="shrink-0 mt-0.5" />
                                 <div>
@@ -126,8 +145,8 @@
                                     {job.current_task || 'Process completed successfully with zero hardware interrupts.'}
                                 </div>
                             </div>
-                        {/if}
-                    </div>
+                        </div>
+                    {/if}
                 </div>
 
                 <!-- Next Steps / Metadata -->

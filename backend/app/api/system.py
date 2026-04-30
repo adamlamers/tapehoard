@@ -48,6 +48,15 @@ class JobSchema(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     created_at: datetime
+    latest_log: Optional[str] = None
+
+
+class JobLogSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    message: str
+    timestamp: datetime
 
 
 class FileItemSchema(BaseModel):
@@ -58,6 +67,11 @@ class FileItemSchema(BaseModel):
     mtime: Optional[float] = None
     ignored: bool = False
     sha256_hash: Optional[str] = None
+
+
+class BrowseResponseSchema(BaseModel):
+    files: List[FileItemSchema]
+    last_scan_time: Optional[datetime] = None
 
 
 class TrackToggleRequest(BaseModel):
@@ -196,11 +210,23 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
             SUM(size) as total_size,
             SUM(CASE WHEN is_ignored = 1 THEN 1 ELSE 0 END) as ignored_count,
             SUM(CASE WHEN is_ignored = 1 THEN size ELSE 0 END) as ignored_size,
-            SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN 1 ELSE 0 END) as unprotected_count,
-            SUM(CASE WHEN is_ignored = 0 AND id NOT IN (SELECT filesystem_state_id FROM file_versions) THEN size ELSE 0 END) as unprotected_size,
+            SUM(CASE WHEN is_ignored = 0 AND id NOT IN (
+                SELECT fv.filesystem_state_id FROM file_versions fv
+                JOIN storage_media sm ON sm.id = fv.media_id
+                WHERE sm.status IN ('active', 'full')
+            ) THEN 1 ELSE 0 END) as unprotected_count,
+            SUM(CASE WHEN is_ignored = 0 AND id NOT IN (
+                SELECT fv.filesystem_state_id FROM file_versions fv
+                JOIN storage_media sm ON sm.id = fv.media_id
+                WHERE sm.status IN ('active', 'full')
+            ) THEN size ELSE 0 END) as unprotected_size,
             SUM(CASE WHEN sha256_hash IS NOT NULL AND is_ignored = 0 THEN 1 ELSE 0 END) as hashed_count,
             SUM(CASE WHEN is_ignored = 0 THEN 1 ELSE 0 END) as eligible_count,
-            SUM(CASE WHEN id IN (SELECT filesystem_state_id FROM file_versions) THEN size ELSE 0 END) as archived_size
+            SUM(CASE WHEN id IN (
+                SELECT fv.filesystem_state_id FROM file_versions fv
+                JOIN storage_media sm ON sm.id = fv.media_id
+                WHERE sm.status IN ('active', 'full')
+            ) THEN size ELSE 0 END) as archived_size
         FROM filesystem_state
     """)
 
@@ -236,7 +262,15 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
         .first()
     )
 
-    total_versions = db_session.query(func.count(models.FileVersion.id)).scalar() or 0
+    total_versions = (
+        db_session.query(func.count(models.FileVersion.id))
+        .join(
+            models.StorageMedia, models.StorageMedia.id == models.FileVersion.media_id
+        )
+        .filter(models.StorageMedia.status.in_(["active", "full"]))
+        .scalar()
+        or 0
+    )
     eligible_redundancy_count = max(total_count - ignored_count, 1)
     redundancy_percentage = (total_versions / eligible_redundancy_count) * 100
 
@@ -258,13 +292,50 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
 @router.get("/jobs", response_model=List[JobSchema])
 def list_jobs(limit: int = 10, offset: int = 0, db_session: Session = Depends(get_db)):
     """Returns a paginated list of background archival and discovery jobs."""
-    return (
+    jobs = (
         db_session.query(models.Job)
         .order_by(models.Job.created_at.desc())
         .limit(limit)
         .offset(offset)
         .all()
     )
+
+    job_ids = [job.id for job in jobs]
+    if job_ids:
+        placeholders = ", ".join([f":id{i}" for i in range(len(job_ids))])
+        params = {f"id{i}": jid for i, jid in enumerate(job_ids)}
+        subquery = text(f"""
+            SELECT jl.job_id, jl.message
+            FROM job_logs jl
+            INNER JOIN (
+                SELECT job_id, MAX(id) as max_id
+                FROM job_logs
+                WHERE job_id IN ({placeholders})
+                GROUP BY job_id
+            ) latest ON jl.id = latest.max_id
+        """)
+        latest_logs = {
+            row[0]: row[1] for row in db_session.execute(subquery, params).fetchall()
+        }
+    else:
+        latest_logs = {}
+
+    result = []
+    for job in jobs:
+        job_dict = {
+            "id": job.id,
+            "job_type": job.job_type,
+            "status": job.status,
+            "progress": job.progress,
+            "current_task": job.current_task,
+            "error_message": job.error_message,
+            "started_at": job.started_at,
+            "completed_at": job.completed_at,
+            "created_at": job.created_at,
+            "latest_log": latest_logs.get(job.id),
+        }
+        result.append(JobSchema(**job_dict))
+    return result
 
 
 @router.get("/jobs/count")
@@ -279,7 +350,45 @@ def get_job_detail(job_id: int, db_session: Session = Depends(get_db)):
     job_record = db_session.get(models.Job, job_id)
     if not job_record:
         raise HTTPException(status_code=404, detail="Job not found")
-    return job_record
+
+    latest_log = (
+        db_session.query(models.JobLog)
+        .filter(models.JobLog.job_id == job_id)
+        .order_by(models.JobLog.id.desc())
+        .first()
+    )
+
+    return JobSchema(
+        id=job_record.id,
+        job_type=job_record.job_type,
+        status=job_record.status,
+        progress=job_record.progress,
+        current_task=job_record.current_task,
+        error_message=job_record.error_message,
+        started_at=job_record.started_at,
+        completed_at=job_record.completed_at,
+        created_at=job_record.created_at,
+        latest_log=latest_log.message if latest_log else None,
+    )
+
+
+@router.get("/jobs/{job_id}/logs", response_model=List[JobLogSchema])
+def get_job_logs(job_id: int, db_session: Session = Depends(get_db)):
+    """Retrieves the full execution log for a specific job."""
+    job_record = db_session.get(models.Job, job_id)
+    if not job_record:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    logs = (
+        db_session.query(models.JobLog)
+        .filter(models.JobLog.job_id == job_id)
+        .order_by(models.JobLog.id.asc())
+        .all()
+    )
+    return [
+        JobLogSchema(id=log.id, message=log.message, timestamp=log.timestamp)
+        for log in logs
+    ]
 
 
 @router.post("/jobs/{job_id}/cancel")
@@ -301,6 +410,27 @@ async def stream_jobs():
                     .filter(models.Job.status.in_(["RUNNING", "PENDING"]))
                     .all()
                 )
+                job_ids = [job.id for job in active_jobs]
+                if job_ids:
+                    placeholders = ", ".join([f":id{i}" for i in range(len(job_ids))])
+                    params = {f"id{i}": jid for i, jid in enumerate(job_ids)}
+                    subquery = text(f"""
+                        SELECT jl.job_id, jl.message
+                        FROM job_logs jl
+                        INNER JOIN (
+                            SELECT job_id, MAX(id) as max_id
+                            FROM job_logs
+                            WHERE job_id IN ({placeholders})
+                            GROUP BY job_id
+                        ) latest ON jl.id = latest.max_id
+                    """)
+                    latest_logs = {
+                        row[0]: row[1]
+                        for row in db_session.execute(subquery, params).fetchall()
+                    }
+                else:
+                    latest_logs = {}
+
                 serialized_data = []
                 for job in active_jobs:
                     job_dict = {
@@ -312,6 +442,7 @@ async def stream_jobs():
                         "error_message": job.error_message,
                         "started_at": job.started_at,
                         "created_at": job.created_at,
+                        "latest_log": latest_logs.get(job.id),
                     }
                     for date_field in ["started_at", "created_at"]:
                         from datetime import datetime
@@ -374,110 +505,98 @@ def get_scan_status():
     )
 
 
-@router.get("/browse", response_model=List[FileItemSchema])
+def _get_last_scan_time(db_session: Session) -> Optional[datetime]:
+    """Returns the completion time of the most recent successful SCAN job."""
+    last_scan = (
+        db_session.query(models.Job)
+        .filter(models.Job.job_type == "SCAN", models.Job.status == "COMPLETED")
+        .order_by(models.Job.completed_at.desc())
+        .first()
+    )
+    return last_scan.completed_at if last_scan else None
+
+
+@router.get("/browse", response_model=BrowseResponseSchema)
 def browse_system_path(
     path: Optional[str] = None, db_session: Session = Depends(get_db)
 ):
-    """Provides a browsable view of the host filesystem for rule configuration."""
+    """Provides a browsable view of the indexed filesystem from the database."""
     roots = get_source_roots(db_session)
     tracking_rules = db_session.query(models.TrackedSource).all()
     tracking_map = {rule.path: rule.action for rule in tracking_rules}
     exclusion_spec = get_exclusion_spec(db_session)
+    last_scan_time = _get_last_scan_time(db_session)
 
     if path is None or path == "ROOT":
         results = []
         for root_path in roots:
-            if not os.path.exists(root_path):
-                continue
-            stats = os.stat(root_path)
-            # Source roots themselves follow policy
-            is_ignored = get_ignored_status(root_path, tracking_map, exclusion_spec)
-            results.append(
-                FileItemSchema(
-                    name=root_path,
-                    path=root_path,
-                    type="directory",
-                    size=stats.st_size,
-                    mtime=stats.st_mtime,
-                    ignored=is_ignored,
-                )
+            count_sql = text("""
+                SELECT COUNT(*) FROM filesystem_state
+                WHERE file_path LIKE :prefix
+            """)
+            count = (
+                db_session.execute(count_sql, {"prefix": f"{root_path}%"}).scalar() or 0
             )
-        return results
-
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Path not found")
-
-    results = []
-    try:
-        entries = []
-        immediate_file_paths = []
-        with os.scandir(path) as directory_iterator:
-            for entry in directory_iterator:
-                entries.append(entry)
-                if not entry.is_dir(follow_symlinks=False):
-                    immediate_file_paths.append(entry.path)
-
-        # Fetch existing indexed files for ONLY the immediate files in this directory
-        indexed_info = {}  # path -> (sha256_hash, is_ignored)
-        if immediate_file_paths:
-            for i in range(0, len(immediate_file_paths), 900):
-                chunk = immediate_file_paths[i : i + 900]
-                for f_path, sha256_hash, db_ignored in (
-                    db_session.query(
-                        models.FilesystemState.file_path,
-                        models.FilesystemState.sha256_hash,
-                        models.FilesystemState.is_ignored,
-                    )
-                    .filter(models.FilesystemState.file_path.in_(chunk))
-                    .all()
-                ):
-                    indexed_info[f_path] = (sha256_hash, db_ignored)
-
-        for entry in entries:
-            try:
-                # Explicitly don't follow symlinks during browsing to show raw state
-                file_stats = entry.stat(follow_symlinks=False)
-
-                if entry.path in indexed_info:
-                    # If in DB, the DB flag is the source of truth for archival intent
-                    is_ignored = indexed_info[entry.path][1]
-                    item_hash = indexed_info[entry.path][0]
-                else:
-                    # If not in DB, calculate intended state based on policy
-                    is_ignored = get_ignored_status(
-                        entry.path, tracking_map, exclusion_spec
-                    )
-                    item_hash = None
-
+            if count > 0:
+                is_ignored = get_ignored_status(root_path, tracking_map, exclusion_spec)
                 results.append(
                     FileItemSchema(
-                        name=entry.name,
-                        path=entry.path,
-                        type="directory"
-                        if entry.is_dir(follow_symlinks=False)
-                        else "file",
-                        size=file_stats.st_size,
-                        mtime=file_stats.st_mtime,
+                        name=root_path,
+                        path=root_path,
+                        type="directory",
                         ignored=is_ignored,
-                        sha256_hash=item_hash,
                     )
                 )
-            except (OSError, FileNotFoundError):
-                continue
-    except PermissionError:
-        raise HTTPException(status_code=403, detail="Permission denied")
+        return BrowseResponseSchema(files=results, last_scan_time=last_scan_time)
 
-    # Deduplicate by path to prevent frontend keyed each block errors
-    seen_paths: set[str] = set()
-    deduped_results: list[FileItemSchema] = []
-    for r in results:
-        if r.path not in seen_paths:
-            seen_paths.add(r.path)
-            deduped_results.append(r)
-    results = deduped_results
+    target_prefix = path if path.endswith("/") else path + "/"
+
+    files_sql = text("""
+        SELECT file_path, size, mtime, sha256_hash, is_ignored
+        FROM filesystem_state
+        WHERE file_path LIKE :prefix
+        AND file_path != :prefix
+    """)
+    rows = db_session.execute(files_sql, {"prefix": f"{target_prefix}%"}).fetchall()
+
+    results = []
+    seen = set()
+
+    for file_path, size, mtime, sha256_hash, is_ignored in rows:
+        relative = file_path[len(target_prefix) :]
+        if "/" in relative:
+            immediate_name = relative.split("/")[0]
+            child_path = target_prefix + immediate_name
+            if child_path not in seen:
+                seen.add(child_path)
+                dir_ignored = get_ignored_status(
+                    child_path, tracking_map, exclusion_spec
+                )
+                results.append(
+                    FileItemSchema(
+                        name=immediate_name,
+                        path=child_path,
+                        type="directory",
+                        ignored=dir_ignored,
+                    )
+                )
+        else:
+            if file_path not in seen:
+                seen.add(file_path)
+                results.append(
+                    FileItemSchema(
+                        name=relative,
+                        path=file_path,
+                        type="file",
+                        size=size,
+                        mtime=mtime,
+                        ignored=is_ignored,
+                        sha256_hash=sha256_hash,
+                    )
+                )
 
     results.sort(key=lambda x: (x.type != "directory", x.name.lower()))
-    return results
+    return BrowseResponseSchema(files=results, last_scan_time=last_scan_time)
 
 
 @router.get("/search", response_model=List[FileItemSchema])
@@ -932,6 +1051,17 @@ def list_discrepancies(db_session: Session = Depends(get_db)):
         if record.id in seen_ids:
             continue
         seen_ids.add(record.id)
+
+        has_valid_versions = (
+            db_session.query(models.FileVersion)
+            .join(models.StorageMedia)
+            .filter(
+                models.FileVersion.filesystem_state_id == record.id,
+                models.StorageMedia.status.in_(["active", "full"]),
+            )
+            .first()
+        ) is not None
+
         if record.is_deleted:
             results.append(
                 DiscrepancySchema(
@@ -942,7 +1072,7 @@ def list_discrepancies(db_session: Session = Depends(get_db)):
                     last_seen_timestamp=record.last_seen_timestamp,
                     sha256_hash=record.sha256_hash,
                     is_deleted=True,
-                    has_versions=len(record.versions) > 0,
+                    has_versions=has_valid_versions,
                 )
             )
         elif not os.path.exists(record.file_path):
@@ -955,7 +1085,7 @@ def list_discrepancies(db_session: Session = Depends(get_db)):
                     last_seen_timestamp=record.last_seen_timestamp,
                     sha256_hash=record.sha256_hash,
                     is_deleted=False,
-                    has_versions=len(record.versions) > 0,
+                    has_versions=has_valid_versions,
                 )
             )
 

@@ -63,7 +63,9 @@
     let showRegisterDialog = $state(false);
     let editingMedia = $state<MediaSchema | null>(null);
 
-    let activeMedia = $derived(mediaList.filter(m => m.status === 'active' && (m.capacity === 0 || (m.bytes_used / m.capacity) < 0.98)));
+    let activeMedia = $derived(mediaList.filter(m => m.status === 'active'));
+    let fullMedia = $derived(mediaList.filter(m => m.status === 'full'));
+    let unavailableMedia = $derived(mediaList.filter(m => ['failed', 'retired', 'offline'].includes(m.status)));
 
     // New Media Form State
     let newMedia = $state({
@@ -734,7 +736,7 @@
             {/if}
 
             <!-- Active Media -->
-            <div class="space-y-4">
+            <div class="space-y-4" data-testid="active-media-section">
                 <SectionHeader title="Active archive media" icon={Database} iconColor="text-blue-500" />
 
                 <Card class="bg-bg-secondary border-border-color shadow-2xl overflow-hidden flex flex-col">
@@ -790,8 +792,8 @@
             </div>
 
             <!-- Fully Utilized Media -->
-            {#if mediaList.some(m => m.status === 'active' && m.capacity > 0 && (m.bytes_used / m.capacity) >= 0.98)}
-                <div class="space-y-4">
+            {#if fullMedia.length > 0}
+                <div class="space-y-4" data-testid="full-media-section">
                     <SectionHeader title="Fully utilized media" icon={ShieldCheck} iconColor="text-success-color" />
 
                     <Card class="bg-bg-secondary/80 border border-border-color/80 rounded-xl overflow-hidden shadow-xl">
@@ -809,7 +811,7 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-border-color/30">
-                                {#each mediaList.filter(m => m.status === 'active' && m.capacity > 0 && (m.bytes_used / m.capacity) >= 0.98) as media (media.id)}
+                                {#each fullMedia as media (media.id)}
                                     <tr class="hover:bg-bg-primary/20 transition-colors">
                                         <td class="px-6 py-4 text-center opacity-30">
                                             <Minus size={16} />
@@ -824,8 +826,8 @@
             {/if}
 
             <!-- Retired & Failed Media -->
-            {#if mediaList.some(m => m.status !== 'active')}
-                <div class="space-y-4">
+            {#if unavailableMedia.length > 0}
+                <div class="space-y-4" data-testid="unavailable-media-section">
                     <SectionHeader title="Retired & failed media" icon={ShieldAlert} iconColor="text-error-color" />
 
                     <Card class="bg-bg-secondary/60 border border-border-color/60 rounded-xl overflow-hidden shadow-xl grayscale-[0.5] opacity-80">
@@ -843,7 +845,7 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-border-color/20">
-                                {#each mediaList.filter(m => m.status !== 'active') as media (media.id)}
+                                {#each unavailableMedia as media (media.id)}
                                     <tr class="hover:bg-bg-primary/20 transition-colors">
                                         <td class="px-6 py-4 text-center opacity-20">
                                             <Minus size={16} />

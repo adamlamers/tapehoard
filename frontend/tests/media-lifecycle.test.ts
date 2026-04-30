@@ -128,4 +128,60 @@ test.describe('Media Lifecycle', () => {
 
     await requestContext.dispose();
   });
+
+  test('inventory categorizes media by status correctly', async ({ page }) => {
+    const requestContext = await setupRequestContext();
+
+    const activeMedia = await requestContext.post(`${API_URL}/inventory/media`, {
+      data: { identifier: 'CAT_ACTIVE', media_type: 'mock_lto', generation_tier: 'LTO-8', capacity: 12000, config: {} }
+    }).then(r => r.json());
+
+    const fullMedia = await requestContext.post(`${API_URL}/inventory/media`, {
+      data: { identifier: 'CAT_FULL', media_type: 'mock_lto', generation_tier: 'LTO-8', capacity: 12000, config: {} }
+    }).then(r => r.json());
+    await requestContext.patch(`${API_URL}/inventory/media/${fullMedia.id}`, { data: { status: 'full' } });
+
+    const failedMedia = await requestContext.post(`${API_URL}/inventory/media`, {
+      data: { identifier: 'CAT_FAILED', media_type: 'mock_lto', generation_tier: 'LTO-8', capacity: 12000, config: {} }
+    }).then(r => r.json());
+    await requestContext.patch(`${API_URL}/inventory/media/${failedMedia.id}`, { data: { status: 'failed' } });
+
+    const retiredMedia = await requestContext.post(`${API_URL}/inventory/media`, {
+      data: { identifier: 'CAT_RETIRED', media_type: 'mock_lto', generation_tier: 'LTO-8', capacity: 12000, config: {} }
+    }).then(r => r.json());
+    await requestContext.patch(`${API_URL}/inventory/media/${retiredMedia.id}`, { data: { status: 'retired' } });
+
+    await page.goto('/inventory');
+    await page.waitForLoadState('networkidle');
+
+    const activeSection = page.getByTestId('active-media-section');
+    const fullSection = page.getByTestId('full-media-section');
+    const unavailableSection = page.getByTestId('unavailable-media-section');
+
+    await expect(activeSection).toBeVisible();
+    await expect(activeSection.getByText('CAT_ACTIVE')).toBeVisible();
+    await expect(activeSection.getByText('CAT_FULL')).not.toBeVisible();
+    await expect(activeSection.getByText('CAT_FAILED')).not.toBeVisible();
+    await expect(activeSection.getByText('CAT_RETIRED')).not.toBeVisible();
+
+    await expect(fullSection).toBeVisible();
+    await expect(fullSection.getByText('CAT_FULL')).toBeVisible();
+    await expect(fullSection.getByText('CAT_ACTIVE')).not.toBeVisible();
+    await expect(fullSection.getByText('CAT_FAILED')).not.toBeVisible();
+    await expect(fullSection.getByText('CAT_RETIRED')).not.toBeVisible();
+
+    await expect(unavailableSection).toBeVisible();
+    await expect(unavailableSection.getByText('CAT_FAILED')).toBeVisible();
+    await expect(unavailableSection.getByText('CAT_RETIRED')).toBeVisible();
+
+    await expect(unavailableSection).toBeVisible();
+    await expect(unavailableSection.getByText('CAT_FAILED')).toBeVisible();
+    await expect(unavailableSection.getByText('CAT_RETIRED')).toBeVisible();
+
+    await requestContext.delete(`${API_URL}/inventory/media/${activeMedia.id}`);
+    await requestContext.delete(`${API_URL}/inventory/media/${fullMedia.id}`);
+    await requestContext.delete(`${API_URL}/inventory/media/${failedMedia.id}`);
+    await requestContext.delete(`${API_URL}/inventory/media/${retiredMedia.id}`);
+    await requestContext.dispose();
+  });
 });

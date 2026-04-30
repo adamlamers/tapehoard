@@ -223,3 +223,159 @@ def test_delete_file_record(client, db_session):
         .first()
         is None
     )
+
+
+def test_dashboard_stats_excludes_failed_media(client, db_session):
+    """Tests that dashboard stats do not count versions on failed or retired media."""
+    active_media = models.StorageMedia(
+        media_type="hdd", identifier="M1", capacity=5000, status="active"
+    )
+    failed_media = models.StorageMedia(
+        media_type="tape", identifier="TAPE_01", capacity=5000, status="failed"
+    )
+    retired_media = models.StorageMedia(
+        media_type="tape", identifier="TAPE_02", capacity=5000, status="retired"
+    )
+    db_session.add_all([active_media, failed_media, retired_media])
+    db_session.flush()
+
+    file1 = models.FilesystemState(
+        file_path="/source/only_active.txt",
+        size=2048,
+        mtime=1000,
+        is_ignored=False,
+    )
+    file2 = models.FilesystemState(
+        file_path="/source/only_failed.txt",
+        size=4096,
+        mtime=1000,
+        is_ignored=False,
+    )
+    file3 = models.FilesystemState(
+        file_path="/source/only_retired.txt",
+        size=8192,
+        mtime=1000,
+        is_ignored=False,
+    )
+    db_session.add_all([file1, file2, file3])
+    db_session.flush()
+
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=file1.id,
+            media_id=active_media.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=2048,
+        )
+    )
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=file2.id,
+            media_id=failed_media.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=4096,
+        )
+    )
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=file3.id,
+            media_id=retired_media.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=8192,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/system/dashboard/stats")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["unprotected_files_count"] == 2
+    assert data["unprotected_data_size"] == 12288
+    assert data["archived_data_size"] == 2048
+
+
+def test_discrepancies_excludes_versions_on_unavailable_media(client, db_session):
+    """Tests that discrepancy has_versions is False when only backed up on failed/retired media."""
+    failed_media = models.StorageMedia(
+        media_type="tape", identifier="TAPE_BAD", capacity=5000, status="failed"
+    )
+    retired_media = models.StorageMedia(
+        media_type="tape", identifier="TAPE_OLD", capacity=5000, status="retired"
+    )
+    active_media = models.StorageMedia(
+        media_type="hdd", identifier="M_OK", capacity=5000, status="active"
+    )
+    db_session.add_all([failed_media, retired_media, active_media])
+    db_session.flush()
+
+    file_failed = models.FilesystemState(
+        file_path="/data/gone_failed.txt",
+        size=500,
+        mtime=1000,
+        is_deleted=True,
+        is_ignored=False,
+    )
+    file_retired = models.FilesystemState(
+        file_path="/data/gone_retired.txt",
+        size=600,
+        mtime=1000,
+        is_deleted=True,
+        is_ignored=False,
+    )
+    file_good = models.FilesystemState(
+        file_path="/data/exists_on_good.txt",
+        size=700,
+        mtime=1000,
+        is_deleted=True,
+        is_ignored=False,
+    )
+    db_session.add_all([file_failed, file_retired, file_good])
+    db_session.flush()
+
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=file_failed.id,
+            media_id=failed_media.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=500,
+        )
+    )
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=file_retired.id,
+            media_id=retired_media.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=600,
+        )
+    )
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=file_good.id,
+            media_id=active_media.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=700,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/system/discrepancies")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data) == 3
+
+    failed_backed = next(d for d in data if d["path"] == "/data/gone_failed.txt")
+    assert failed_backed["has_versions"] is False
+
+    retired_backed = next(d for d in data if d["path"] == "/data/gone_retired.txt")
+    assert retired_backed["has_versions"] is False
+
+    good_backed = next(d for d in data if d["path"] == "/data/exists_on_good.txt")
+    assert good_backed["has_versions"] is True

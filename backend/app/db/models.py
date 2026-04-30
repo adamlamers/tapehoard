@@ -126,6 +126,23 @@ class Job(Base):
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
 
+    logs: Mapped[List["JobLog"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
+
+
+class JobLog(Base):
+    __tablename__ = "job_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
+    message: Mapped[str] = mapped_column(String)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    job: Mapped["Job"] = relationship(back_populates="logs")
+
 
 class SystemSetting(Base):
     __tablename__ = "system_settings"

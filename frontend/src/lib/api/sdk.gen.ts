@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostData, AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostErrors, AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostResponses, AddFileToRecoveryQueueRestoresQueueFileFileIdPostData, AddFileToRecoveryQueueRestoresQueueFileFileIdPostErrors, AddFileToRecoveryQueueRestoresQueueFileFileIdPostResponses, BatchUpdateTrackingSystemTrackBatchPostData, BatchUpdateTrackingSystemTrackBatchPostErrors, BatchUpdateTrackingSystemTrackBatchPostResponses, BrowseArchiveIndexInventoryBrowseGetData, BrowseArchiveIndexInventoryBrowseGetErrors, BrowseArchiveIndexInventoryBrowseGetResponses, BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetData, BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetErrors, BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetResponses, BrowseSystemPathSystemBrowseGetData, BrowseSystemPathSystemBrowseGetErrors, BrowseSystemPathSystemBrowseGetResponses, CalculateRecoveryManifestRestoresManifestGetData, CalculateRecoveryManifestRestoresManifestGetResponses, CancelJobSystemJobsJobIdCancelPostData, CancelJobSystemJobsJobIdCancelPostErrors, CancelJobSystemJobsJobIdCancelPostResponses, ClearRecoveryQueueRestoresQueueClearPostData, ClearRecoveryQueueRestoresQueueClearPostResponses, DeleteMediaAssetInventoryMediaMediaIdDeleteData, DeleteMediaAssetInventoryMediaMediaIdDeleteErrors, DeleteMediaAssetInventoryMediaMediaIdDeleteResponses, DiscoverHardwareNodesSystemHardwareDiscoverGetData, DiscoverHardwareNodesSystemHardwareDiscoverGetResponses, ExportDatabaseIndexSystemDatabaseExportGetData, ExportDatabaseIndexSystemDatabaseExportGetResponses, GetArchiveItemMetadataInventoryMetadataGetData, GetArchiveItemMetadataInventoryMetadataGetErrors, GetArchiveItemMetadataInventoryMetadataGetResponses, GetArchiveTreeInventoryTreeGetData, GetArchiveTreeInventoryTreeGetErrors, GetArchiveTreeInventoryTreeGetResponses, GetDashboardStatsSystemDashboardStatsGetData, GetDashboardStatsSystemDashboardStatsGetResponses, GetJobDetailSystemJobsJobIdGetData, GetJobDetailSystemJobsJobIdGetErrors, GetJobDetailSystemJobsJobIdGetResponses, GetJobsCountSystemJobsCountGetData, GetJobsCountSystemJobsCountGetResponses, GetRecoveryQueueTreeRestoresQueueTreeGetData, GetRecoveryQueueTreeRestoresQueueTreeGetErrors, GetRecoveryQueueTreeRestoresQueueTreeGetResponses, GetScanStatusSystemScanStatusGetData, GetScanStatusSystemScanStatusGetResponses, GetSystemAnalyticsInventoryInsightsGetData, GetSystemAnalyticsInventoryInsightsGetResponses, GetSystemSettingsSystemSettingsGetData, GetSystemSettingsSystemSettingsGetResponses, GetSystemTreeSystemTreeGetData, GetSystemTreeSystemTreeGetErrors, GetSystemTreeSystemTreeGetResponses, HealthHeartbeatHealthGetData, HealthHeartbeatHealthGetResponses, IgnoreHardwareNodeSystemHardwareIgnorePostData, IgnoreHardwareNodeSystemHardwareIgnorePostErrors, IgnoreHardwareNodeSystemHardwareIgnorePostResponses, ImportDatabaseIndexSystemDatabaseImportPostData, ImportDatabaseIndexSystemDatabaseImportPostErrors, ImportDatabaseIndexSystemDatabaseImportPostResponses, InitializeStorageHardwareInventoryMediaMediaIdInitializePostData, InitializeStorageHardwareInventoryMediaMediaIdInitializePostErrors, InitializeStorageHardwareInventoryMediaMediaIdInitializePostResponses, ListArchivalHistoryBackupsGetData, ListArchivalHistoryBackupsGetResponses, ListHostDirectoriesSystemLsGetData, ListHostDirectoriesSystemLsGetErrors, ListHostDirectoriesSystemLsGetResponses, ListJobsSystemJobsGetData, ListJobsSystemJobsGetErrors, ListJobsSystemJobsGetResponses, ListRecoveryQueueRestoresQueueGetData, ListRecoveryQueueRestoresQueueGetResponses, ListStorageFleetInventoryMediaGetData, ListStorageFleetInventoryMediaGetErrors, ListStorageFleetInventoryMediaGetResponses, ListStorageProvidersInventoryProvidersGetData, ListStorageProvidersInventoryProvidersGetResponses, RegisterNewMediaInventoryMediaPostData, RegisterNewMediaInventoryMediaPostErrors, RegisterNewMediaInventoryMediaPostResponses, RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteData, RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteErrors, RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteResponses, ReorderArchivalPriorityInventoryMediaReorderPostData, ReorderArchivalPriorityInventoryMediaReorderPostErrors, ReorderArchivalPriorityInventoryMediaReorderPostResponses, SearchArchiveIndexInventorySearchGetData, SearchArchiveIndexInventorySearchGetErrors, SearchArchiveIndexInventorySearchGetResponses, SearchSystemIndexSystemSearchGetData, SearchSystemIndexSystemSearchGetErrors, SearchSystemIndexSystemSearchGetResponses, StreamJobsSystemJobsStreamGetData, StreamJobsSystemJobsStreamGetResponses, TestNotificationDispatchSystemNotificationsTestPostData, TestNotificationDispatchSystemNotificationsTestPostErrors, TestNotificationDispatchSystemNotificationsTestPostResponses, TriggerAutoBackupBackupsTriggerAutoPostData, TriggerAutoBackupBackupsTriggerAutoPostResponses, TriggerBackupJobBackupsTriggerMediaIdPostData, TriggerBackupJobBackupsTriggerMediaIdPostErrors, TriggerBackupJobBackupsTriggerMediaIdPostResponses, TriggerIndexingSystemIndexHashPostData, TriggerIndexingSystemIndexHashPostResponses, TriggerRecoveryJobRestoresTriggerPostData, TriggerRecoveryJobRestoresTriggerPostErrors, TriggerRecoveryJobRestoresTriggerPostResponses, TriggerScanSystemScanPostData, TriggerScanSystemScanPostResponses, UpdateMediaAssetInventoryMediaMediaIdPatchData, UpdateMediaAssetInventoryMediaMediaIdPatchErrors, UpdateMediaAssetInventoryMediaMediaIdPatchResponses, UpdateSystemSettingSystemSettingsPostData, UpdateSystemSettingSystemSettingsPostErrors, UpdateSystemSettingSystemSettingsPostResponses } from './types.gen';
+import type { AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostData, AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostErrors, AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostResponses, AddFileToRecoveryQueueRestoresQueueFileFileIdPostData, AddFileToRecoveryQueueRestoresQueueFileFileIdPostErrors, AddFileToRecoveryQueueRestoresQueueFileFileIdPostResponses, BatchUpdateTrackingSystemTrackBatchPostData, BatchUpdateTrackingSystemTrackBatchPostErrors, BatchUpdateTrackingSystemTrackBatchPostResponses, BrowseArchiveIndexInventoryBrowseGetData, BrowseArchiveIndexInventoryBrowseGetErrors, BrowseArchiveIndexInventoryBrowseGetResponses, BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetData, BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetErrors, BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetResponses, BrowseSystemPathSystemBrowseGetData, BrowseSystemPathSystemBrowseGetErrors, BrowseSystemPathSystemBrowseGetResponses, CalculateRecoveryManifestRestoresManifestGetData, CalculateRecoveryManifestRestoresManifestGetResponses, CancelJobSystemJobsJobIdCancelPostData, CancelJobSystemJobsJobIdCancelPostErrors, CancelJobSystemJobsJobIdCancelPostResponses, ClearRecoveryQueueRestoresQueueClearPostData, ClearRecoveryQueueRestoresQueueClearPostResponses, ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostData, ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostErrors, ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostResponses, DeleteFileRecordSystemDiscrepanciesFileIdDeleteData, DeleteFileRecordSystemDiscrepanciesFileIdDeleteErrors, DeleteFileRecordSystemDiscrepanciesFileIdDeleteResponses, DeleteMediaAssetInventoryMediaMediaIdDeleteData, DeleteMediaAssetInventoryMediaMediaIdDeleteErrors, DeleteMediaAssetInventoryMediaMediaIdDeleteResponses, DetectUnregisteredMediaInventoryDetectGetData, DetectUnregisteredMediaInventoryDetectGetResponses, DiscoverHardwareNodesSystemHardwareDiscoverGetData, DiscoverHardwareNodesSystemHardwareDiscoverGetResponses, DismissDiscrepancySystemDiscrepanciesFileIdDismissPostData, DismissDiscrepancySystemDiscrepanciesFileIdDismissPostErrors, DismissDiscrepancySystemDiscrepanciesFileIdDismissPostResponses, ExportDatabaseIndexSystemDatabaseExportGetData, ExportDatabaseIndexSystemDatabaseExportGetResponses, GetArchiveItemMetadataInventoryMetadataGetData, GetArchiveItemMetadataInventoryMetadataGetErrors, GetArchiveItemMetadataInventoryMetadataGetResponses, GetArchiveTreeInventoryTreeGetData, GetArchiveTreeInventoryTreeGetErrors, GetArchiveTreeInventoryTreeGetResponses, GetDashboardStatsSystemDashboardStatsGetData, GetDashboardStatsSystemDashboardStatsGetResponses, GetJobDetailSystemJobsJobIdGetData, GetJobDetailSystemJobsJobIdGetErrors, GetJobDetailSystemJobsJobIdGetResponses, GetJobLogsSystemJobsJobIdLogsGetData, GetJobLogsSystemJobsJobIdLogsGetErrors, GetJobLogsSystemJobsJobIdLogsGetResponses, GetJobsCountSystemJobsCountGetData, GetJobsCountSystemJobsCountGetResponses, GetRecoveryQueueTreeRestoresQueueTreeGetData, GetRecoveryQueueTreeRestoresQueueTreeGetErrors, GetRecoveryQueueTreeRestoresQueueTreeGetResponses, GetScanStatusSystemScanStatusGetData, GetScanStatusSystemScanStatusGetResponses, GetSystemAnalyticsInventoryInsightsGetData, GetSystemAnalyticsInventoryInsightsGetResponses, GetSystemSettingsSystemSettingsGetData, GetSystemSettingsSystemSettingsGetResponses, GetSystemTreeSystemTreeGetData, GetSystemTreeSystemTreeGetErrors, GetSystemTreeSystemTreeGetResponses, HealthHeartbeatHealthGetData, HealthHeartbeatHealthGetResponses, IgnoreHardwareNodeSystemHardwareIgnorePostData, IgnoreHardwareNodeSystemHardwareIgnorePostErrors, IgnoreHardwareNodeSystemHardwareIgnorePostResponses, ImportDatabaseIndexSystemDatabaseImportPostData, ImportDatabaseIndexSystemDatabaseImportPostErrors, ImportDatabaseIndexSystemDatabaseImportPostResponses, InitializeStorageHardwareInventoryMediaMediaIdInitializePostData, InitializeStorageHardwareInventoryMediaMediaIdInitializePostErrors, InitializeStorageHardwareInventoryMediaMediaIdInitializePostResponses, ListArchivalHistoryBackupsGetData, ListArchivalHistoryBackupsGetResponses, ListDiscrepanciesSystemDiscrepanciesGetData, ListDiscrepanciesSystemDiscrepanciesGetResponses, ListHostDirectoriesSystemLsGetData, ListHostDirectoriesSystemLsGetErrors, ListHostDirectoriesSystemLsGetResponses, ListJobsSystemJobsGetData, ListJobsSystemJobsGetErrors, ListJobsSystemJobsGetResponses, ListRecoveryQueueRestoresQueueGetData, ListRecoveryQueueRestoresQueueGetResponses, ListStorageFleetInventoryMediaGetData, ListStorageFleetInventoryMediaGetErrors, ListStorageFleetInventoryMediaGetResponses, ListStorageProvidersInventoryProvidersGetData, ListStorageProvidersInventoryProvidersGetResponses, RegisterNewMediaInventoryMediaPostData, RegisterNewMediaInventoryMediaPostErrors, RegisterNewMediaInventoryMediaPostResponses, RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteData, RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteErrors, RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteResponses, ReorderArchivalPriorityInventoryMediaReorderPostData, ReorderArchivalPriorityInventoryMediaReorderPostErrors, ReorderArchivalPriorityInventoryMediaReorderPostResponses, ResetTestEnvironmentSystemTestResetPostData, ResetTestEnvironmentSystemTestResetPostResponses, SearchArchiveIndexInventorySearchGetData, SearchArchiveIndexInventorySearchGetErrors, SearchArchiveIndexInventorySearchGetResponses, SearchSystemIndexSystemSearchGetData, SearchSystemIndexSystemSearchGetErrors, SearchSystemIndexSystemSearchGetResponses, StreamJobsSystemJobsStreamGetData, StreamJobsSystemJobsStreamGetResponses, TestNotificationDispatchSystemNotificationsTestPostData, TestNotificationDispatchSystemNotificationsTestPostErrors, TestNotificationDispatchSystemNotificationsTestPostResponses, TriggerAutoBackupBackupsTriggerAutoPostData, TriggerAutoBackupBackupsTriggerAutoPostResponses, TriggerBackupJobBackupsTriggerMediaIdPostData, TriggerBackupJobBackupsTriggerMediaIdPostErrors, TriggerBackupJobBackupsTriggerMediaIdPostResponses, TriggerIndexingSystemIndexHashPostData, TriggerIndexingSystemIndexHashPostResponses, TriggerRecoveryJobRestoresTriggerPostData, TriggerRecoveryJobRestoresTriggerPostErrors, TriggerRecoveryJobRestoresTriggerPostResponses, TriggerScanSystemScanPostData, TriggerScanSystemScanPostResponses, UpdateMediaAssetInventoryMediaMediaIdPatchData, UpdateMediaAssetInventoryMediaMediaIdPatchErrors, UpdateMediaAssetInventoryMediaMediaIdPatchResponses, UpdateSystemSettingSystemSettingsPostData, UpdateSystemSettingSystemSettingsPostErrors, UpdateSystemSettingSystemSettingsPostResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,13 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: Record<string, unknown>;
 };
+
+/**
+ * Reset Test Environment
+ *
+ * Wipes the database and resets state for E2E testing.
+ */
+export const resetTestEnvironmentSystemTestResetPost = <ThrowOnError extends boolean = false>(options?: Options<ResetTestEnvironmentSystemTestResetPostData, ThrowOnError>) => (options?.client ?? client).post<ResetTestEnvironmentSystemTestResetPostResponses, unknown, ThrowOnError>({ url: '/system/test/reset', ...options });
 
 /**
  * Get Dashboard Stats
@@ -45,6 +52,13 @@ export const getJobsCountSystemJobsCountGet = <ThrowOnError extends boolean = fa
  * Retrieves detailed metadata for a specific job.
  */
 export const getJobDetailSystemJobsJobIdGet = <ThrowOnError extends boolean = false>(options: Options<GetJobDetailSystemJobsJobIdGetData, ThrowOnError>) => (options.client ?? client).get<GetJobDetailSystemJobsJobIdGetResponses, GetJobDetailSystemJobsJobIdGetErrors, ThrowOnError>({ url: '/system/jobs/{job_id}', ...options });
+
+/**
+ * Get Job Logs
+ *
+ * Retrieves the full execution log for a specific job.
+ */
+export const getJobLogsSystemJobsJobIdLogsGet = <ThrowOnError extends boolean = false>(options: Options<GetJobLogsSystemJobsJobIdLogsGetData, ThrowOnError>) => (options.client ?? client).get<GetJobLogsSystemJobsJobIdLogsGetResponses, GetJobLogsSystemJobsJobIdLogsGetErrors, ThrowOnError>({ url: '/system/jobs/{job_id}/logs', ...options });
 
 /**
  * Cancel Job
@@ -84,7 +98,7 @@ export const getScanStatusSystemScanStatusGet = <ThrowOnError extends boolean = 
 /**
  * Browse System Path
  *
- * Provides a browsable view of the host filesystem for rule configuration.
+ * Provides a browsable view of the indexed filesystem from the database.
  */
 export const browseSystemPathSystemBrowseGet = <ThrowOnError extends boolean = false>(options?: Options<BrowseSystemPathSystemBrowseGetData, ThrowOnError>) => (options?.client ?? client).get<BrowseSystemPathSystemBrowseGetResponses, BrowseSystemPathSystemBrowseGetErrors, ThrowOnError>({ url: '/system/browse', ...options });
 
@@ -194,6 +208,34 @@ export const importDatabaseIndexSystemDatabaseImportPost = <ThrowOnError extends
 export const getSystemTreeSystemTreeGet = <ThrowOnError extends boolean = false>(options?: Options<GetSystemTreeSystemTreeGetData, ThrowOnError>) => (options?.client ?? client).get<GetSystemTreeSystemTreeGetResponses, GetSystemTreeSystemTreeGetErrors, ThrowOnError>({ url: '/system/tree', ...options });
 
 /**
+ * List Discrepancies
+ *
+ * Lists files with discrepancies: confirmed deleted or unhashed and missing from disk.
+ */
+export const listDiscrepanciesSystemDiscrepanciesGet = <ThrowOnError extends boolean = false>(options?: Options<ListDiscrepanciesSystemDiscrepanciesGetData, ThrowOnError>) => (options?.client ?? client).get<ListDiscrepanciesSystemDiscrepanciesGetResponses, unknown, ThrowOnError>({ url: '/system/discrepancies', ...options });
+
+/**
+ * Confirm File Deleted
+ *
+ * Marks a file as confirmed deleted (soft delete).
+ */
+export const confirmFileDeletedSystemDiscrepanciesFileIdConfirmPost = <ThrowOnError extends boolean = false>(options: Options<ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostData, ThrowOnError>) => (options.client ?? client).post<ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostResponses, ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}/confirm', ...options });
+
+/**
+ * Dismiss Discrepancy
+ *
+ * Clears the deleted flag — user confirms file should be tracked again.
+ */
+export const dismissDiscrepancySystemDiscrepanciesFileIdDismissPost = <ThrowOnError extends boolean = false>(options: Options<DismissDiscrepancySystemDiscrepanciesFileIdDismissPostData, ThrowOnError>) => (options.client ?? client).post<DismissDiscrepancySystemDiscrepanciesFileIdDismissPostResponses, DismissDiscrepancySystemDiscrepanciesFileIdDismissPostErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}/dismiss', ...options });
+
+/**
+ * Delete File Record
+ *
+ * Hard-deletes a file record and all associated versions/cart entries.
+ */
+export const deleteFileRecordSystemDiscrepanciesFileIdDelete = <ThrowOnError extends boolean = false>(options: Options<DeleteFileRecordSystemDiscrepanciesFileIdDeleteData, ThrowOnError>) => (options.client ?? client).delete<DeleteFileRecordSystemDiscrepanciesFileIdDeleteResponses, DeleteFileRecordSystemDiscrepanciesFileIdDeleteErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}', ...options });
+
+/**
  * List Storage Providers
  *
  * Returns a registry of all available storage providers and their configurations.
@@ -269,6 +311,13 @@ export const initializeStorageHardwareInventoryMediaMediaIdInitializePost = <Thr
  * Computes high-signal system metrics with optimized single-pass queries.
  */
 export const getSystemAnalyticsInventoryInsightsGet = <ThrowOnError extends boolean = false>(options?: Options<GetSystemAnalyticsInventoryInsightsGetData, ThrowOnError>) => (options?.client ?? client).get<GetSystemAnalyticsInventoryInsightsGetResponses, unknown, ThrowOnError>({ url: '/inventory/insights', ...options });
+
+/**
+ * Detect Unregistered Media
+ *
+ * Scans all configured hardware providers for newly inserted, unregistered media.
+ */
+export const detectUnregisteredMediaInventoryDetectGet = <ThrowOnError extends boolean = false>(options?: Options<DetectUnregisteredMediaInventoryDetectGetData, ThrowOnError>) => (options?.client ?? client).get<DetectUnregisteredMediaInventoryDetectGetResponses, unknown, ThrowOnError>({ url: '/inventory/detect', ...options });
 
 /**
  * Browse Archive Index

@@ -384,6 +384,18 @@ class JobManager:
                 logger.debug(f"JobManager.fail_job failed for {job_id}: {e}")
 
     @staticmethod
+    def add_job_log(job_id: int, message: str):
+        """Appends a log entry to a job's log history."""
+        with SessionLocal() as db_session:
+            try:
+                log_entry = models.JobLog(job_id=job_id, message=message)
+                db_session.add(log_entry)
+                db_session.commit()
+            except (StaleDataError, Exception) as e:
+                db_session.rollback()
+                logger.debug(f"JobManager.add_job_log failed for {job_id}: {e}")
+
+    @staticmethod
     def cancel_job(job_id: int):
         """Submits a cancellation request for a pending or running job."""
         with SessionLocal() as db_session:
@@ -514,6 +526,7 @@ class ScannerService:
         if job_id is not None:
             JobManager.start_job(job_id)
             JobManager.update_job(job_id, 0.0, "Starting system scan...")
+            JobManager.add_job_log(job_id, "Starting system scan")
 
         self._set_process_priority("normal")
         with self._metrics_lock:
@@ -661,6 +674,10 @@ class ScannerService:
                     )
 
             if job_id is not None and not JobManager.is_cancelled(job_id):
+                JobManager.add_job_log(
+                    job_id,
+                    f"Scan complete: {self.files_new} new, {self.files_modified} modified, {self.files_missing} missing",
+                )
                 JobManager.complete_job(job_id)
                 self.last_run_time = current_timestamp
 
@@ -901,6 +918,10 @@ class ScannerService:
                         break
 
                 if not JobManager.is_cancelled(hashing_job.id) and self.is_hashing:
+                    JobManager.add_job_log(
+                        hashing_job.id,
+                        f"Hashing complete: {self.files_hashed} files indexed",
+                    )
                     JobManager.complete_job(hashing_job.id)
 
         except Exception as e:
