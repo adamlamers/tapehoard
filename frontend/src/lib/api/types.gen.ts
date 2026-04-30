@@ -1372,6 +1372,75 @@ export type ListDiscrepanciesSystemDiscrepanciesGetResponses = {
 
 export type ListDiscrepanciesSystemDiscrepanciesGetResponse = ListDiscrepanciesSystemDiscrepanciesGetResponses[keyof ListDiscrepanciesSystemDiscrepanciesGetResponses];
 
+export type BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostData = {
+    body: BatchDiscrepancyAction;
+    path?: never;
+    query?: never;
+    url: '/system/discrepancies/batch/confirm';
+};
+
+export type BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostError = BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostErrors[keyof BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostErrors];
+
+export type BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type BatchDismissSystemDiscrepanciesBatchDismissPostData = {
+    body: BatchDiscrepancyAction;
+    path?: never;
+    query?: never;
+    url: '/system/discrepancies/batch/dismiss';
+};
+
+export type BatchDismissSystemDiscrepanciesBatchDismissPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BatchDismissSystemDiscrepanciesBatchDismissPostError = BatchDismissSystemDiscrepanciesBatchDismissPostErrors[keyof BatchDismissSystemDiscrepanciesBatchDismissPostErrors];
+
+export type BatchDismissSystemDiscrepanciesBatchDismissPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type BatchHardDeleteSystemDiscrepanciesBatchDeletePostData = {
+    body: BatchDiscrepancyAction;
+    path?: never;
+    query?: never;
+    url: '/system/discrepancies/batch/delete';
+};
+
+export type BatchHardDeleteSystemDiscrepanciesBatchDeletePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BatchHardDeleteSystemDiscrepanciesBatchDeletePostError = BatchHardDeleteSystemDiscrepanciesBatchDeletePostErrors[keyof BatchHardDeleteSystemDiscrepanciesBatchDeletePostErrors];
+
+export type BatchHardDeleteSystemDiscrepanciesBatchDeletePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostData = {
     body?: never;
     path: {
@@ -1450,75 +1519,6 @@ export type DeleteFileRecordSystemDiscrepanciesFileIdDeleteErrors = {
 export type DeleteFileRecordSystemDiscrepanciesFileIdDeleteError = DeleteFileRecordSystemDiscrepanciesFileIdDeleteErrors[keyof DeleteFileRecordSystemDiscrepanciesFileIdDeleteErrors];
 
 export type DeleteFileRecordSystemDiscrepanciesFileIdDeleteResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostData = {
-    body: BatchDiscrepancyAction;
-    path?: never;
-    query?: never;
-    url: '/system/discrepancies/batch/confirm';
-};
-
-export type BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostError = BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostErrors[keyof BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostErrors];
-
-export type BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type BatchDismissSystemDiscrepanciesBatchDismissPostData = {
-    body: BatchDiscrepancyAction;
-    path?: never;
-    query?: never;
-    url: '/system/discrepancies/batch/dismiss';
-};
-
-export type BatchDismissSystemDiscrepanciesBatchDismissPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type BatchDismissSystemDiscrepanciesBatchDismissPostError = BatchDismissSystemDiscrepanciesBatchDismissPostErrors[keyof BatchDismissSystemDiscrepanciesBatchDismissPostErrors];
-
-export type BatchDismissSystemDiscrepanciesBatchDismissPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type BatchHardDeleteSystemDiscrepanciesBatchDeletePostData = {
-    body: BatchDiscrepancyAction;
-    path?: never;
-    query?: never;
-    url: '/system/discrepancies/batch/delete';
-};
-
-export type BatchHardDeleteSystemDiscrepanciesBatchDeletePostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type BatchHardDeleteSystemDiscrepanciesBatchDeletePostError = BatchHardDeleteSystemDiscrepanciesBatchDeletePostErrors[keyof BatchHardDeleteSystemDiscrepanciesBatchDeletePostErrors];
-
-export type BatchHardDeleteSystemDiscrepanciesBatchDeletePostResponses = {
     /**
      * Successful Response
      */

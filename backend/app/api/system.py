@@ -1156,6 +1156,7 @@ def list_discrepancies(db_session: Session = Depends(get_db)):
         .filter(
             models.FilesystemState.is_deleted.is_(True),
             models.FilesystemState.is_ignored.is_(False),
+            models.FilesystemState.missing_acknowledged_at.is_(None),
         )
         .order_by(models.FilesystemState.last_seen_timestamp.desc())
         .all()
@@ -1261,8 +1262,7 @@ def batch_dismiss(
         models.FilesystemState.id.in_(ids)
     ).update(
         {
-            models.FilesystemState.is_deleted: False,
-            models.FilesystemState.is_ignored: True,
+            models.FilesystemState.missing_acknowledged_at: datetime.now(timezone.utc),
         },
         synchronize_session="fetch",
     )
@@ -1303,12 +1303,11 @@ def confirm_file_deleted(file_id: int, db_session: Session = Depends(get_db)):
 
 @router.post("/discrepancies/{file_id}/dismiss")
 def dismiss_discrepancy(file_id: int, db_session: Session = Depends(get_db)):
-    """Acknowledges a discrepancy by marking the file as ignored."""
+    """Acknowledges a missing file — hides it from discrepancies."""
     record = db_session.get(models.FilesystemState, file_id)
     if not record:
         raise HTTPException(status_code=404, detail="File record not found")
-    record.is_deleted = False
-    record.is_ignored = True
+    record.missing_acknowledged_at = datetime.now(timezone.utc)
     db_session.commit()
     return {"message": f"File '{record.file_path}' discrepancy dismissed"}
 

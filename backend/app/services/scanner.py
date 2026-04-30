@@ -664,6 +664,8 @@ class ScannerService:
                         record.is_deleted = True
                         missing_count += 1
                     else:
+                        record.is_deleted = False
+                        record.missing_acknowledged_at = None
                         record.last_seen_timestamp = current_timestamp
                 db_session.commit()
                 if missing_count:

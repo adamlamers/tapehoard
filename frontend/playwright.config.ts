@@ -1,5 +1,4 @@
 import { defineConfig, devices } from '@playwright/test';
-
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -39,13 +38,13 @@ export default defineConfig({
     {
       command: 'cd ../backend && rm -f e2e_test.db* && DATABASE_URL="sqlite:///e2e_test.db" TAPEHOARD_TEST_MODE="true" uv run python -m app.start_test_server --host 0.0.0.0 --port 8001',
       url: 'http://localhost:8001/health',
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
     },
     {
       command: 'VITE_API_URL=http://localhost:8001 npm run dev -- --port 5174',
       url: 'http://localhost:5174',
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
     },
   ],

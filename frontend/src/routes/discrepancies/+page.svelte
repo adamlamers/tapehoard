@@ -25,9 +25,7 @@
     import { toast } from 'svelte-sonner';
     import {
         listDiscrepanciesSystemDiscrepanciesGet,
-        confirmFileDeletedSystemDiscrepanciesFileIdConfirmPost,
         dismissDiscrepancySystemDiscrepanciesFileIdDismissPost,
-        batchConfirmDeletedSystemDiscrepanciesBatchConfirmPost,
         batchDismissSystemDiscrepanciesBatchDismissPost,
         batchHardDeleteSystemDiscrepanciesBatchDeletePost,
         addFileToRecoveryQueueRestoresQueueFileFileIdPost,
@@ -42,11 +40,10 @@
 
     let discrepancies = $state<DiscrepancySchema[]>([]);
     let loading = $state(true);
-    let confirming = $state<number | null>(null);
     let acknowledging = $state<number | null>(null);
     let recovering = $state<number | null>(null);
     let selectedIds = $state<Set<number>>(new Set());
-    let batchAction = $state<'confirm' | 'acknowledge' | 'recover' | null>(null);
+    let batchAction = $state<'acknowledge' | 'recover' | null>(null);
     let batchLoading = $state(false);
     let collapsedDirs = $state<Record<string, boolean>>({});
 
@@ -86,25 +83,10 @@
         }
     }
 
-    async function confirmDeleted(id: number) {
-        confirming = id;
-        try {
-            await confirmFileDeletedSystemDiscrepanciesFileIdConfirmPost({
-                path: { file_id: id }
-            });
-            toast.success("File confirmed deleted");
-            await loadDiscrepancies();
-        } catch (error: any) {
-            toast.error(error.body?.detail || "Failed to confirm deletion");
-        } finally {
-            confirming = null;
-        }
-    }
-
     async function acknowledgeLoss(id: number) {
         acknowledging = id;
         try {
-            await confirmFileDeletedSystemDiscrepanciesFileIdConfirmPost({
+            await dismissDiscrepancySystemDiscrepanciesFileIdDismissPost({
                 path: { file_id: id }
             });
             toast.success("Loss acknowledged");
@@ -141,17 +123,11 @@
                     body: { ids }
                 });
                 toast.success(`${selectedIds.size} file(s) added to recovery queue`);
-            } else if (batchAction === 'confirm' || batchAction === 'acknowledge') {
-                await batchConfirmDeletedSystemDiscrepanciesBatchConfirmPost({
-                    body: { ids }
-                });
-                const msg = batchAction === 'confirm' ? 'confirmed deleted' : 'acknowledged as lost';
-                toast.success(`${selectedIds.size} file(s) ${msg}`);
-            } else {
+            } else if (batchAction === 'acknowledge') {
                 await batchDismissSystemDiscrepanciesBatchDismissPost({
                     body: { ids }
                 });
-                toast.success(`${selectedIds.size} file(s) dismissed`);
+                toast.success(`${selectedIds.size} file(s) acknowledged as lost`);
             }
             selectedIds = new Set();
             batchAction = null;
@@ -303,14 +279,6 @@
                     <Button
                         variant="outline"
                         size="sm"
-                        class="h-8 text-xs border-error-color/30 text-error-color hover:bg-error-color/10"
-                        onclick={() => batchAction = 'confirm'}
-                    >
-                        <FileX size={12} class="mr-1.5" /> Confirm delete
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
                         class="h-8 text-xs border-success-color/30 text-success-color hover:bg-success-color/10"
                         onclick={() => batchAction = 'recover'}
                     >
@@ -343,14 +311,7 @@
             <Card class="p-6 bg-bg-secondary border-border-color">
                 <div class="flex items-center justify-between">
                     <div>
-                        {#if batchAction === 'confirm'}
-                            <h4 class="text-sm font-bold text-error-color">
-                                Confirm {selectedWithBackups.length} file(s) as deleted?
-                            </h4>
-                            <p class="text-xs text-text-secondary opacity-60 mt-1">
-                                These files have backed up versions on archive media. This marks them as intentionally deleted.
-                            </p>
-                        {:else if batchAction === 'recover'}
+                        {#if batchAction === 'recover'}
                             <h4 class="text-sm font-bold text-success-color">
                                 Add {selectedWithBackups.length} file(s) to recovery queue?
                             </h4>
@@ -374,7 +335,6 @@
                             size="sm"
                             class={cn(
                                 batchAction === 'recover' && 'bg-success-color hover:bg-success-color/90',
-                                batchAction === 'confirm' && 'bg-error-color hover:bg-error-color/90',
                                 batchAction === 'acknowledge' && 'bg-yellow-500 hover:bg-yellow-500/90 text-black'
                             )}
                             onclick={executeBatchAction}
@@ -383,9 +343,7 @@
                             {#if batchLoading}
                                 <RotateCw size={14} class="mr-2 animate-spin" />
                             {/if}
-                            {#if batchAction === 'confirm'}
-                                Confirm delete
-                            {:else if batchAction === 'recover'}
+                            {#if batchAction === 'recover'}
                                 Add to recovery
                             {:else}
                                 Acknowledge loss
@@ -473,20 +431,6 @@
                                                             <ShieldCheck size={11} />
                                                             <span class="text-[10px] font-medium">On archive</span>
                                                         </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            class="h-8 w-8 text-error-color hover:bg-error-color/10 opacity-40 group-hover:opacity-100 transition-opacity"
-                                                            onclick={() => confirmDeleted(item.id)}
-                                                            disabled={confirming === item.id}
-                                                            title="Confirm delete"
-                                                        >
-                                                            {#if confirming === item.id}
-                                                                <RotateCw size={14} class="animate-spin" />
-                                                            {:else}
-                                                                <FileX size={14} />
-                                                            {/if}
-                                                        </Button>
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
@@ -608,20 +552,6 @@
                                                             <ShieldCheck size={11} />
                                                             <span class="text-[10px] font-medium">On archive</span>
                                                         </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            class="h-8 w-8 text-error-color hover:bg-error-color/10 opacity-40 group-hover:opacity-100 transition-opacity"
-                                                            onclick={() => confirmDeleted(item.id)}
-                                                            disabled={confirming === item.id}
-                                                            title="Confirm delete"
-                                                        >
-                                                            {#if confirming === item.id}
-                                                                <RotateCw size={14} class="animate-spin" />
-                                                            {:else}
-                                                                <FileX size={14} />
-                                                            {/if}
-                                                        </Button>
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"

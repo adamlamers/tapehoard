@@ -229,27 +229,6 @@ export const getSystemTreeSystemTreeGet = <ThrowOnError extends boolean = false>
 export const listDiscrepanciesSystemDiscrepanciesGet = <ThrowOnError extends boolean = false>(options?: Options<ListDiscrepanciesSystemDiscrepanciesGetData, ThrowOnError>) => (options?.client ?? client).get<ListDiscrepanciesSystemDiscrepanciesGetResponses, unknown, ThrowOnError>({ url: '/system/discrepancies', ...options });
 
 /**
- * Confirm File Deleted
- *
- * Marks a file as confirmed deleted (soft delete).
- */
-export const confirmFileDeletedSystemDiscrepanciesFileIdConfirmPost = <ThrowOnError extends boolean = false>(options: Options<ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostData, ThrowOnError>) => (options.client ?? client).post<ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostResponses, ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}/confirm', ...options });
-
-/**
- * Dismiss Discrepancy
- *
- * Clears the deleted flag — user confirms file should be tracked again.
- */
-export const dismissDiscrepancySystemDiscrepanciesFileIdDismissPost = <ThrowOnError extends boolean = false>(options: Options<DismissDiscrepancySystemDiscrepanciesFileIdDismissPostData, ThrowOnError>) => (options.client ?? client).post<DismissDiscrepancySystemDiscrepanciesFileIdDismissPostResponses, DismissDiscrepancySystemDiscrepanciesFileIdDismissPostErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}/dismiss', ...options });
-
-/**
- * Delete File Record
- *
- * Hard-deletes a file record and all associated versions/cart entries.
- */
-export const deleteFileRecordSystemDiscrepanciesFileIdDelete = <ThrowOnError extends boolean = false>(options: Options<DeleteFileRecordSystemDiscrepanciesFileIdDeleteData, ThrowOnError>) => (options.client ?? client).delete<DeleteFileRecordSystemDiscrepanciesFileIdDeleteResponses, DeleteFileRecordSystemDiscrepanciesFileIdDeleteErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}', ...options });
-
-/**
  * Batch Confirm Deleted
  */
 export const batchConfirmDeletedSystemDiscrepanciesBatchConfirmPost = <ThrowOnError extends boolean = false>(options: Options<BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostData, ThrowOnError>) => (options.client ?? client).post<BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostResponses, BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostErrors, ThrowOnError>({
@@ -284,6 +263,27 @@ export const batchHardDeleteSystemDiscrepanciesBatchDeletePost = <ThrowOnError e
         ...options.headers
     }
 });
+
+/**
+ * Confirm File Deleted
+ *
+ * Marks a file as confirmed deleted (soft delete).
+ */
+export const confirmFileDeletedSystemDiscrepanciesFileIdConfirmPost = <ThrowOnError extends boolean = false>(options: Options<ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostData, ThrowOnError>) => (options.client ?? client).post<ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostResponses, ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}/confirm', ...options });
+
+/**
+ * Dismiss Discrepancy
+ *
+ * Acknowledges a missing file — hides it from discrepancies.
+ */
+export const dismissDiscrepancySystemDiscrepanciesFileIdDismissPost = <ThrowOnError extends boolean = false>(options: Options<DismissDiscrepancySystemDiscrepanciesFileIdDismissPostData, ThrowOnError>) => (options.client ?? client).post<DismissDiscrepancySystemDiscrepanciesFileIdDismissPostResponses, DismissDiscrepancySystemDiscrepanciesFileIdDismissPostErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}/dismiss', ...options });
+
+/**
+ * Delete File Record
+ *
+ * Hard-deletes a file record and all associated versions/cart entries.
+ */
+export const deleteFileRecordSystemDiscrepanciesFileIdDelete = <ThrowOnError extends boolean = false>(options: Options<DeleteFileRecordSystemDiscrepanciesFileIdDeleteData, ThrowOnError>) => (options.client ?? client).delete<DeleteFileRecordSystemDiscrepanciesFileIdDeleteResponses, DeleteFileRecordSystemDiscrepanciesFileIdDeleteErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}', ...options });
 
 /**
  * List Storage Providers

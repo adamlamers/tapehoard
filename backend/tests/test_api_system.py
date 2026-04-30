@@ -175,7 +175,7 @@ def test_dismiss_discrepancy(client, db_session):
 
     db_session.expire_all()
     db_session.refresh(file_record)
-    assert file_record.is_deleted is False
+    assert file_record.missing_acknowledged_at is not None
 
 
 def test_delete_file_record(client, db_session):

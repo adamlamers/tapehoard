@@ -25,6 +25,9 @@ class FilesystemState(Base):
     is_deleted: Mapped[bool] = mapped_column(
         Boolean, default=False
     )  # True if confirmed missing from disk
+    missing_acknowledged_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True
+    )  # User acknowledged this missing file; hide from discrepancies
     last_seen_timestamp: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
