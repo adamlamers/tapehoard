@@ -172,6 +172,18 @@ def get_ignored_status(
     return False
 
 
+def _validate_path_within_roots(path: str, roots: List[str]) -> bool:
+    """Validates that a path does not contain traversal sequences and is within configured roots."""
+    if ".." in path:
+        return False
+    abs_path = os.path.abspath(path)
+    for root in roots:
+        abs_root = os.path.abspath(root)
+        if abs_path == abs_root or abs_path.startswith(abs_root + os.sep):
+            return True
+    return False
+
+
 # --- Endpoints ---
 
 
@@ -628,15 +640,25 @@ def browse_system_path(
             )
         return BrowseResponseSchema(files=results, last_scan_time=last_scan_time)
 
+    if not _validate_path_within_roots(path, roots):
+        raise HTTPException(
+            status_code=403, detail="Path is outside configured source roots"
+        )
+
     target_prefix = path if path.endswith("/") else path + "/"
+
+    # Escape LIKE wildcards in the prefix
+    escaped_prefix = (
+        target_prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    )
 
     files_sql = text("""
         SELECT file_path, size, mtime, sha256_hash, is_ignored
         FROM filesystem_state
-        WHERE file_path LIKE :prefix
+        WHERE file_path LIKE :prefix ESCAPE '\\'
         AND file_path != :prefix
     """)
-    rows = db_session.execute(files_sql, {"prefix": f"{target_prefix}%"}).fetchall()
+    rows = db_session.execute(files_sql, {"prefix": f"{escaped_prefix}%"}).fetchall()
 
     if not rows and os.path.isdir(path):
         try:
@@ -873,6 +895,8 @@ def test_notification_dispatch(request_data: TestNotificationRequest):
 @router.get("/ls")
 def list_host_directories(path: str = "/"):
     """Lists subdirectories on the host system for UI path selection."""
+    if ".." in path:
+        raise HTTPException(status_code=403, detail="Path traversal not allowed")
     if not os.path.exists(path) or not os.path.isdir(path):
         return []
 
@@ -1128,6 +1152,11 @@ def get_system_tree(path: Optional[str] = None, db_session: Session = Depends(ge
             TreeNodeSchema(name=root, path=root, has_children=True) for root in roots
         ]
 
+    if not _validate_path_within_roots(path, roots):
+        raise HTTPException(
+            status_code=403, detail="Path is outside configured source roots"
+        )
+
     results = []
     if os.path.exists(path):
         try:
@@ -1168,6 +1197,7 @@ def list_discrepancies(db_session: Session = Depends(get_db)):
             models.FilesystemState.sha256_hash.is_(None),
             models.FilesystemState.is_ignored.is_(False),
             models.FilesystemState.is_deleted.is_(False),
+            models.FilesystemState.missing_acknowledged_at.is_(None),
         )
         .all()
     )

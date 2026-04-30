@@ -123,6 +123,7 @@ class Job(Base):
     progress: Mapped[float] = mapped_column(Float, default=0.0)
     current_task: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    is_cancelled: Mapped[bool] = mapped_column(Boolean, default=False)
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

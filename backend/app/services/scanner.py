@@ -112,37 +112,8 @@ def _init_fast_features() -> Tuple[Optional[str], Optional[str]]:
 _FAST_FIND_BINARY, _FAST_HASH_BINARY = _init_fast_features()
 
 
-def _make_hash_callback(scanner, path_to_record, job_id, total_pending):
-    """Create a thread-safe callback for streaming hash results.
-
-    Updates metrics, assigns hashes to records, and reports job progress
-    as each file completes.
-    """
-
-    def on_result(file_path, hex_digest):
-        target_record = path_to_record.get(file_path)
-        if target_record and hex_digest:
-            target_record.sha256_hash = hex_digest
-            with scanner._metrics_lock:
-                scanner.bytes_hashed += target_record.size or 0
-                scanner.files_hashed += 1
-                # Report progress incrementally as files complete
-                if scanner.files_hashed % 5 == 0:
-                    progress = min(
-                        99.9,
-                        (scanner.files_hashed / max(total_pending, 1)) * 100,
-                    )
-                    JobManager.update_job(
-                        job_id,
-                        progress,
-                        f"Hashed {scanner.files_hashed} files ({scanner._format_throughput()})...",
-                    )
-
-    return on_result
-
-
 def _hash_file_batch_fast(
-    file_paths: List[str], binary: str, on_result=None
+    file_paths: List[str], binary: str
 ) -> Dict[str, Optional[str]]:
     """Hash a batch of files using a native SHA-256 binary.
 
@@ -151,8 +122,6 @@ def _hash_file_batch_fast(
     Args:
         file_paths: Paths to hash.
         binary: Path to sha256sum or shasum.
-        on_result: Optional callback(file_path, hex_digest) called for each
-                   file as it completes.
 
     Returns a mapping of file_path -> hex_digest (or None on failure).
     """
@@ -172,11 +141,12 @@ def _hash_file_batch_fast(
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
         )
 
         # Stream output line-by-line for incremental progress
-        assert proc.stdout is not None
+        if proc.stdout is None:
+            return results
         for line in iter(proc.stdout.readline, b""):
             line = line.strip()
             if not line:
@@ -196,8 +166,6 @@ def _hash_file_batch_fast(
             clean_path = raw_path.replace("\\\\", "\\")
 
             results[clean_path] = file_hash
-            if on_result is not None:
-                on_result(clean_path, file_hash)
 
         proc.stdout.close()
         proc.wait()
@@ -246,9 +214,13 @@ def _discover_files_fast(
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
         )
-        assert proc.stdout is not None
+        if proc.stdout is None:
+            logger.error(
+                f"Fast file discovery failed: could not open stdout for {root_base}"
+            )
+            return 0, 0
     except Exception as e:
         logger.error(f"Fast file discovery failed for {root_base}: {e}")
         return 0, 0
@@ -403,6 +375,7 @@ class JobManager:
                 job_record = db_session.get(models.Job, job_id)
                 if job_record and job_record.status in ["PENDING", "RUNNING"]:
                     job_record.status = "FAILED"
+                    job_record.is_cancelled = True
                     job_record.error_message = "Cancelled by user"
                     job_record.completed_at = datetime.now(timezone.utc)
                     db_session.commit()
@@ -416,11 +389,7 @@ class JobManager:
         with SessionLocal() as db_session:
             try:
                 job_record = db_session.get(models.Job, job_id)
-                return bool(
-                    job_record
-                    and job_record.status == "FAILED"
-                    and job_record.error_message == "Cancelled by user"
-                )
+                return bool(job_record and job_record.is_cancelled)
             except Exception:
                 return False
 
@@ -644,22 +613,18 @@ class ScannerService:
                 db_session.commit()
 
             # Detect files present in DB but not found during this scan
-            stale_records = (
+            stale_query = (
                 db_session.query(models.FilesystemState)
                 .filter(
                     models.FilesystemState.last_seen_timestamp < current_timestamp,
                     models.FilesystemState.is_deleted.is_(False),
                     models.FilesystemState.is_ignored.is_(False),
                 )
-                .all()
+                .yield_per(1000)
             )
-            if (
-                stale_records and not JobManager.is_cancelled(job_id)
-                if job_id
-                else True
-            ):
+            if not JobManager.is_cancelled(job_id) if job_id else True:
                 missing_count = 0
-                for record in stale_records:
+                for record in stale_query:
                     if not os.path.exists(record.file_path):
                         record.is_deleted = True
                         missing_count += 1
@@ -827,12 +792,6 @@ class ScannerService:
                                     _hash_file_batch_fast,
                                     batch,
                                     _FAST_HASH_BINARY,
-                                    _make_hash_callback(
-                                        self,
-                                        path_to_record,
-                                        hashing_job.id,
-                                        total_pending,
-                                    ),
                                 ): batch
                                 for batch in sub_batches
                             }
@@ -849,13 +808,34 @@ class ScannerService:
                                 except Exception:
                                     continue
 
-                                # Detect files in this batch that didn't get a hash
-                                # (likely missing from disk) and mark them as deleted
-                                for file_path, target_record in path_to_record.items():
-                                    if (
-                                        file_path not in batch_results
-                                        and not os.path.exists(file_path)
-                                    ):
+                                # Apply hashes and detect missing files ONLY for this batch
+                                for file_path in batch:
+                                    target_record = path_to_record.get(file_path)
+                                    if not target_record:
+                                        continue
+                                    if file_path in batch_results:
+                                        target_record.sha256_hash = batch_results[
+                                            file_path
+                                        ]
+                                        with self._metrics_lock:
+                                            self.bytes_hashed += target_record.size or 0
+                                            self.files_hashed += 1
+                                            # Report progress incrementally as files complete
+                                            if self.files_hashed % 5 == 0:
+                                                progress = min(
+                                                    99.9,
+                                                    (
+                                                        self.files_hashed
+                                                        / max(total_pending, 1)
+                                                    )
+                                                    * 100,
+                                                )
+                                                JobManager.update_job(
+                                                    hashing_job.id,
+                                                    progress,
+                                                    f"Hashed {self.files_hashed} files ({self._format_throughput()})...",
+                                                )
+                                    elif not os.path.exists(file_path):
                                         target_record.is_deleted = True
                                         with self._metrics_lock:
                                             self.files_missing += 1

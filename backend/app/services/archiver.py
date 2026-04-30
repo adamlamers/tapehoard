@@ -156,6 +156,7 @@ class ArchiverService:
             )
             .filter(
                 not_(models.FilesystemState.is_ignored),
+                models.FilesystemState.is_deleted.is_(False),
                 (coverage_subquery.c.covered_bytes.is_(None))
                 | (coverage_subquery.c.covered_bytes < models.FilesystemState.size),
             )
