@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
-from app.api.schemas import DiscrepancySchema, TreeNodeSchema
+from app.api.schemas import BatchDiscrepancyAction, DiscrepancySchema, TreeNodeSchema
 from app.db import models
 from app.db.database import SessionLocal, get_db
 from app.services.scanner import JobManager, scanner_manager
@@ -344,6 +344,56 @@ def get_jobs_count(db_session: Session = Depends(get_db)):
     return {"count": db_session.query(models.Job).count()}
 
 
+@router.get("/jobs/stats")
+def get_jobs_stats(db_session: Session = Depends(get_db)):
+    """Returns summary statistics for all jobs."""
+    total = db_session.query(models.Job).count()
+    completed = (
+        db_session.query(models.Job).filter(models.Job.status == "COMPLETED").count()
+    )
+    failed = db_session.query(models.Job).filter(models.Job.status == "FAILED").count()
+    running = (
+        db_session.query(models.Job).filter(models.Job.status == "RUNNING").count()
+    )
+    pending = (
+        db_session.query(models.Job).filter(models.Job.status == "PENDING").count()
+    )
+
+    success_rate = (
+        (completed / (completed + failed) * 100) if (completed + failed) > 0 else 100.0
+    )
+
+    avg_duration_result = db_session.execute(
+        text("""
+            SELECT AVG(
+                CAST((julianday(completed_at) - julianday(started_at)) * 86400 AS INTEGER)
+            ) as avg_seconds
+            FROM jobs
+            WHERE status = 'COMPLETED' AND started_at IS NOT NULL AND completed_at IS NOT NULL
+        """)
+    ).fetchone()
+    avg_duration = (
+        avg_duration_result[0] if avg_duration_result and avg_duration_result[0] else 0
+    )
+
+    job_type_counts = {}
+    for row in db_session.execute(
+        text("SELECT job_type, COUNT(*) as cnt FROM jobs GROUP BY job_type")
+    ).fetchall():
+        job_type_counts[row[0]] = row[1]
+
+    return {
+        "total": total,
+        "completed": completed,
+        "failed": failed,
+        "running": running,
+        "pending": pending,
+        "success_rate": round(success_rate, 1),
+        "avg_duration_seconds": round(avg_duration, 0),
+        "job_type_counts": job_type_counts,
+    }
+
+
 @router.get("/jobs/{job_id}", response_model=JobSchema)
 def get_job_detail(job_id: int, db_session: Session = Depends(get_db)):
     """Retrieves detailed metadata for a specific job."""
@@ -396,6 +446,43 @@ def cancel_job(job_id: int):
     """Submits a cancellation request for an active job."""
     JobManager.cancel_job(job_id)
     return {"message": "Cancellation request submitted"}
+
+
+@router.post("/jobs/{job_id}/retry")
+def retry_job(
+    job_id: int,
+    background_tasks: BackgroundTasks,
+    db_session: Session = Depends(get_db),
+):
+    """Retries a failed SCAN job by creating a new job of the same type."""
+    job_record = db_session.get(models.Job, job_id)
+    if not job_record:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job_record.status != "FAILED":
+        raise HTTPException(status_code=400, detail="Only failed jobs can be retried")
+
+    new_job = JobManager.create_job(db_session, job_record.job_type)
+
+    if job_record.job_type == "SCAN":
+
+        def run_discovery_task():
+            with SessionLocal() as db_inner:
+                scanner_manager.scan_sources(db_inner, new_job.id)
+
+        background_tasks.add_task(run_discovery_task)
+    else:
+        db_session.delete(new_job)
+        db_session.commit()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Retry for {job_record.job_type} jobs is not supported. "
+            f"Please re-trigger from the appropriate endpoint.",
+        )
+
+    return {
+        "message": f"Retry initiated for {job_record.job_type} job",
+        "new_job_id": new_job.id,
+    }
 
 
 @router.get("/jobs/stream")
@@ -530,23 +617,15 @@ def browse_system_path(
     if path is None or path == "ROOT":
         results = []
         for root_path in roots:
-            count_sql = text("""
-                SELECT COUNT(*) FROM filesystem_state
-                WHERE file_path LIKE :prefix
-            """)
-            count = (
-                db_session.execute(count_sql, {"prefix": f"{root_path}%"}).scalar() or 0
-            )
-            if count > 0:
-                is_ignored = get_ignored_status(root_path, tracking_map, exclusion_spec)
-                results.append(
-                    FileItemSchema(
-                        name=root_path,
-                        path=root_path,
-                        type="directory",
-                        ignored=is_ignored,
-                    )
+            is_ignored = get_ignored_status(root_path, tracking_map, exclusion_spec)
+            results.append(
+                FileItemSchema(
+                    name=root_path,
+                    path=root_path,
+                    type="directory",
+                    ignored=is_ignored,
                 )
+            )
         return BrowseResponseSchema(files=results, last_scan_time=last_scan_time)
 
     target_prefix = path if path.endswith("/") else path + "/"
@@ -558,6 +637,50 @@ def browse_system_path(
         AND file_path != :prefix
     """)
     rows = db_session.execute(files_sql, {"prefix": f"{target_prefix}%"}).fetchall()
+
+    if not rows and os.path.isdir(path):
+        try:
+            live_results = []
+            with os.scandir(path) as it:
+                for entry in it:
+                    try:
+                        if entry.name.startswith("."):
+                            continue
+                        entry_path = entry.path
+                        is_dir = entry.is_dir()
+                        is_ignored = get_ignored_status(
+                            entry_path, tracking_map, exclusion_spec
+                        )
+                        if is_dir:
+                            live_results.append(
+                                FileItemSchema(
+                                    name=entry.name,
+                                    path=entry_path,
+                                    type="directory",
+                                    ignored=is_ignored,
+                                )
+                            )
+                        else:
+                            stat = entry.stat()
+                            live_results.append(
+                                FileItemSchema(
+                                    name=entry.name,
+                                    path=entry_path,
+                                    type="file",
+                                    size=stat.st_size,
+                                    mtime=stat.st_mtime,
+                                    ignored=is_ignored,
+                                    sha256_hash=None,
+                                )
+                            )
+                    except OSError:
+                        continue
+            live_results.sort(key=lambda x: (x.type != "directory", x.name.lower()))
+            return BrowseResponseSchema(
+                files=live_results, last_scan_time=last_scan_time
+            )
+        except OSError:
+            pass
 
     results = []
     seen = set()
@@ -1090,6 +1213,79 @@ def list_discrepancies(db_session: Session = Depends(get_db)):
             )
 
     return results
+
+
+def _resolve_ids_from_action(
+    action: BatchDiscrepancyAction, db_session: Session
+) -> List[int]:
+    if action.ids:
+        return action.ids
+    if action.path_prefix:
+        records = (
+            db_session.query(models.FilesystemState)
+            .filter(models.FilesystemState.file_path.startswith(action.path_prefix))
+            .all()
+        )
+        return [r.id for r in records]
+    return []
+
+
+@router.post("/discrepancies/batch/confirm")
+def batch_confirm_deleted(
+    action: BatchDiscrepancyAction, db_session: Session = Depends(get_db)
+):
+    ids = _resolve_ids_from_action(action, db_session)
+    if not ids:
+        raise HTTPException(status_code=400, detail="No IDs or path prefix provided")
+    db_session.query(models.FilesystemState).filter(
+        models.FilesystemState.id.in_(ids)
+    ).update({models.FilesystemState.is_deleted: True}, synchronize_session="fetch")
+    db_session.commit()
+    return {
+        "message": f"{len(ids)} file(s) marked as confirmed deleted",
+        "count": len(ids),
+    }
+
+
+@router.post("/discrepancies/batch/dismiss")
+def batch_dismiss(
+    action: BatchDiscrepancyAction, db_session: Session = Depends(get_db)
+):
+    ids = _resolve_ids_from_action(action, db_session)
+    if not ids:
+        raise HTTPException(status_code=400, detail="No IDs or path prefix provided")
+    now = datetime.now(timezone.utc)
+    db_session.query(models.FilesystemState).filter(
+        models.FilesystemState.id.in_(ids)
+    ).update(
+        {
+            models.FilesystemState.is_deleted: False,
+            models.FilesystemState.last_seen_timestamp: now,
+        },
+        synchronize_session="fetch",
+    )
+    db_session.commit()
+    return {"message": f"{len(ids)} discrepancy(ies) dismissed", "count": len(ids)}
+
+
+@router.post("/discrepancies/batch/delete")
+def batch_hard_delete(
+    action: BatchDiscrepancyAction, db_session: Session = Depends(get_db)
+):
+    ids = _resolve_ids_from_action(action, db_session)
+    if not ids:
+        raise HTTPException(status_code=400, detail="No IDs or path prefix provided")
+    db_session.query(models.RestoreCart).filter(
+        models.RestoreCart.filesystem_state_id.in_(ids)
+    ).delete(synchronize_session="fetch")
+    db_session.query(models.FileVersion).filter(
+        models.FileVersion.filesystem_state_id.in_(ids)
+    ).delete(synchronize_session="fetch")
+    db_session.query(models.FilesystemState).filter(
+        models.FilesystemState.id.in_(ids)
+    ).delete(synchronize_session="fetch")
+    db_session.commit()
+    return {"message": f"{len(ids)} record(s) permanently deleted", "count": len(ids)}
 
 
 @router.post("/discrepancies/{file_id}/confirm")

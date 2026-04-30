@@ -41,7 +41,8 @@ test.describe('Settings & System', () => {
 
     const browseResp = await requestContext.get(`${API_URL}/system/browse?path=ROOT`);
     expect(browseResp.ok()).toBe(true);
-    const roots = await browseResp.json();
+    const browseData = await browseResp.json();
+    const roots = (browseData as any).files;
     const sourceRoot = (roots as Array<any>).find((r: any) => r.path === SOURCE_ROOT);
     expect(sourceRoot).toBeDefined();
 

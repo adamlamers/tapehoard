@@ -67,7 +67,8 @@ test.describe('Source Management', () => {
     const browseResp = await requestContext.get(
       `${API_URL}/system/browse?path=${path.join(SOURCE_ROOT, 'excluded_dir')}`
     );
-    const files = await browseResp.json();
+    const browseData = await browseResp.json();
+    const files = (browseData as any).files;
     const secretFile = (files as Array<any>).find((f: any) => f.name === 'secret.txt');
     if (secretFile) {
       expect(secretFile.ignored).toBe(true);
@@ -99,7 +100,8 @@ test.describe('Source Management', () => {
     const browseResp = await requestContext.get(
       `${API_URL}/system/browse?path=${SOURCE_ROOT}`
     );
-    const files = await browseResp.json();
+    const browseData = await browseResp.json();
+    const files = (browseData as any).files;
     const includedFile = (files as Array<any>).find((f: any) => f.name === 'include.txt');
     expect(includedFile).toBeDefined();
     expect(includedFile.ignored).toBe(false);

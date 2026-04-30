@@ -140,6 +140,176 @@ test.describe('Discrepancies', () => {
     await requestContext.dispose();
   });
 
+  test('batch confirm deleted via API', async ({}) => {
+    const requestContext = await request.newContext();
+
+    // Create two files to test batch operations
+    const files = ['batch_confirm_1.txt', 'batch_confirm_2.txt'];
+    for (const f of files) {
+      fs.writeFileSync(path.join(SOURCE_ROOT, f), `batch content for ${f}`);
+    }
+
+    // Scan to register them
+    await configureBackend(requestContext);
+    await requestContext.post(`${API_URL}/system/scan`);
+
+    // Wait for files to be registered by polling metadata
+    const deadline = Date.now() + 30000;
+    let ids: number[] = [];
+    while (Date.now() < deadline) {
+      ids = [];
+      for (const f of files) {
+        const filePath = path.join(SOURCE_ROOT, f);
+        const encodedPath = encodeURIComponent(filePath);
+        const metaResp = await requestContext.get(`${API_URL}/inventory/metadata?path=${encodedPath}`);
+        if (metaResp.ok()) {
+          const meta = await metaResp.json();
+          ids.push(meta.id);
+        }
+      }
+      if (ids.length === 2) break;
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    expect(ids.length).toBe(2);
+
+    // Confirm both as deleted via batch endpoint
+    const batchResp = await requestContext.post(`${API_URL}/system/discrepancies/batch/confirm`, {
+      data: { ids }
+    });
+    expect(batchResp.ok()).toBe(true);
+    const batchBody = await batchResp.json();
+    expect((batchBody as any).count).toBe(2);
+
+    // Verify both appear as deleted in discrepancies
+    const discResp = await requestContext.get(`${API_URL}/system/discrepancies`);
+    const discrepancies = await discResp.json();
+    for (const f of files) {
+      const found = (discrepancies as Array<any>).find((d: any) => d.path === path.join(SOURCE_ROOT, f));
+      expect(found).toBeDefined();
+      expect(found.is_deleted).toBe(true);
+    }
+
+    // Clean up
+    for (const id of ids) {
+      await requestContext.delete(`${API_URL}/system/discrepancies/${id}`);
+    }
+
+    await requestContext.dispose();
+  });
+
+  test('batch dismiss via API', async ({}) => {
+    const requestContext = await request.newContext();
+
+    // Create two files
+    const files = ['batch_dismiss_1.txt', 'batch_dismiss_2.txt'];
+    for (const f of files) {
+      fs.writeFileSync(path.join(SOURCE_ROOT, f), `batch content for ${f}`);
+    }
+
+    await configureBackend(requestContext);
+    await requestContext.post(`${API_URL}/system/scan`);
+
+    // Wait for files to be registered
+    const deadline = Date.now() + 30000;
+    let ids: number[] = [];
+    while (Date.now() < deadline) {
+      ids = [];
+      for (const f of files) {
+        const filePath = path.join(SOURCE_ROOT, f);
+        const encodedPath = encodeURIComponent(filePath);
+        const metaResp = await requestContext.get(`${API_URL}/inventory/metadata?path=${encodedPath}`);
+        if (metaResp.ok()) {
+          const meta = await metaResp.json();
+          ids.push(meta.id);
+        }
+      }
+      if (ids.length === 2) break;
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    expect(ids.length).toBe(2);
+
+    // Confirm as deleted first so they appear in discrepancies
+    for (const id of ids) {
+      await requestContext.post(`${API_URL}/system/discrepancies/${id}/confirm`);
+    }
+
+    // Batch dismiss
+    const batchResp = await requestContext.post(`${API_URL}/system/discrepancies/batch/dismiss`, {
+      data: { ids }
+    });
+    expect(batchResp.ok()).toBe(true);
+    const batchBody = await batchResp.json();
+    expect((batchBody as any).count).toBe(2);
+
+    // Verify discrepancies are cleared
+    const discResp = await requestContext.get(`${API_URL}/system/discrepancies`);
+    const discrepancies = await discResp.json();
+    for (const f of files) {
+      const found = (discrepancies as Array<any>).find((d: any) => d.path === path.join(SOURCE_ROOT, f));
+      expect(found).toBeUndefined();
+    }
+
+    await requestContext.dispose();
+  });
+
+  test('batch delete via API', async ({}) => {
+    const requestContext = await request.newContext();
+
+    // Create two files
+    const files = ['batch_delete_1.txt', 'batch_delete_2.txt'];
+    for (const f of files) {
+      fs.writeFileSync(path.join(SOURCE_ROOT, f), `batch content for ${f}`);
+    }
+
+    await configureBackend(requestContext);
+    await requestContext.post(`${API_URL}/system/scan`);
+
+    // Wait for files to be registered
+    const deadline = Date.now() + 30000;
+    let ids: number[] = [];
+    while (Date.now() < deadline) {
+      ids = [];
+      for (const f of files) {
+        const filePath = path.join(SOURCE_ROOT, f);
+        const encodedPath = encodeURIComponent(filePath);
+        const metaResp = await requestContext.get(`${API_URL}/inventory/metadata?path=${encodedPath}`);
+        if (metaResp.ok()) {
+          const meta = await metaResp.json();
+          ids.push(meta.id);
+        }
+      }
+      if (ids.length === 2) break;
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    expect(ids.length).toBe(2);
+
+    // Confirm as deleted first
+    for (const id of ids) {
+      await requestContext.post(`${API_URL}/system/discrepancies/${id}/confirm`);
+    }
+
+    // Batch delete
+    const batchResp = await requestContext.post(`${API_URL}/system/discrepancies/batch/delete`, {
+      data: { ids }
+    });
+    expect(batchResp.ok()).toBe(true);
+    const batchBody = await batchResp.json();
+    expect((batchBody as any).count).toBe(2);
+
+    // Verify records are permanently gone
+    const discResp = await requestContext.get(`${API_URL}/system/discrepancies`);
+    const discrepancies = await discResp.json();
+    for (const f of files) {
+      const found = (discrepancies as Array<any>).find((d: any) => d.path === path.join(SOURCE_ROOT, f));
+      expect(found).toBeUndefined();
+    }
+
+    await requestContext.dispose();
+  });
+
   test('discrepancies page UI renders correctly', async ({ page }) => {
     const requestContext = await request.newContext();
     const fileId = fileIds['ui_deleted.txt'];
@@ -160,8 +330,8 @@ test.describe('Discrepancies', () => {
     await expect(page.getByText('Files missing from disk or confirmed deleted')).toBeVisible();
 
     console.log('Step 3: Verify summary cards are visible');
-    await expect(page.getByText('Confirmed deleted', { exact: true })).toBeVisible();
-    await expect(page.getByText('Missing from disk', { exact: true })).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: 'Missing from disk' }).first()).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: 'Pending confirmation' }).first()).toBeVisible();
 
     await requestContext.dispose();
   });

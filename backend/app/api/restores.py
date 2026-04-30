@@ -64,6 +64,10 @@ class DirectoryCartRequest(BaseModel):
     path: str
 
 
+class BatchCartRequest(BaseModel):
+    ids: List[int]
+
+
 # --- Endpoints ---
 
 
@@ -158,6 +162,42 @@ def add_file_to_recovery_queue(file_id: int, db_session: Session = Depends(get_d
     db_session.add(new_queue_item)
     db_session.commit()
     return {"message": "Added to recovery queue."}
+
+
+@router.post("/queue/batch")
+def batch_add_to_recovery_queue(
+    request: BatchCartRequest, db_session: Session = Depends(get_db)
+):
+    """Adds multiple files to the recovery queue if they have valid backups."""
+    now = datetime.now(timezone.utc)
+    added_count = 0
+    skipped_count = 0
+
+    for file_id in request.ids:
+        existing_item = (
+            db_session.query(models.RestoreCart)
+            .filter(models.RestoreCart.filesystem_state_id == file_id)
+            .first()
+        )
+        if existing_item:
+            skipped_count += 1
+            continue
+
+        file_record = db_session.get(models.FilesystemState, file_id)
+        if not file_record or file_record.is_deleted or not file_record.versions:
+            skipped_count += 1
+            continue
+
+        new_queue_item = models.RestoreCart(filesystem_state_id=file_id, created_at=now)
+        db_session.add(new_queue_item)
+        added_count += 1
+
+    db_session.commit()
+    return {
+        "message": f"{added_count} item(s) added to recovery queue.",
+        "added": added_count,
+        "skipped": skipped_count,
+    }
 
 
 @router.delete("/queue/item/{item_id}")

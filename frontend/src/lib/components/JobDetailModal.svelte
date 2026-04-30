@@ -1,11 +1,11 @@
 <script lang="ts">
+    import { onMount, onDestroy } from 'svelte';
     import { X, Activity, Search, Play, RotateCw, Clock, CheckCircle2, AlertCircle, FileText, Database, HardDrive, MapPin, ExternalLink, ArrowRight, Terminal } from 'lucide-svelte';
     import { Button } from './ui/button';
     import { Card } from './ui/card';
     import Dialog from './ui/Dialog.svelte';
     import { getJobDetailSystemJobsJobIdGet, getJobLogsSystemJobsJobIdLogsGet, type AppApiSystemJobSchema } from '$lib/api';
     import { cn, formatLocalTime, formatLocalDateTime, parseUTCDate } from '$lib/utils';
-    import { onMount } from 'svelte';
 
     let { jobId, onClear } = $props<{
         jobId: number;
@@ -15,6 +15,7 @@
     let job = $state<AppApiSystemJobSchema | null>(null);
     let logs = $state<{ id: number; message: string; timestamp: string }[]>([]);
     let loading = $state(true);
+    let pollInterval: any;
 
     async function loadJob() {
         loading = true;
@@ -29,6 +30,28 @@
             console.error("Failed to load job details:", error);
         } finally {
             loading = false;
+        }
+    }
+
+    async function pollJob() {
+        if (!job || (job.status !== 'RUNNING' && job.status !== 'PENDING')) return;
+
+        try {
+            const [jobRes, logsRes] = await Promise.all([
+                getJobDetailSystemJobsJobIdGet({ path: { job_id: jobId } }),
+                getJobLogsSystemJobsJobIdLogsGet({ path: { job_id: jobId } })
+            ]);
+            if (jobRes.data) {
+                const wasRunning = job.status === 'RUNNING' || job.status === 'PENDING';
+                job = jobRes.data;
+                if (!wasRunning && job.status !== 'RUNNING' && job.status !== 'PENDING') {
+                    // Job just finished, stop polling
+                    if (pollInterval) clearInterval(pollInterval);
+                }
+            }
+            if (logsRes.data) logs = logsRes.data;
+        } catch (error) {
+            // Silently fail
         }
     }
 
@@ -51,7 +74,14 @@
         return date.toLocaleTimeString();
     }
 
-    onMount(loadJob);
+    onMount(() => {
+        loadJob();
+        pollInterval = setInterval(pollJob, 2000);
+    });
+
+    onDestroy(() => {
+        if (pollInterval) clearInterval(pollInterval);
+    });
 </script>
 
 <Dialog show={true} onClose={onClear} ariaLabelledBy="modal-title">
@@ -80,6 +110,9 @@
                                     job.status === 'FAILED' ? 'text-error-color border-error-color/20 bg-error-color/5' :
                                     'text-blue-400 border-blue-500/20 bg-blue-500/5'
                                 )}>{job.status}</span>
+                                {#if job.status === 'RUNNING' || job.status === 'PENDING'}
+                                    <span class="text-[10px] font-medium mono text-blue-400 ml-1">{job.progress.toFixed(1)}%</span>
+                                {/if}
                             </div>
                             <p class="text-xs text-text-secondary opacity-60">Execution timeline & artifacts</p>
                         </div>
@@ -104,15 +137,31 @@
                     </div>
                     <div class="p-4 bg-bg-primary/40 border border-border-color/60 rounded-xl">
                         <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-1 uppercase tracking-wider">End time</span>
-                        <span class="text-sm font-semibold text-text-primary mono">{formatLocalDateTime(job.completed_at)}</span>
+                        <span class="text-sm font-semibold text-text-primary mono">{formatLocalDateTime(job.completed_at) || '--'}</span>
                     </div>
                 </div>
+
+                <!-- Progress bar for running jobs -->
+                {#if job.status === 'RUNNING' || job.status === 'PENDING'}
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-text-secondary">{job.latest_log || job.current_task || 'Starting...'}</span>
+                            <span class="mono font-medium text-text-primary">{job.progress.toFixed(1)}%</span>
+                        </div>
+                        <div class="w-full bg-bg-primary h-2 rounded-full overflow-hidden">
+                            <div class="bg-blue-500 h-full transition-all duration-1000" style="width: {job.progress}%"></div>
+                        </div>
+                    </div>
+                {/if}
 
                 <!-- Execution Log -->
                 <div class="space-y-4">
                     <div class="flex items-center gap-2 px-1">
                         <Terminal size={14} class="text-text-secondary opacity-50" />
                         <h3 class="text-[10px] font-medium text-text-secondary uppercase tracking-wider">Execution log</h3>
+                        {#if job.status === 'RUNNING' || job.status === 'PENDING'}
+                            <div class="ml-auto w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                        {/if}
                     </div>
 
                     {#if logs.length > 0}

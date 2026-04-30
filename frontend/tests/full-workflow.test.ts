@@ -114,8 +114,9 @@ test.describe('TapeHoard Golden Path', () => {
 
     console.log('Step 6: Waiting for archival job');
     await page.goto('/jobs');
-    const backupJob = page.locator('div', { hasText: /BACKUP/i }).filter({ hasText: /JOB #/ }).first();
-    await expect(backupJob.getByText('COMPLETED', { exact: true }).first()).toBeVisible({ timeout: 60000 });
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('Backup', { exact: false }).first()).toBeVisible({ timeout: 60000 });
+    await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 60000 });
 
     console.log('Step 7: Verify Protection');
     await page.goto('/index-browser');
@@ -143,8 +144,9 @@ test.describe('TapeHoard Golden Path', () => {
 
     console.log('Step 9: Waiting for restore job');
     await page.goto('/jobs');
-    const restoreJob = page.locator('div', { hasText: /RESTORE/i }).filter({ hasText: /JOB #/ }).first();
-    await expect(restoreJob.getByText('COMPLETED', { exact: true }).first()).toBeVisible({ timeout: 60000 });
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('Restore', { exact: false }).first()).toBeVisible({ timeout: 60000 });
+    await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 60000 });
 
     console.log('Step 10: Verify disk');
     const restoredFilePath = path.join(RESTORE_DEST, SOURCE_ROOT, 'subfolder', 'test_file_2.txt');

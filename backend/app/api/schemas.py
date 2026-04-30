@@ -36,6 +36,11 @@ class DiscrepancySchema(BaseModel):
     has_versions: bool = False
 
 
+class BatchDiscrepancyAction(BaseModel):
+    ids: Optional[List[int]] = None
+    path_prefix: Optional[str] = None
+
+
 class MediaSchema(BaseModel):
     id: int
     identifier: str

@@ -6,42 +6,75 @@
         FileQuestion,
         RotateCw,
         Check,
-        Trash2,
         ShieldCheck,
-        EyeOff
+        EyeOff,
+        FolderOpen,
+        X,
+        ChevronDown,
+        ChevronRight,
+        HardDriveDownload
     } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import PageHeader from '$lib/components/ui/PageHeader.svelte';
+    import SectionHeader from '$lib/components/ui/SectionHeader.svelte';
     import { Card } from '$lib/components/ui/card';
     import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
-    import { cn, formatLocalDate, formatLocalTime } from '$lib/utils';
+    import StatCard from '$lib/components/ui/StatCard.svelte';
+    import EmptyState from '$lib/components/ui/EmptyState.svelte';
+    import { cn, formatLocalDate } from '$lib/utils';
     import { toast } from 'svelte-sonner';
-    import { client } from '$lib/api/client.gen';
+    import {
+        listDiscrepanciesSystemDiscrepanciesGet,
+        confirmFileDeletedSystemDiscrepanciesFileIdConfirmPost,
+        dismissDiscrepancySystemDiscrepanciesFileIdDismissPost,
+        batchConfirmDeletedSystemDiscrepanciesBatchConfirmPost,
+        batchDismissSystemDiscrepanciesBatchDismissPost,
+        batchHardDeleteSystemDiscrepanciesBatchDeletePost,
+        addFileToRecoveryQueueRestoresQueueFileFileIdPost,
+        batchAddToRecoveryQueueRestoresQueueBatchPost,
+        type DiscrepancySchema
+    } from '$lib/api';
 
-    interface Discrepancy {
-        id: number;
-        path: string;
-        size: number;
-        mtime: string;
-        last_seen_timestamp: string | null;
-        sha256_hash: string | null;
-        is_deleted: boolean;
-        has_versions: boolean;
+    interface GroupedItem {
+        directory: string;
+        items: DiscrepancySchema[];
     }
 
-    let discrepancies = $state<Discrepancy[]>([]);
+    let discrepancies = $state<DiscrepancySchema[]>([]);
     let loading = $state(true);
     let confirming = $state<number | null>(null);
-    let dismissing = $state<number | null>(null);
-    let deleting = $state<number | null>(null);
+    let acknowledging = $state<number | null>(null);
+    let recovering = $state<number | null>(null);
+    let selectedIds = $state<Set<number>>(new Set());
+    let batchAction = $state<'confirm' | 'acknowledge' | 'recover' | null>(null);
+    let batchLoading = $state(false);
+    let collapsedDirs = $state<Record<string, boolean>>({});
+
+    function toggleCollapse(dir: string) {
+        collapsedDirs[dir] = !collapsedDirs[dir];
+    }
+
+    const groupedItems = $derived.by(() => {
+        collapsedDirs;
+        const map = new Map<string, DiscrepancySchema[]>();
+        for (const d of discrepancies) {
+            const parts = d.path.split('/');
+            const dir = parts.length > 1 ? parts.slice(0, -1).join('/') : '/';
+            if (!map.has(dir)) map.set(dir, []);
+            map.get(dir)!.push(d);
+        }
+        const result: GroupedItem[] = [];
+        for (const [dir, items] of map) {
+            result.push({ directory: dir, items });
+        }
+        result.sort((a, b) => a.directory.localeCompare(b.directory));
+        return result;
+    });
 
     async function loadDiscrepancies() {
         loading = true;
         try {
-            const response = await client.request<Discrepancy[]>({
-                method: 'GET',
-                url: '/system/discrepancies'
-            });
+            const response = await listDiscrepanciesSystemDiscrepanciesGet();
             if (response.data) {
                 discrepancies = response.data;
             }
@@ -56,11 +89,10 @@
     async function confirmDeleted(id: number) {
         confirming = id;
         try {
-            await client.request({
-                method: 'POST',
-                url: `/system/discrepancies/${id}/confirm`
+            await confirmFileDeletedSystemDiscrepanciesFileIdConfirmPost({
+                path: { file_id: id }
             });
-            toast.success("File marked as confirmed deleted");
+            toast.success("File confirmed deleted");
             await loadDiscrepancies();
         } catch (error: any) {
             toast.error(error.body?.detail || "Failed to confirm deletion");
@@ -69,37 +101,117 @@
         }
     }
 
-    async function dismiss(id: number) {
-        dismissing = id;
+    async function acknowledgeLoss(id: number) {
+        acknowledging = id;
         try {
-            await client.request({
-                method: 'POST',
-                url: `/system/discrepancies/${id}/dismiss`
+            await dismissDiscrepancySystemDiscrepanciesFileIdDismissPost({
+                path: { file_id: id }
             });
-            toast.success("Discrepancy dismissed");
+            toast.success("Loss acknowledged");
             await loadDiscrepancies();
         } catch (error: any) {
-            toast.error(error.body?.detail || "Failed to dismiss discrepancy");
+            toast.error(error.body?.detail || "Failed to acknowledge loss");
         } finally {
-            dismissing = null;
+            acknowledging = null;
         }
     }
 
-    async function hardDelete(id: number) {
-        deleting = id;
+    async function addToRecoveryQueue(id: number) {
+        recovering = id;
         try {
-            await client.request({
-                method: 'DELETE',
-                url: `/system/discrepancies/${id}`
+            await addFileToRecoveryQueueRestoresQueueFileFileIdPost({
+                path: { file_id: id }
             });
-            toast.success("File record permanently deleted");
+            toast.success("Added to recovery queue");
             await loadDiscrepancies();
         } catch (error: any) {
-            toast.error(error.body?.detail || "Failed to delete record");
+            toast.error(error.body?.detail || "Failed to add to recovery queue");
         } finally {
-            deleting = null;
+            recovering = null;
         }
     }
+
+    async function executeBatchAction() {
+        if (!batchAction || selectedIds.size === 0) return;
+        batchLoading = true;
+        const ids = Array.from(selectedIds);
+        try {
+            if (batchAction === 'recover') {
+                await batchAddToRecoveryQueueRestoresQueueBatchPost({
+                    body: { ids }
+                });
+                toast.success(`${selectedIds.size} file(s) added to recovery queue`);
+            } else if (batchAction === 'confirm') {
+                await batchConfirmDeletedSystemDiscrepanciesBatchConfirmPost({
+                    body: { ids }
+                });
+                toast.success(`${selectedIds.size} file(s) confirmed deleted`);
+            } else {
+                await batchDismissSystemDiscrepanciesBatchDismissPost({
+                    body: { ids }
+                });
+                toast.success(`${selectedIds.size} file(s) acknowledged as lost`);
+            }
+            selectedIds = new Set();
+            batchAction = null;
+            await loadDiscrepancies();
+        } catch (error: any) {
+            toast.error(error.body?.detail || "Batch action failed");
+        } finally {
+            batchLoading = false;
+        }
+    }
+
+    function toggleSelect(id: number) {
+        const next = new Set(selectedIds);
+        if (next.has(id)) {
+            next.delete(id);
+        } else {
+            next.add(id);
+        }
+        selectedIds = next;
+    }
+
+    function selectAllInGroup(items: DiscrepancySchema[]) {
+        const next = new Set(selectedIds);
+        const allSelected = items.every(i => next.has(i.id));
+        if (allSelected) {
+            items.forEach(i => next.delete(i.id));
+        } else {
+            items.forEach(i => next.add(i.id));
+        }
+        selectedIds = next;
+    }
+
+    function selectAllMissing() {
+        const ids = missingItems.map(d => d.id);
+        const allSelected = ids.every(id => selectedIds.has(id));
+        if (allSelected) {
+            ids.forEach(id => selectedIds.delete(id));
+        } else {
+            ids.forEach(id => selectedIds.add(id));
+        }
+        selectedIds = new Set(selectedIds);
+    }
+
+    function selectAllPending() {
+        const ids = pendingItems.map(d => d.id);
+        const allSelected = ids.every(id => selectedIds.has(id));
+        if (allSelected) {
+            ids.forEach(id => selectedIds.delete(id));
+        } else {
+            ids.forEach(id => selectedIds.add(id));
+        }
+        selectedIds = new Set(selectedIds);
+    }
+
+    function clearSelection() {
+        selectedIds = new Set();
+    }
+
+    const selectedItems = $derived(discrepancies.filter(d => selectedIds.has(d.id)));
+    const selectedWithBackups = $derived(selectedItems.filter(d => d.has_versions));
+    const selectedWithoutBackups = $derived(selectedItems.filter(d => !d.has_versions));
 
     function formatSize(bytes: number) {
         if (bytes === 0) return "0 B";
@@ -113,23 +225,23 @@
         return `${size.toFixed(1)} ${units[unitIndex]}`;
     }
 
-    function formatPath(path: string, maxLength = 70) {
-        if (path.length <= maxLength) return { head: path, tail: null };
+    function formatPath(path: string) {
         const parts = path.split('/');
-        if (parts.length <= 3) return { head: path, tail: null };
-
+        if (parts.length <= 3) return path;
         const headParts = parts.slice(0, -2);
         const tailParts = parts.slice(-2);
-        const head = headParts.join('/');
-        const tail = tailParts.join('/');
-
-        return { head, tail };
+        return {
+            head: headParts.join('/'),
+            tail: tailParts.join('/')
+        };
     }
 
     onMount(loadDiscrepancies);
 
     const missingItems = $derived(discrepancies.filter(d => d.is_deleted));
     const pendingItems = $derived(discrepancies.filter(d => !d.is_deleted));
+    const allMissingSelected = $derived(missingItems.length > 0 && missingItems.every(d => selectedIds.has(d.id)));
+    const allPendingSelected = $derived(pendingItems.length > 0 && pendingItems.every(d => selectedIds.has(d.id)));
 </script>
 
 <svelte:head>
@@ -143,195 +255,416 @@
         icon={AlertTriangle}
     >
         {#snippet actions()}
-            <Button variant="outline" onclick={loadDiscrepancies}>
-                <RotateCw size={14} class={cn("mr-2", loading && "animate-spin")} /> Refresh
+            <div class="flex items-center gap-2 px-3 py-1.5 bg-bg-primary/50 rounded-lg border border-border-color shadow-inner">
+                <div class="w-2 h-2 rounded-full {discrepancies.length > 0 ? 'bg-error-color animate-pulse' : 'opacity-20 bg-text-secondary'}"></div>
+                <span class="text-[10px] font-medium text-text-secondary uppercase tracking-wider">
+                    {discrepancies.length} found
+                </span>
+            </div>
+            <Button variant="outline" size="icon" onclick={loadDiscrepancies} disabled={loading}>
+                <RotateCw size={16} class={loading ? 'animate-spin' : ''} />
             </Button>
         {/snippet}
     </PageHeader>
 
     {#if loading && discrepancies.length === 0}
-        <div class="space-y-6">
-            <div class="h-40 bg-bg-secondary animate-pulse rounded-xl border border-border-color/50"></div>
-            <div class="h-64 bg-bg-secondary animate-pulse rounded-xl border border-border-color/50"></div>
+        <div class="grid grid-cols-2 gap-3">
+            <div class="h-20 bg-bg-secondary animate-pulse rounded-xl border border-border-color/50"></div>
+            <div class="h-20 bg-bg-secondary animate-pulse rounded-xl border border-border-color/50"></div>
         </div>
+        <div class="h-64 bg-bg-secondary animate-pulse rounded-xl border border-border-color/50"></div>
     {:else if discrepancies.length === 0}
-        <Card class="p-12 bg-bg-secondary border-border-color shadow-xl flex flex-col items-center justify-center text-center">
-            <div class="w-16 h-16 bg-success-color/10 rounded-2xl flex items-center justify-center text-success-color mb-6">
-                <ShieldCheck size={32} />
-            </div>
-            <h3 class="text-xl font-bold text-text-primary mb-2">All clear</h3>
-            <p class="text-sm text-text-secondary opacity-60">
-                No discrepancies detected. All tracked files are present on disk.
-            </p>
-        </Card>
+        <EmptyState
+            icon={ShieldCheck}
+            title="All clear"
+            description="No discrepancies detected. All tracked files are present on disk."
+        />
     {:else}
-        <div class="space-y-6">
-            <!-- Summary Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card class="p-6 bg-bg-secondary border-border-color shadow-xl">
-                    <div class="flex items-start gap-4">
-                        <div class="w-10 h-10 bg-error-color/10 rounded-xl flex items-center justify-center text-error-color shrink-0">
-                            <FileX size={20} />
-                        </div>
-                        <div class="flex-1">
-                            <span class="text-xs text-text-secondary opacity-60 block mb-1">Missing from disk</span>
-                            <h4 class="text-2xl font-bold text-error-color mono tabular-nums">{missingItems.length}</h4>
-                            <p class="text-[10px] font-medium text-text-secondary uppercase opacity-40 mt-1">Files the scanner did not find</p>
-                        </div>
-                    </div>
-                </Card>
+        <!-- Summary Statistics -->
+        <div class="grid grid-cols-2 gap-3">
+            <StatCard label="Missing from disk" value={missingItems.length} subLabel="Files the scanner did not find" variant="error" />
+            <StatCard label="Pending confirmation" value={pendingItems.length} subLabel="Tracked files not yet confirmed" variant="warning" />
+        </div>
 
-                <Card class="p-6 bg-bg-secondary border-border-color shadow-xl">
-                    <div class="flex items-start gap-4">
-                        <div class="w-10 h-10 bg-yellow-500/10 rounded-xl flex items-center justify-center text-yellow-500 shrink-0">
-                            <FileQuestion size={20} />
-                        </div>
-                        <div class="flex-1">
-                            <span class="text-xs text-text-secondary opacity-60 block mb-1">Pending confirmation</span>
-                            <h4 class="text-2xl font-bold text-yellow-500 mono tabular-nums">{pendingItems.length}</h4>
-                            <p class="text-[10px] font-medium text-text-secondary uppercase opacity-40 mt-1">Tracked files not yet confirmed</p>
-                        </div>
-                    </div>
-                </Card>
-            </div>
+        <!-- Batch Selection Toolbar -->
+        {#if selectedIds.size > 0}
+            <Card class="p-4 bg-blue-500/10 border-blue-500/30 flex items-center gap-4">
+                <span class="text-sm font-medium text-blue-400">
+                    {selectedIds.size} file(s) selected
+                    {#if selectedWithBackups.length > 0 && selectedWithoutBackups.length > 0}
+                        <span class="opacity-60">
+                            ({selectedWithBackups.length} backed up, {selectedWithoutBackups.length} no backup)
+                        </span>
+                    {/if}
+                </span>
+                <div class="flex-1"></div>
+                {#if selectedWithBackups.length > 0}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="h-8 text-xs border-error-color/30 text-error-color hover:bg-error-color/10"
+                        onclick={() => batchAction = 'confirm'}
+                    >
+                        <FileX size={12} class="mr-1.5" /> Confirm delete
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="h-8 text-xs border-success-color/30 text-success-color hover:bg-success-color/10"
+                        onclick={() => batchAction = 'recover'}
+                    >
+                        <HardDriveDownload size={12} class="mr-1.5" /> Add to recovery
+                    </Button>
+                {/if}
+                {#if selectedWithoutBackups.length > 0}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="h-8 text-xs border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
+                        onclick={() => batchAction = 'acknowledge'}
+                    >
+                        <ShieldCheck size={12} class="mr-1.5" /> Acknowledge loss
+                    </Button>
+                {/if}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    class="h-8 text-xs text-text-secondary"
+                    onclick={clearSelection}
+                >
+                    <X size={12} class="mr-1.5" /> Clear
+                </Button>
+            </Card>
+        {/if}
 
-            <!-- Discrepancy List -->
-            <Card class="bg-bg-secondary border-border-color shadow-xl overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="border-b border-border-color/30">
-                                <th class="text-left text-4xs font-bold uppercase text-text-secondary opacity-40 px-6 py-3 tracking-wider">Status</th>
-                                <th class="text-left text-4xs font-bold uppercase text-text-secondary opacity-40 px-6 py-3 tracking-wider">File path</th>
-                                <th class="text-right text-4xs font-bold uppercase text-text-secondary opacity-40 px-6 py-3 tracking-wider">Size</th>
-                                <th class="text-left text-4xs font-bold uppercase text-text-secondary opacity-40 px-6 py-3 tracking-wider">Last seen</th>
-                                <th class="text-center text-4xs font-bold uppercase text-text-secondary opacity-40 px-6 py-3 tracking-wider">Backed up</th>
-                                <th class="text-right text-4xs font-bold uppercase text-text-secondary opacity-40 px-6 py-3 tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {#each discrepancies as item (item.id)}
-                                {@const path = formatPath(item.path)}
-                                <tr class="border-b border-border-color/10 hover:bg-white/[0.02] transition-colors group">
-                                    <td class="px-6 py-4 align-top">
-                                        {#if item.is_deleted}
-                                            <StatusBadge variant="error">Missing</StatusBadge>
-                                        {:else}
-                                            <StatusBadge variant="warning">Pending</StatusBadge>
-                                        {/if}
-                                    </td>
-                                    <td class="px-6 py-4 align-top">
-                                        <div class="max-w-[500px]">
-                                            {#if path.tail}
-                                                <div class="flex flex-col gap-0.5">
-                                                    <span class="text-xs font-medium text-text-secondary mono leading-tight" title={item.path}>
-                                                        {path.head}
-                                                    </span>
-                                                    <span class="text-sm font-medium text-text-primary mono leading-tight" title={item.path}>
-                                                        {path.tail}
-                                                    </span>
-                                                </div>
-                                            {:else}
-                                                <span class="text-sm font-medium text-text-primary mono truncate block" title={item.path}>
-                                                    {path.head}
-                                                </span>
-                                            {/if}
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 text-right align-top">
-                                        <span class="text-xs text-text-secondary mono">{formatSize(item.size)}</span>
-                                    </td>
-                                    <td class="px-6 py-4 align-top">
-                                        <span class="text-xs text-text-secondary mono">
-                                            {#if item.last_seen_timestamp}
-                                                {formatLocalDate(item.last_seen_timestamp)}
-                                            {:else}
-                                                —
-                                            {/if}
-                                        </span>
-                                    </td>
-                                    <td class="px-6 py-4 text-center align-top">
-                                        {#if item.has_versions}
-                                            <div class="inline-flex items-center gap-1.5 text-success-color">
-                                                <ShieldCheck size={14} />
-                                                <span class="text-xs font-medium">Yes</span>
-                                            </div>
-                                        {:else}
-                                            <div class="inline-flex items-center gap-1.5 text-text-secondary opacity-40">
-                                                <EyeOff size={14} />
-                                                <span class="text-xs font-medium">No</span>
-                                            </div>
-                                        {/if}
-                                    </td>
-                                    <td class="px-6 py-4 align-top">
-                                        <div class="flex items-center justify-end gap-2 pt-1">
-                                            {#if item.is_deleted}
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    class="h-7 px-2 text-xs text-text-secondary hover:text-success-color"
-                                                    onclick={() => dismiss(item.id)}
-                                                    disabled={dismissing === item.id || confirming === item.id || deleting === item.id}
-                                                >
-                                                    {#if dismissing === item.id}
-                                                        <RotateCw size={12} class="animate-spin" />
-                                                    {:else}
-                                                        <Check size={12} />
-                                                    {/if}
-                                                    <span class="ml-1">Dismiss</span>
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    class="h-7 px-2 text-xs text-text-secondary hover:text-error-color"
-                                                    onclick={() => hardDelete(item.id)}
-                                                    disabled={dismissing === item.id || confirming === item.id || deleting === item.id}
-                                                >
-                                                    {#if deleting === item.id}
-                                                        <RotateCw size={12} class="animate-spin" />
-                                                    {:else}
-                                                        <Trash2 size={12} />
-                                                    {/if}
-                                                    <span class="ml-1">Purge</span>
-                                                </Button>
-                                            {:else}
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    class="h-7 px-2 text-xs text-text-secondary hover:text-error-color"
-                                                    onclick={() => confirmDeleted(item.id)}
-                                                    disabled={dismissing === item.id || confirming === item.id || deleting === item.id}
-                                                >
-                                                    {#if confirming === item.id}
-                                                        <RotateCw size={12} class="animate-spin" />
-                                                    {:else}
-                                                        <FileX size={12} />
-                                                    {/if}
-                                                    <span class="ml-1">Confirm</span>
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    class="h-7 px-2 text-xs text-text-secondary hover:text-success-color"
-                                                    onclick={() => dismiss(item.id)}
-                                                    disabled={dismissing === item.id || confirming === item.id || deleting === item.id}
-                                                >
-                                                    {#if dismissing === item.id}
-                                                        <RotateCw size={12} class="animate-spin" />
-                                                    {:else}
-                                                        <Check size={12} />
-                                                    {/if}
-                                                    <span class="ml-1">Dismiss</span>
-                                                </Button>
-                                            {/if}
-                                        </div>
-                                    </td>
-                                </tr>
-                            {/each}
-                        </tbody>
-                    </table>
+        <!-- Batch Action Confirmation -->
+        {#if batchAction}
+            <Card class="p-6 bg-bg-secondary border-border-color">
+                <div class="flex items-center justify-between">
+                    <div>
+                        {#if batchAction === 'confirm'}
+                            <h4 class="text-sm font-bold text-error-color">
+                                Confirm {selectedWithBackups.length} file(s) as deleted?
+                            </h4>
+                            <p class="text-xs text-text-secondary opacity-60 mt-1">
+                                These files have backed up versions on archive media. This marks them as intentionally deleted.
+                            </p>
+                        {:else if batchAction === 'recover'}
+                            <h4 class="text-sm font-bold text-success-color">
+                                Add {selectedWithBackups.length} file(s) to recovery queue?
+                            </h4>
+                            <p class="text-xs text-text-secondary opacity-60 mt-1">
+                                These files will be queued for restoration from archive media.
+                            </p>
+                        {:else}
+                            <h4 class="text-sm font-bold text-yellow-400">
+                                Acknowledge loss of {selectedWithoutBackups.length} file(s)?
+                            </h4>
+                            <p class="text-xs text-text-secondary opacity-60 mt-1">
+                                These files have no backup on archive media. They will be marked as acknowledged lost.
+                            </p>
+                        {/if}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onclick={() => batchAction = null}>
+                            Cancel
+                        </Button>
+                        <Button
+                            size="sm"
+                            class={cn(
+                                batchAction === 'recover' && 'bg-success-color hover:bg-success-color/90',
+                                batchAction === 'confirm' && 'bg-error-color hover:bg-error-color/90',
+                                batchAction === 'acknowledge' && 'bg-yellow-500 hover:bg-yellow-500/90 text-black'
+                            )}
+                            onclick={executeBatchAction}
+                            disabled={batchLoading}
+                        >
+                            {#if batchLoading}
+                                <RotateCw size={14} class="mr-2 animate-spin" />
+                            {/if}
+                            {#if batchAction === 'confirm'}
+                                Confirm delete
+                            {:else if batchAction === 'recover'}
+                                Add to recovery
+                            {:else}
+                                Acknowledge loss
+                            {/if}
+                        </Button>
+                    </div>
                 </div>
             </Card>
+        {/if}
+
+        <div class="space-y-8">
+            <!-- MISSING ITEMS SECTION -->
+            {#if missingItems.length > 0}
+                <section class="space-y-4">
+                    <div class="flex items-center gap-3">
+                        <SectionHeader title="Missing from disk" icon={FileX} iconColor="text-error-color" class="flex-1" />
+                        <button
+                            class="text-[10px] font-medium text-text-secondary uppercase tracking-wider hover:text-text-primary transition-colors px-2"
+                            onclick={selectAllMissing}
+                        >
+                            {allMissingSelected ? 'Deselect all' : 'Select all'}
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3">
+                        {#each groupedItems.filter(g => g.items.some(i => i.is_deleted)) as group}
+                            <div class="space-y-2">
+                                <div class="flex items-center gap-2 px-1">
+                                    <button
+                                        class="flex items-center gap-2 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
+                                        onclick={() => toggleCollapse('missing-' + group.directory)}
+                                    >
+                                        {#if collapsedDirs['missing-' + group.directory]}
+                                            <ChevronRight size={14} />
+                                        {:else}
+                                            <ChevronDown size={14} />
+                                        {/if}
+                                        <FolderOpen size={14} />
+                                        <span class="mono text-xs">{group.directory}</span>
+                                        <span class="text-[10px] font-normal opacity-40">({group.items.filter(i => i.is_deleted).length})</span>
+                                    </button>
+                                    <button
+                                        class="text-[10px] text-text-secondary opacity-40 hover:opacity-70 hover:text-text-primary transition-colors ml-auto"
+                                        onclick={() => selectAllInGroup(group.items.filter(i => i.is_deleted))}
+                                    >
+                                        {group.items.filter(i => i.is_deleted).every(i => selectedIds.has(i.id)) ? 'Deselect group' : 'Select group'}
+                                    </button>
+                                </div>
+
+                                {#if !collapsedDirs['missing-' + group.directory]}
+                                    {#each group.items.filter(i => i.is_deleted) as item (item.id)}
+                                        {@const path = formatPath(item.path)}
+                                        <Card class="px-5 py-3 bg-bg-secondary/40 border-border-color/40 hover:bg-bg-secondary transition-colors group">
+                                            <div class="flex items-center gap-4">
+                                                <input
+                                                    type="checkbox"
+                                                    class="rounded border-border-color/30 bg-transparent cursor-pointer shrink-0"
+                                                    checked={selectedIds.has(item.id)}
+                                                    onchange={(e) => e.currentTarget.checked ? toggleSelect(item.id) : toggleSelect(item.id)}
+                                                />
+
+                                                <StatusBadge variant="error">Missing</StatusBadge>
+
+                                                <div class="flex-1 min-w-0">
+                                                    {#if typeof path === 'string'}
+                                                        <span class="text-sm font-medium text-text-primary mono truncate block" title={item.path}>
+                                                            {path}
+                                                        </span>
+                                                    {:else}
+                                                        <div class="flex flex-col gap-0.5">
+                                                            <span class="text-xs font-medium text-text-secondary mono leading-tight" title={item.path}>
+                                                                {path.head}
+                                                            </span>
+                                                            <span class="text-sm font-medium text-text-primary mono leading-tight" title={item.path}>
+                                                                {path.tail}
+                                                            </span>
+                                                        </div>
+                                                    {/if}
+                                                    <p class="text-xs text-text-secondary mt-0.5 opacity-60">{formatSize(item.size)} · Last seen: {item.last_seen_timestamp ? formatLocalDate(item.last_seen_timestamp) : '—'}</p>
+                                                </div>
+
+                                                <div class="flex items-center gap-1.5 shrink-0">
+                                                    {#if item.has_versions}
+                                                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-success-color/10 text-success-color">
+                                                            <ShieldCheck size={11} />
+                                                            <span class="text-[10px] font-medium">On archive</span>
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            class="h-8 w-8 text-error-color hover:bg-error-color/10 opacity-40 group-hover:opacity-100 transition-opacity"
+                                                            onclick={() => confirmDeleted(item.id)}
+                                                            disabled={confirming === item.id}
+                                                            title="Confirm delete"
+                                                        >
+                                                            {#if confirming === item.id}
+                                                                <RotateCw size={14} class="animate-spin" />
+                                                            {:else}
+                                                                <FileX size={14} />
+                                                            {/if}
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            class="h-8 w-8 text-success-color hover:bg-success-color/10 opacity-40 group-hover:opacity-100 transition-opacity"
+                                                            onclick={() => addToRecoveryQueue(item.id)}
+                                                            disabled={recovering === item.id}
+                                                            title="Add to recovery queue"
+                                                        >
+                                                            {#if recovering === item.id}
+                                                                <RotateCw size={14} class="animate-spin" />
+                                                            {:else}
+                                                                <HardDriveDownload size={14} />
+                                                            {/if}
+                                                        </Button>
+                                                    {:else}
+                                                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 text-yellow-500">
+                                                            <EyeOff size={11} />
+                                                            <span class="text-[10px] font-medium">No backup</span>
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            class="h-8 w-8 text-yellow-500 hover:bg-yellow-500/10 opacity-40 group-hover:opacity-100 transition-opacity"
+                                                            onclick={() => acknowledgeLoss(item.id)}
+                                                            disabled={acknowledging === item.id}
+                                                            title="Acknowledge loss"
+                                                        >
+                                                            {#if acknowledging === item.id}
+                                                                <RotateCw size={14} class="animate-spin" />
+                                                            {:else}
+                                                                <ShieldCheck size={14} />
+                                                            {/if}
+                                                        </Button>
+                                                    {/if}
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    {/each}
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
+                </section>
+            {/if}
+
+            <!-- PENDING ITEMS SECTION -->
+            {#if pendingItems.length > 0}
+                <section class="space-y-4">
+                    <div class="flex items-center gap-3">
+                        <SectionHeader title="Pending confirmation" icon={FileQuestion} iconColor="text-yellow-500" class="flex-1" />
+                        <button
+                            class="text-[10px] font-medium text-text-secondary uppercase tracking-wider hover:text-text-primary transition-colors px-2"
+                            onclick={selectAllPending}
+                        >
+                            {allPendingSelected ? 'Deselect all' : 'Select all'}
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3">
+                        {#each groupedItems.filter(g => g.items.some(i => !i.is_deleted)) as group}
+                            <div class="space-y-2">
+                                <div class="flex items-center gap-2 px-1">
+                                    <button
+                                        class="flex items-center gap-2 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
+                                        onclick={() => toggleCollapse('pending-' + group.directory)}
+                                    >
+                                        {#if collapsedDirs['pending-' + group.directory]}
+                                            <ChevronRight size={14} />
+                                        {:else}
+                                            <ChevronDown size={14} />
+                                        {/if}
+                                        <FolderOpen size={14} />
+                                        <span class="mono text-xs">{group.directory}</span>
+                                        <span class="text-[10px] font-normal opacity-40">({group.items.filter(i => !i.is_deleted).length})</span>
+                                    </button>
+                                    <button
+                                        class="text-[10px] text-text-secondary opacity-40 hover:opacity-70 hover:text-text-primary transition-colors ml-auto"
+                                        onclick={() => selectAllInGroup(group.items.filter(i => !i.is_deleted))}
+                                    >
+                                        {group.items.filter(i => !i.is_deleted).every(i => selectedIds.has(i.id)) ? 'Deselect group' : 'Select group'}
+                                    </button>
+                                </div>
+
+                                {#if !collapsedDirs['pending-' + group.directory]}
+                                    {#each group.items.filter(i => !i.is_deleted) as item (item.id)}
+                                        {@const path = formatPath(item.path)}
+                                        <Card class="px-5 py-3 bg-bg-secondary/40 border-border-color/40 hover:bg-bg-secondary transition-colors group">
+                                            <div class="flex items-center gap-4">
+                                                <input
+                                                    type="checkbox"
+                                                    class="rounded border-border-color/30 bg-transparent cursor-pointer shrink-0"
+                                                    checked={selectedIds.has(item.id)}
+                                                    onchange={(e) => e.currentTarget.checked ? toggleSelect(item.id) : toggleSelect(item.id)}
+                                                />
+
+                                                <StatusBadge variant="warning">Pending</StatusBadge>
+
+                                                <div class="flex-1 min-w-0">
+                                                    {#if typeof path === 'string'}
+                                                        <span class="text-sm font-medium text-text-primary mono truncate block" title={item.path}>
+                                                            {path}
+                                                        </span>
+                                                    {:else}
+                                                        <div class="flex flex-col gap-0.5">
+                                                            <span class="text-xs font-medium text-text-secondary mono leading-tight" title={item.path}>
+                                                                {path.head}
+                                                            </span>
+                                                            <span class="text-sm font-medium text-text-primary mono leading-tight" title={item.path}>
+                                                                {path.tail}
+                                                            </span>
+                                                        </div>
+                                                    {/if}
+                                                    <p class="text-xs text-text-secondary mt-0.5 opacity-60">{formatSize(item.size)}</p>
+                                                </div>
+
+                                                <div class="flex items-center gap-1.5 shrink-0">
+                                                    {#if item.has_versions}
+                                                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-success-color/10 text-success-color">
+                                                            <ShieldCheck size={11} />
+                                                            <span class="text-[10px] font-medium">On archive</span>
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            class="h-8 w-8 text-error-color hover:bg-error-color/10 opacity-40 group-hover:opacity-100 transition-opacity"
+                                                            onclick={() => confirmDeleted(item.id)}
+                                                            disabled={confirming === item.id}
+                                                            title="Confirm delete"
+                                                        >
+                                                            {#if confirming === item.id}
+                                                                <RotateCw size={14} class="animate-spin" />
+                                                            {:else}
+                                                                <FileX size={14} />
+                                                            {/if}
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            class="h-8 w-8 text-success-color hover:bg-success-color/10 opacity-40 group-hover:opacity-100 transition-opacity"
+                                                            onclick={() => addToRecoveryQueue(item.id)}
+                                                            disabled={recovering === item.id}
+                                                            title="Add to recovery queue"
+                                                        >
+                                                            {#if recovering === item.id}
+                                                                <RotateCw size={14} class="animate-spin" />
+                                                            {:else}
+                                                                <HardDriveDownload size={14} />
+                                                            {/if}
+                                                        </Button>
+                                                    {:else}
+                                                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 text-yellow-500">
+                                                            <EyeOff size={11} />
+                                                            <span class="text-[10px] font-medium">No backup</span>
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            class="h-8 w-8 text-yellow-500 hover:bg-yellow-500/10 opacity-40 group-hover:opacity-100 transition-opacity"
+                                                            onclick={() => acknowledgeLoss(item.id)}
+                                                            disabled={acknowledging === item.id}
+                                                            title="Acknowledge loss"
+                                                        >
+                                                            {#if acknowledging === item.id}
+                                                                <RotateCw size={14} class="animate-spin" />
+                                                            {:else}
+                                                                <ShieldCheck size={14} />
+                                                            {/if}
+                                                        </Button>
+                                                    {/if}
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    {/each}
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
+                </section>
+            {/if}
         </div>
     {/if}
 </div>
