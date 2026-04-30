@@ -104,7 +104,7 @@
     async function acknowledgeLoss(id: number) {
         acknowledging = id;
         try {
-            await dismissDiscrepancySystemDiscrepanciesFileIdDismissPost({
+            await confirmFileDeletedSystemDiscrepanciesFileIdConfirmPost({
                 path: { file_id: id }
             });
             toast.success("Loss acknowledged");
@@ -141,16 +141,17 @@
                     body: { ids }
                 });
                 toast.success(`${selectedIds.size} file(s) added to recovery queue`);
-            } else if (batchAction === 'confirm') {
+            } else if (batchAction === 'confirm' || batchAction === 'acknowledge') {
                 await batchConfirmDeletedSystemDiscrepanciesBatchConfirmPost({
                     body: { ids }
                 });
-                toast.success(`${selectedIds.size} file(s) confirmed deleted`);
+                const msg = batchAction === 'confirm' ? 'confirmed deleted' : 'acknowledged as lost';
+                toast.success(`${selectedIds.size} file(s) ${msg}`);
             } else {
                 await batchDismissSystemDiscrepanciesBatchDismissPost({
                     body: { ids }
                 });
-                toast.success(`${selectedIds.size} file(s) acknowledged as lost`);
+                toast.success(`${selectedIds.size} file(s) dismissed`);
             }
             selectedIds = new Set();
             batchAction = null;
