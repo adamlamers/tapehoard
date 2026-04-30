@@ -54,6 +54,11 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
 *   **Concurrent Phasing:** Decoupled into `SCAN` (Metadata, Normal priority) and `HASH` (Content, Idle priority with dynamic `iowait` throttling).
 *   **Thread-Safe Metrics:** All counters (files processed, bytes hashed) must be protected by a `threading.Lock`.
 *   **Hashing Progress:** Hashing jobs calculate progress against a dynamically updating snapshot of total `sha256_hash IS NULL AND is_ignored = 0` files.
+*   **Streaming Subprocess I/O:** Both `_discover_files_fast` (`find -printf`) and `_hash_file_batch_fast` (`sha256sum`/`shasum`) use `subprocess.Popen` with line-by-line `readline` streaming — never `subprocess.run(capture_output=True)`. This enables incremental progress updates as each file is discovered or hashed.
+*   **Streaming Callback Pattern:** The hashing sub-batch workers accept an `on_result(file_path, hex_digest)` callback (created via `_make_hash_callback`) that assigns hashes to DB records and reports job progress with throughput every 5 files, providing responsive UI updates during large batches.
+*   **Partial Batch Results:** `sha256sum`/`shasum` may return non-zero exit codes when some files in a batch are missing. Output is always parsed regardless of returncode to capture partial results.
+*   **Missing File Guard:** Files that cannot be hashed (deleted or inaccessible) are detected via `os.path.exists` fallback and marked `is_deleted = True` to prevent infinite re-query loops in the hashing worker.
+*   **Provider Temp Dir Lifecycle:** `MockLTOProvider` auto-creates temp dirs when no `device_path` is configured. These are tracked in a module-level `_auto_temp_dirs` set and cleaned up via `atexit` on server shutdown. The `device_path` is persisted to `StorageMedia.extra_config` on `/initialize` so background threads can locate the correct directory.
 
 ### Archival & Recovery
 *   **Format Negotiation:** The Archiver adapts formats based on provider capabilities (`supports_random_access`).

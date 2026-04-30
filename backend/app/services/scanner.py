@@ -112,10 +112,47 @@ def _init_fast_features() -> Tuple[Optional[str], Optional[str]]:
 _FAST_FIND_BINARY, _FAST_HASH_BINARY = _init_fast_features()
 
 
+def _make_hash_callback(scanner, path_to_record, job_id, total_pending):
+    """Create a thread-safe callback for streaming hash results.
+
+    Updates metrics, assigns hashes to records, and reports job progress
+    as each file completes.
+    """
+
+    def on_result(file_path, hex_digest):
+        target_record = path_to_record.get(file_path)
+        if target_record and hex_digest:
+            target_record.sha256_hash = hex_digest
+            with scanner._metrics_lock:
+                scanner.bytes_hashed += target_record.size or 0
+                scanner.files_hashed += 1
+                # Report progress incrementally as files complete
+                if scanner.files_hashed % 5 == 0:
+                    progress = min(
+                        99.9,
+                        (scanner.files_hashed / max(total_pending, 1)) * 100,
+                    )
+                    JobManager.update_job(
+                        job_id,
+                        progress,
+                        f"Hashed {scanner.files_hashed} files ({scanner._format_throughput()})...",
+                    )
+
+    return on_result
+
+
 def _hash_file_batch_fast(
-    file_paths: List[str], binary: str
+    file_paths: List[str], binary: str, on_result=None
 ) -> Dict[str, Optional[str]]:
     """Hash a batch of files using a native SHA-256 binary.
+
+    Streams output line-by-line via subprocess.Popen for incremental progress.
+
+    Args:
+        file_paths: Paths to hash.
+        binary: Path to sha256sum or shasum.
+        on_result: Optional callback(file_path, hex_digest) called for each
+                   file as it completes.
 
     Returns a mapping of file_path -> hex_digest (or None on failure).
     """
@@ -132,17 +169,17 @@ def _hash_file_batch_fast(
         cmd = [binary, "-a", "256", "--"] + file_paths
 
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
-            capture_output=True,
-            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
 
-        # Parse output regardless of returncode: sha256sum may succeed for
-        # some files in the batch while failing for others (e.g. deleted),
-        # still emitting hashes for the ones that worked.
-        for line in proc.stdout.split(b"\n"):
-            if not line.strip():
+        # Stream output line-by-line for incremental progress
+        assert proc.stdout is not None
+        for line in iter(proc.stdout.readline, b""):
+            line = line.strip()
+            if not line:
                 continue
             # Format: "<hash>  <path>" or "<hash> *<path>"
             parts = line.split(b"  ", 1)
@@ -159,6 +196,11 @@ def _hash_file_batch_fast(
             clean_path = raw_path.replace("\\\\", "\\")
 
             results[clean_path] = file_hash
+            if on_result is not None:
+                on_result(clean_path, file_hash)
+
+        proc.stdout.close()
+        proc.wait()
 
     except Exception as e:
         logger.error(f"Native hash batch failed: {e}")
@@ -179,6 +221,9 @@ def _discover_files_fast(
 ) -> Tuple[int, int]:
     """Walk a tree using `find -printf` for fast metadata extraction.
 
+    Streams output line-by-line via subprocess.Popen so progress updates
+    appear as files are discovered instead of waiting for find to finish.
+
     Returns (files_found, files_batched) counts.
     """
     total_files_found = 0
@@ -198,23 +243,18 @@ def _discover_files_fast(
     ]
 
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
-            capture_output=True,
-            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
-        stdout = proc.stdout
-        if proc.returncode != 0:
-            logger.warning(
-                f"Fast find exited with code {proc.returncode} for {root_base}"
-            )
-            return 0, 0
+        assert proc.stdout is not None
     except Exception as e:
         logger.error(f"Fast file discovery failed for {root_base}: {e}")
         return 0, 0
 
-    # Process output line by line (tab-separated: path\tsize\tmtime)
-    for line in stdout.split(b"\n"):
+    # Stream output line by line (tab-separated: path\tsize\tmtime)
+    for line in iter(proc.stdout.readline, b""):
         if job_id is not None and JobManager.is_cancelled(job_id):
             break
 
@@ -260,6 +300,9 @@ def _discover_files_fast(
                     10.0,
                     f"Discovered {total_files_found} items...",
                 )
+
+    proc.stdout.close()
+    proc.wait()
 
     # Flush remaining batch
     if pending_metadata:
@@ -765,6 +808,12 @@ class ScannerService:
                                     _hash_file_batch_fast,
                                     batch,
                                     _FAST_HASH_BINARY,
+                                    _make_hash_callback(
+                                        self,
+                                        path_to_record,
+                                        hashing_job.id,
+                                        total_pending,
+                                    ),
                                 ): batch
                                 for batch in sub_batches
                             }
@@ -780,14 +829,6 @@ class ScannerService:
                                     batch_results = future.result()
                                 except Exception:
                                     continue
-
-                                for file_path, computed_hash in batch_results.items():
-                                    target_record = path_to_record.get(file_path)
-                                    if target_record and computed_hash:
-                                        target_record.sha256_hash = computed_hash
-                                        with self._metrics_lock:
-                                            self.bytes_hashed += target_record.size or 0
-                                            self.files_hashed += 1
 
                                 # Detect files in this batch that didn't get a hash
                                 # (likely missing from disk) and mark them as deleted
@@ -805,18 +846,6 @@ class ScannerService:
                                     should_throttle = self.is_throttled
                                 if should_throttle:
                                     time.sleep(0.5)
-
-                                if self.files_hashed % 5 == 0:
-                                    progress = min(
-                                        99.9,
-                                        (self.files_hashed / max(total_pending, 1))
-                                        * 100,
-                                    )
-                                    JobManager.update_job(
-                                        hashing_job.id,
-                                        progress,
-                                        f"Hashed {self.files_hashed} files...",
-                                    )
                     else:
                         # Compatibility path: Python hashlib via thread pool
                         max_workers = os.cpu_count() or 4
@@ -861,7 +890,7 @@ class ScannerService:
                                     JobManager.update_job(
                                         hashing_job.id,
                                         progress,
-                                        f"Hashed {self.files_hashed} files...",
+                                        f"Hashed {self.files_hashed} files ({self._format_throughput()})...",
                                     )
 
                     # Commit batch
