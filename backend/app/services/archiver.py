@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 from sqlalchemy import func, not_
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.db import models
 from app.providers.cloud import CloudStorageProvider
@@ -627,7 +628,14 @@ class ArchiverService:
                 )
                 media_record.priority_index = max_priority + 1
 
-            db_session.commit()
+            try:
+                db_session.commit()
+            except StaleDataError:
+                db_session.rollback()
+                logger.warning(
+                    f"Media record {media_record.id} was modified or deleted by another process; skipping final commit"
+                )
+
             JobManager.complete_job(job_id)
             from app.services.notifications import notification_manager
 

@@ -160,8 +160,8 @@ test.describe('Discrepancies', () => {
     await expect(page.getByText('Files missing from disk or confirmed deleted')).toBeVisible();
 
     console.log('Step 3: Verify summary cards are visible');
-    await expect(page.getByText('Confirmed deleted')).toBeVisible();
-    await expect(page.getByText('Missing from disk')).toBeVisible();
+    await expect(page.getByText('Confirmed deleted', { exact: true })).toBeVisible();
+    await expect(page.getByText('Missing from disk', { exact: true })).toBeVisible();
 
     await requestContext.dispose();
   });
