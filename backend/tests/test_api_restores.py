@@ -163,7 +163,7 @@ def test_calculate_manifest(client, db_session):
     assert data["media_required"][0]["identifier"] == "T001"
 
 
-def test_trigger_recovery(client, db_session):
+def test_trigger_recovery(client, db_session, tmp_path):
     """Tests initiating a recovery job."""
     file_record = models.FilesystemState(file_path="/data/file.txt", size=10, mtime=1)
     db_session.add(file_record)
@@ -171,9 +171,10 @@ def test_trigger_recovery(client, db_session):
     db_session.add(models.RestoreCart(filesystem_state_id=file_record.id))
     db_session.commit()
 
-    response = client.post(
-        "/restores/trigger", json={"destination_path": "/tmp/recovery"}
-    )
+    dest = tmp_path / "recovery"
+    dest.mkdir()
+
+    response = client.post("/restores/trigger", json={"destination_path": str(dest)})
     assert response.status_code == 200
     assert "job_id" in response.json()
 
