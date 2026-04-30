@@ -138,13 +138,9 @@ def _hash_file_batch_fast(
             check=False,
         )
 
-        if proc.returncode != 0:
-            logger.warning(
-                f"Native hash exited with code {proc.returncode} for {len(file_paths)} files"
-            )
-            return results
-
-        # Parse output: "hash  filename" or "hash  *filename" (binary mode marker)
+        # Parse output regardless of returncode: sha256sum may succeed for
+        # some files in the batch while failing for others (e.g. deleted),
+        # still emitting hashes for the ones that worked.
         for line in proc.stdout.split(b"\n"):
             if not line.strip():
                 continue
