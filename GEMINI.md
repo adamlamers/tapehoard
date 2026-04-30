@@ -43,6 +43,7 @@ This document (`GEMINI.md`) contains critical, contextual information about the 
 *   **Standardized Telemetry:** Providers must implement `get_live_info(force: bool)` to return unified telemetry (e.g., drive status, capacity).
 *   **Sanitization:** Initializing media performs a full purge of existing TapeHoard data if the `force` flag is set.
 *   **Hardware Failure:** Marking media as "Failed" triggers an automatic atomic purge of all associated `file_versions` to surface those files as "Pending" on the dashboard.
+*   **Tape Registration is Discovery-Only:** Tape media (`lto_tape`, `mock_lto`) cannot be registered through the manual "Register media" dialog. Tapes are only registered via the hardware discovery section (`/inventory` → "Discovered unregistered drives") where the system auto-captures `device_path`, barcode, and serial number from the connected drive's MAM. The `device_path` is excluded from `LTOProvider.config_schema` because it is a per-drive setting configured globally in `tape_drives`, not a per-media attribute. The archiver resolves the drive at runtime when instantiating the provider.
 
 ### Database & Performance
 *   **High Concurrency:** SQLite must always run in **WAL (Write-Ahead Logging)** mode with a 30s busy timeout and larger page cache.

@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel, ConfigDict
@@ -217,6 +218,31 @@ def trigger_recovery_job(
 ):
     """Initiates the background physical recovery process to the specified destination."""
     destination_root = request_data.destination_path
+
+    if not os.path.isabs(destination_root):
+        raise HTTPException(
+            status_code=400,
+            detail="Destination path must be an absolute path.",
+        )
+
+    if ".." in destination_root:
+        raise HTTPException(
+            status_code=400,
+            detail="Path traversal sequences are not allowed in destination path.",
+        )
+
+    normalized = os.path.normpath(destination_root)
+    if normalized != destination_root:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Destination path must be normalized: '{destination_root}' -> '{normalized}'",
+        )
+
+    if not os.path.isdir(destination_root):
+        raise HTTPException(
+            status_code=400,
+            detail="Destination path does not exist or is not a directory.",
+        )
 
     # Pre-validation of queue
     queue_count = db_session.query(models.RestoreCart).count()

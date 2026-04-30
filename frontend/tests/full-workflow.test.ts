@@ -47,7 +47,7 @@ test.describe('TapeHoard Golden Path', () => {
     await requestContext.dispose();
   });
 
-  test('full ingestion, archival, and recovery workflow', async ({ page }) => {
+  test('full ingestion, archival, and recovery workflow', async ({ page, request }) => {
     page.on('console', msg => console.log('BROWSER CONSOLE:', msg.text()));
     page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
 
@@ -82,22 +82,22 @@ test.describe('TapeHoard Golden Path', () => {
     }).toPass({ timeout: 20000 });
 
     console.log('Step 3: Media Registration');
+    // Tape media is registered via API (discovery-only flow — no UI form for tape)
+    const registerResp = await request.post(`${API_URL}/inventory/media`, {
+        data: {
+            media_type: 'mock_lto',
+            identifier: 'TAPE001',
+            generation_tier: 'LTO-6',
+            capacity: 100 * 1024 * 1024 * 1024,
+            location: 'Test Shelf',
+            config: { device_path: MOCK_LTO_PATH }
+        }
+    });
+    expect(registerResp.ok()).toBe(true);
+
     await page.goto('/inventory');
     await page.waitForLoadState('networkidle');
-    console.log('Clicking Register media button');
-    await page.getByRole('button', { name: /Register media/i }).click();
-
-    console.log('Waiting for Mock LTO Tape text');
-    await expect(page.getByText('Mock LTO Tape (Test)')).toBeVisible({ timeout: 10000 });
-    await page.getByText('Mock LTO Tape (Test)').click();
-
-    console.log('Filling form');
-    await page.getByLabel('Identifier (Barcode/SN)').fill('TAPE001');
-    await page.getByLabel('Capacity (GB)').fill('100');
-    await page.getByLabel('Mock Directory Path').fill(MOCK_LTO_PATH);
-
-    await page.getByRole('button', { name: 'Register media' }).last().click();
-    await expect(page.getByText(/TAPE001 registered/i)).toBeVisible();
+    await expect(page.getByText('TAPE001')).toBeVisible({ timeout: 10000 });
 
     console.log('Step 4: Initialization');
     page.on('dialog', dialog => {

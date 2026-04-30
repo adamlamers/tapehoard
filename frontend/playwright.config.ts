@@ -19,7 +19,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5174',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -43,8 +43,8 @@ export default defineConfig({
       timeout: 120 * 1000,
     },
     {
-      command: 'VITE_API_URL=http://localhost:8001 npm run dev',
-      url: 'http://localhost:5173',
+      command: 'VITE_API_URL=http://localhost:8001 npm run dev -- --port 5174',
+      url: 'http://localhost:5174',
       reuseExistingServer: false,
       timeout: 120 * 1000,
     },

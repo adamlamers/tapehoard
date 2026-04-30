@@ -786,15 +786,8 @@ def search_archive_index(
     if len(q) < 2:
         return []
 
-    path_filter = ""
-    query_params = {"query": q}
-
-    if path and path != "ROOT":
-        path_filter = " AND fs.file_path LIKE :path_prefix"
-        query_params["path_prefix"] = f"{path}%"
-
     search_sql = text(
-        f"""
+        """
         SELECT
             fs.id, fs.file_path, fs.size, fs.mtime,
             EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) as has_version,
@@ -806,11 +799,14 @@ def search_archive_index(
         FROM filesystem_fts fts
         JOIN filesystem_state fs ON fs.id = fts.rowid
         WHERE filesystem_fts MATCH :query
-        {path_filter}
+          AND fs.file_path LIKE :path_prefix
         ORDER BY rank
         LIMIT 100
     """
     )
+
+    path_prefix = f"{path}%" if path and path != "ROOT" else "%"
+    query_params = {"query": q, "path_prefix": path_prefix}
 
     rows = db_session.execute(search_sql, query_params).fetchall()
     return [

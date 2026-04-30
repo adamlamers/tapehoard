@@ -29,10 +29,11 @@ app = FastAPI(
 )
 
 # Configure Cross-Origin Resource Sharing (CORS)
-# In production, this should be restricted to your known frontend domains
+# Use TAPEHOARD_CORS_ORIGINS env var (comma-separated) in production
+cors_origins = os.getenv("TAPEHOARD_CORS_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in cors_origins if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -35,6 +35,35 @@ export async function waitForScanComplete(requestContext: any, timeoutMs = 20000
 }
 
 /**
+ * Triggers a scan and waits for it to complete, ensuring the scan actually ran.
+ */
+export async function triggerScanAndWait(requestContext: any, timeoutMs = 30000) {
+  // Get current scan status to detect when a new scan completes
+  const statusResp = await requestContext.get(`${API_URL}/system/scan/status`);
+  const beforeStatus = await statusResp.json();
+  const beforeLastRun = beforeStatus.last_run_time;
+
+  const scanResp = await requestContext.post(`${API_URL}/system/scan`);
+  if (!scanResp.ok()) {
+    const errBody = await scanResp.json();
+    console.error(`Scan trigger failed: ${JSON.stringify(errBody)}`);
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const currentStatusResp = await requestContext.get(`${API_URL}/system/scan/status`);
+    const currentStatus = await currentStatusResp.json();
+
+    // Scan is complete if it's not running AND last_run_time changed
+    if (!currentStatus.is_running && currentStatus.last_run_time !== beforeLastRun) {
+      return;
+    }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  throw new Error('Scan did not complete within timeout');
+}
+
+/**
  * Configures the source roots and restore destinations.
  */
 export async function configureBackend(requestContext: any) {

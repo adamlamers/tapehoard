@@ -61,19 +61,6 @@ class StorageMedia(Base):
     versions: Mapped[List["FileVersion"]] = relationship(back_populates="media")
 
 
-class BackupJob(Base):
-    __tablename__ = "backups"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    job_name: Mapped[str] = mapped_column(String)
-    job_type: Mapped[str] = mapped_column(String)  # initial, incremental
-    start_time: Mapped[datetime] = mapped_column(DateTime)
-    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    status: Mapped[str] = mapped_column(String)  # running, success, failed, aborted
-
-    logs: Mapped[List["JobLog"]] = relationship(back_populates="backup")
-
-
 class FileVersion(Base):
     __tablename__ = "file_versions"
 
@@ -150,17 +137,3 @@ class SystemSetting(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
-
-
-class JobLog(Base):
-    __tablename__ = "job_logs"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    backup_id: Mapped[int] = mapped_column(ForeignKey("backups.id"))
-    timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
-    )
-    log_level: Mapped[str] = mapped_column(String)  # INFO, ERROR, WARN
-    message: Mapped[str] = mapped_column(String)
-
-    backup: Mapped["BackupJob"] = relationship(back_populates="logs")

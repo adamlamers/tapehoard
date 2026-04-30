@@ -16,7 +16,7 @@ router = APIRouter(prefix="/backups", tags=["Backups"])
 # --- Request/Response Schemas ---
 
 
-class BackupJobSchema(BaseModel):
+class JobSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -113,7 +113,7 @@ def trigger_backup_job(
     }
 
 
-@router.get("/", response_model=List[BackupJobSchema])
+@router.get("/", response_model=List[JobSchema])
 def list_archival_history(db_session: Session = Depends(get_db)):
     """Retrieves a history of archival jobs, sorted by most recent."""
     # Note: Using the generic Job model for consistency across the UI

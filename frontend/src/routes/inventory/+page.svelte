@@ -539,8 +539,13 @@
                                             {/if}
                                             {#if asset.hardware_info.tape}
                                                 <div class="flex flex-wrap gap-1">
-                                                    <span class="text-[9px] font-medium bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary">MFR: {asset.hardware_info.tape.manufacturer}</span>
-                                                    <span class="text-[9px] font-medium bg-blue-500/10 px-1 rounded border border-blue-500/20 text-blue-400">{asset.hardware_info.tape.generation_label || asset.hardware_info.tape.generation}</span>
+                                                    {#if asset.hardware_info.tape.barcode}
+                                                        <span class="text-[9px] font-medium bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary">BC: {asset.hardware_info.tape.barcode}</span>
+                                                    {/if}
+                                                    {#if asset.hardware_info.tape.serial}
+                                                        <span class="text-[9px] font-medium bg-blue-500/10 px-1 rounded border border-blue-500/20 text-blue-400">SN: {asset.hardware_info.tape.serial}</span>
+                                                    {/if}
+                                                    <span class="text-[9px] font-medium bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-text-secondary">{asset.hardware_info.tape.generation_label || asset.hardware_info.tape.generation}</span>
                                                 </div>
                                             {/if}
                                         </div>
@@ -560,6 +565,11 @@
                                                 }
                                             } else if (asset.type === 'tape') {
                                                 dynamicConfig.device_path = asset.device_path;
+                                                dynamicConfig.serial = asset.hardware_info?.tape?.serial || '';
+                                                dynamicConfig.barcode = asset.hardware_info?.tape?.barcode || '';
+                                                if (asset.hardware_info?.tape?.max_capacity_mib) {
+                                                    newMedia.capacity_gb = Math.floor(asset.hardware_info.tape.max_capacity_mib / 1024);
+                                                }
                                             }
                                             showRegisterDialog = true;
                                         }}>Add media</Button>
@@ -856,7 +866,7 @@
             </header>
 
             <div class="grid grid-cols-3 gap-4">
-                {#each providersList as provider}
+                {#each providersList.filter(p => !['lto_tape', 'mock_lto'].includes(p.provider_id)) as provider}
                     <button class={cn("flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all", newMedia.media_type === provider.provider_id ? "bg-blue-500/10 border-blue-500 text-blue-400 shadow-lg shadow-blue-500/10" : "bg-bg-primary/50 border-border-color text-text-secondary hover:border-text-secondary/30")}
                         onclick={() => {
                             newMedia.media_type = provider.provider_id;

@@ -14,7 +14,8 @@
 		Activity,
 		ChevronLeft,
 		ChevronRight,
-		PieChart
+		PieChart,
+		AlertTriangle
 	} from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import { Toaster } from 'svelte-sonner';
@@ -32,6 +33,7 @@
 		{ name: 'Insights', href: '/insights', icon: PieChart },
 		{ name: 'Archive Index', href: '/index-browser', icon: Library },
 		{ name: 'Filesystem', href: '/filesystem', icon: FolderTree },
+		{ name: 'Discrepancies', href: '/discrepancies', icon: AlertTriangle },
 		{ name: 'Jobs', href: '/jobs', icon: Activity },
 		{ name: 'Media Inventory', href: '/inventory', icon: CassetteTape },
 		{ name: 'Data Recovery', href: '/restores', icon: History }
@@ -61,6 +63,7 @@
 			else if (key === 'g') window.location.href = '/insights';
 			else if (key === 'i') window.location.href = '/index-browser';
 			else if (key === 't') window.location.href = '/filesystem';
+			else if (key === 'x') window.location.href = '/discrepancies';
 			else if (key === 'a') window.location.href = '/jobs';
 			else if (key === 'm') window.location.href = '/inventory';
 			else if (key === 'r') window.location.href = '/restores';
@@ -192,6 +195,7 @@
 					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Insights</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">G</span></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Archive Index</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">I</span></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Filesystem</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">T</span></div>
+					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Discrepancies</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">X</span></div>
 					<div class="flex justify-between items-center"><span class="text-xs font-semibold text-text-primary">Jobs</span> <span class="px-2 py-1 bg-bg-tertiary border border-border-color rounded text-4xs mono">A</span></div>
 				</div>
 				<div class="space-y-4">

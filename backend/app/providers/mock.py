@@ -35,7 +35,7 @@ class MockLTOProvider(AbstractStorageProvider):
         "device_path": {
             "type": "string",
             "title": "Mock Directory Path",
-            "description": "Path to a directory representing the tape drive (optional — auto-created if omitted)",
+            "description": "Path to a directory representing the tape drive (used internally for testing).",
             "required": False,
         }
     }

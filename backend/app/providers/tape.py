@@ -18,11 +18,6 @@ class LTOProvider(AbstractStorageProvider):
         "supports_hardware_encryption": True,
     }
     config_schema = {
-        "device_path": {
-            "type": "string",
-            "title": "Device Path",
-            "description": "e.g., /dev/nst0",
-        },
         "compression": {
             "type": "boolean",
             "title": "Hardware Compression",
