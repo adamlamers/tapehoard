@@ -63,6 +63,8 @@
     let showRegisterDialog = $state(false);
     let editingMedia = $state<MediaSchema | null>(null);
 
+    let activeMedia = $derived(mediaList.filter(m => m.status === 'active' && (m.capacity === 0 || (m.bytes_used / m.capacity) < 0.98)));
+
     // New Media Form State
     let newMedia = $state({
         media_type: 'lto_tape',
@@ -747,7 +749,6 @@
                             <span class="text-[10px] font-medium text-text-secondary opacity-70">Next archival target</span>
                         </div>
                     </div>
-
                     <table class="w-full border-collapse">
                         <thead>
                             <tr class="bg-bg-tertiary/50 border-b border-border-color">
@@ -761,25 +762,29 @@
                                 <th class="px-6 py-3 text-right text-xs font-semibold text-text-secondary">Actions</th>
                             </tr>
                         </thead>
-                        <tbody
-                            use:dndzone={{items: mediaList.filter(m => m.status === 'active' && (m.capacity === 0 || (m.bytes_used / m.capacity) < 0.98)), flipDurationMs: 200}}
-                            onconsider={handleDndConsider}
-                            onfinalize={handleDndFinalize}
-                            class="divide-y divide-border-color/30"
-                        >
-                            {#each mediaList.filter(m => m.status === 'active' && (m.capacity === 0 || (m.bytes_used / m.capacity) < 0.98)) as media (media.id)}
-                                <tr class="hover:bg-bg-primary/30 transition-colors group">
-                                    <td class="px-6 py-4 text-center">
-                                        <div class="cursor-grab active:cursor-grabbing text-text-secondary opacity-20 group-hover:opacity-100 transition-opacity">
-                                            <GripVertical size={16} />
-                                        </div>
-                                    </td>
-                                    {@render mediaRow(media)}
-                                </tr>
-                            {:else}
+                        {#if activeMedia.length > 0}
+                            <tbody
+                                use:dndzone={{items: activeMedia, flipDurationMs: 200}}
+                                onconsider={handleDndConsider}
+                                onfinalize={handleDndFinalize}
+                                class="divide-y divide-border-color/30"
+                            >
+                                {#each activeMedia as media (media.id)}
+                                    <tr class="hover:bg-bg-primary/30 transition-colors group">
+                                        <td class="px-6 py-4 text-center">
+                                            <div class="cursor-grab active:cursor-grabbing text-text-secondary opacity-20 group-hover:opacity-100 transition-opacity">
+                                                <GripVertical size={16} />
+                                            </div>
+                                        </td>
+                                        {@render mediaRow(media)}
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        {:else}
+                            <tbody class="divide-y divide-border-color/30">
                                 <tr><td colspan="8" class="px-8 py-24 text-center opacity-20"><Database size={48} class="mx-auto mb-3" /><p class="text-sm font-medium">No active archive media</p></td></tr>
-                            {/each}
-                        </tbody>
+                            </tbody>
+                        {/if}
                     </table>
                 </Card>
             </div>
