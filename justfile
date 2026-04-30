@@ -63,10 +63,10 @@ db-migrate message:
 # --- Code Generation ---
 
 # Generate the TypeScript API client from the FastAPI OpenAPI spec
-generate-client:
+generate-client: db-upgrade
     @echo "Generating TypeScript API client..."
-    # Ensure backend is running first: `just backend`
-    cd frontend && npx @hey-api/openapi-ts -i http://localhost:8000/openapi.json -o src/lib/api -c @hey-api/client-fetch
+    @cd backend && uv run python scripts/generate_openapi.py /tmp/tapehoard_openapi.json
+    @cd frontend && npx @hey-api/openapi-ts -i /tmp/tapehoard_openapi.json -o src/lib/api -c @hey-api/client-fetch
 
 # --- Docker ---
 
