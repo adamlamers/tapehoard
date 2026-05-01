@@ -426,14 +426,18 @@ class ScannerService:
         """Polls system I/O pressure to enable dynamic back-off."""
         while self.is_running or self.is_hashing:
             try:
-                cpu_times = psutil.cpu_times_percent(interval=1)
+                cpu_times = psutil.cpu_times_percent(interval=0.1)
                 iowait_value = getattr(cpu_times, "iowait", 0.0)
                 with self._metrics_lock:
                     self.is_throttled = iowait_value > 5.0
                     self._current_iowait = iowait_value
             except Exception:
                 pass
-            time.sleep(2)
+            # Use short sleep in a loop so we notice when the flags change
+            for _ in range(20):
+                if not (self.is_running or self.is_hashing):
+                    return
+                time.sleep(0.1)
 
     def _set_process_priority(self, level: str):
         """Adjusts the CPU and I/O priority of the current process."""
