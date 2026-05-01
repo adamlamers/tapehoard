@@ -258,6 +258,11 @@ class ArchiverService:
             JobManager.fail_job(job_id, "Media record not found.")
             return
 
+        # Capture identifiers early to avoid StaleDataError/ObjectDeletedError
+        # if the ORM object becomes stale during the long-running backup
+        media_id_for_log = media_record.id
+        media_identifier_for_log = media_record.identifier
+
         JobManager.start_job(job_id)
         JobManager.update_job(
             job_id, 5.0, f"Calculating backup set for {media_record.identifier}..."
@@ -650,7 +655,7 @@ class ArchiverService:
             except StaleDataError:
                 db_session.rollback()
                 logger.warning(
-                    f"Media record {media_record.id} was modified or deleted by another process; skipping final commit"
+                    f"Media record {media_id_for_log} was modified or deleted by another process; skipping final commit"
                 )
 
             JobManager.add_job_log(
@@ -661,7 +666,7 @@ class ArchiverService:
 
             notification_manager.notify(
                 "Archival Complete",
-                f"{media_record.identifier} synchronized.",
+                f"{media_identifier_for_log} synchronized.",
                 "success",
             )
 
@@ -702,8 +707,12 @@ class ArchiverService:
         os.makedirs(destination_root, exist_ok=True)
 
         media_workload: Dict[int, Dict[str, List[models.FileVersion]]] = {}
+        skipped_acknowledged = 0
         for cart_item in active_cart:
             if cart_item.file_state.is_deleted:
+                continue
+            if cart_item.file_state.missing_acknowledged_at is not None:
+                skipped_acknowledged += 1
                 continue
             if not cart_item.file_state.versions:
                 continue
@@ -724,6 +733,12 @@ class ArchiverService:
                 if v.file_number not in media_workload[v.media_id]:
                     media_workload[v.media_id][v.file_number] = []
                 media_workload[v.media_id][v.file_number].append(v)
+
+        if skipped_acknowledged:
+            JobManager.add_job_log(
+                job_id,
+                f"Skipped {skipped_acknowledged} item(s) with acknowledged loss (missing_acknowledged_at set)",
+            )
 
         processed_bytes = 0
         try:

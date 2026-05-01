@@ -3,6 +3,7 @@
 	import '../app.css';
 	// @ts-ignore
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import {
 		LayoutDashboard,
 		Library,
@@ -59,15 +60,15 @@
 		// Navigation Shortcuts
 		if (!e.ctrlKey && !e.metaKey && !e.altKey) {
 			const key = e.key;
-			if (key === 'd') window.location.href = '/';
-			else if (key === 'g') window.location.href = '/insights';
-			else if (key === 'i') window.location.href = '/index-browser';
-			else if (key === 't') window.location.href = '/filesystem';
-			else if (key === 'x') window.location.href = '/discrepancies';
-			else if (key === 'a') window.location.href = '/jobs';
-			else if (key === 'm') window.location.href = '/inventory';
-			else if (key === 'r') window.location.href = '/restores';
-			else if (key === 's') window.location.href = '/settings';
+			if (key === 'd') goto('/');
+			else if (key === 'g') goto('/insights');
+			else if (key === 'i') goto('/index-browser');
+			else if (key === 't') goto('/filesystem');
+			else if (key === 'x') goto('/discrepancies');
+			else if (key === 'a') goto('/jobs');
+			else if (key === 'm') goto('/inventory');
+			else if (key === 'r') goto('/restores');
+			else if (key === 's') goto('/settings');
 		}
 	}
 </script>

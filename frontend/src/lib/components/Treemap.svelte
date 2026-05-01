@@ -4,6 +4,7 @@
     import EmptyState from './ui/EmptyState.svelte';
     import { FolderSearch, ExternalLink, ChevronLeft } from 'lucide-svelte';
     import type { TreemapItem } from '$lib/types';
+    import { formatSize } from '$lib/utils';
 
     let { items = [], onSelect = null } = $props<{
         items: TreemapItem[];
@@ -73,14 +74,6 @@
     }
 
     const rects = $derived(computeRects(currentItems, containerWidth, containerHeight - (zoomStack.length > 0 ? 40 : 0), colors));
-
-    function formatSize(bytes: number) {
-        if (!bytes) return "0 B";
-        const units = ["B", "KB", "MB", "GB", "TB"];
-        let size = bytes, i = 0;
-        while (size >= 1024 && i < 4) { size /= 1024; i++; }
-        return `${size.toFixed(1)} ${units[i]}`;
-    }
 
     function handleLeftClick(e: MouseEvent, item: TreemapItem) {
         e.stopPropagation();

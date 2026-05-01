@@ -19,6 +19,21 @@ from app.services.scanner import JobManager, scanner_manager
 
 router = APIRouter(prefix="/system", tags=["System"])
 
+
+def _active_job_exists(db_session: Session, job_type: str) -> bool:
+    """Return True if an active (non-completed/failed/cancelled) job of the given type exists. (MEDIUM #16)"""
+    return (
+        db_session.query(models.Job)
+        .filter(
+            models.Job.job_type == job_type,
+            models.Job.status.in_(["PENDING", "RUNNING"]),
+            models.Job.is_cancelled.is_(False),
+        )
+        .first()
+        is not None
+    )
+
+
 # --- Request/Response Schemas ---
 
 
@@ -564,6 +579,8 @@ def trigger_scan(
     background_tasks: BackgroundTasks, db_session: Session = Depends(get_db)
 ):
     """Initiates a full metadata discovery scan of configured source roots."""
+    if _active_job_exists(db_session, "SCAN"):
+        raise HTTPException(status_code=400, detail="A scan job is already running")
     job_record = JobManager.create_job(db_session, "SCAN")
 
     def run_discovery_task():
@@ -803,15 +820,21 @@ def batch_update_tracking(
     request_data: BatchTrackRequest, db_session: Session = Depends(get_db)
 ):
     """Applies bulk inclusion and exclusion rules and synchronizes is_ignored flags."""
+    all_paths = list(request_data.tracks) + list(request_data.untracks)
+    # Batch-fetch existing TrackedSource records (MEDIUM #15)
+    existing_records = (
+        db_session.query(models.TrackedSource)
+        .filter(models.TrackedSource.path.in_(all_paths))
+        .all()
+        if all_paths
+        else []
+    )
+    existing_map = {r.path: r for r in existing_records}
+
     # 1. Update Tracking Rules and set is_ignored = 0 for inclusions
     for path_to_track in request_data.tracks:
-        existing = (
-            db_session.query(models.TrackedSource)
-            .filter(models.TrackedSource.path == path_to_track)
-            .first()
-        )
-        if existing:
-            existing.action = "include"
+        if path_to_track in existing_map:
+            existing_map[path_to_track].action = "include"
         else:
             db_session.add(models.TrackedSource(path=path_to_track, action="include"))
 
@@ -825,13 +848,8 @@ def batch_update_tracking(
 
     # 2. Update Tracking Rules and set is_ignored = 1 for exclusions
     for path_to_untrack in request_data.untracks:
-        existing = (
-            db_session.query(models.TrackedSource)
-            .filter(models.TrackedSource.path == path_to_untrack)
-            .first()
-        )
-        if existing:
-            existing.action = "exclude"
+        if path_to_untrack in existing_map:
+            existing_map[path_to_untrack].action = "exclude"
         else:
             db_session.add(models.TrackedSource(path=path_to_untrack, action="exclude"))
 
@@ -1202,22 +1220,32 @@ def list_discrepancies(db_session: Session = Depends(get_db)):
         .all()
     )
 
+    # Batch-load valid version flags to avoid N+1 (MEDIUM #14)
+    all_records = deleted_records + unhashed_missing
+    record_ids = {r.id for r in all_records}
+    if record_ids:
+        valid_version_rows = (
+            db_session.query(models.FileVersion.filesystem_state_id)
+            .join(models.StorageMedia)
+            .filter(
+                models.FileVersion.filesystem_state_id.in_(record_ids),
+                models.StorageMedia.status.in_(["active", "full"]),
+            )
+            .distinct()
+            .all()
+        )
+        ids_with_valid_versions = {row[0] for row in valid_version_rows}
+    else:
+        ids_with_valid_versions = set()
+
     results = []
     seen_ids = set()
-    for record in deleted_records + unhashed_missing:
+    for record in all_records:
         if record.id in seen_ids:
             continue
         seen_ids.add(record.id)
 
-        has_valid_versions = (
-            db_session.query(models.FileVersion)
-            .join(models.StorageMedia)
-            .filter(
-                models.FileVersion.filesystem_state_id == record.id,
-                models.StorageMedia.status.in_(["active", "full"]),
-            )
-            .first()
-        ) is not None
+        has_valid_versions = record.id in ids_with_valid_versions
 
         if record.is_deleted:
             results.append(
@@ -1340,6 +1368,19 @@ def dismiss_discrepancy(file_id: int, db_session: Session = Depends(get_db)):
     record.missing_acknowledged_at = datetime.now(timezone.utc)
     db_session.commit()
     return {"message": f"File '{record.file_path}' discrepancy dismissed"}
+
+
+@router.post("/discrepancies/{file_id}/undo-dismiss")
+def undo_dismiss_discrepancy(file_id: int, db_session: Session = Depends(get_db)):
+    """Clears the acknowledged state so the file reappears in discrepancies (MEDIUM #22)."""
+    record = db_session.get(models.FilesystemState, file_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="File record not found")
+    record.missing_acknowledged_at = None
+    db_session.commit()
+    return {
+        "message": f"File '{record.file_path}' dismiss undone, will reappear in discrepancies"
+    }
 
 
 @router.delete("/discrepancies/{file_id}")

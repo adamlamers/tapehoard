@@ -14,6 +14,20 @@ from datetime import datetime, timezone
 router = APIRouter(prefix="/restores", tags=["Restores"])
 
 
+def _active_restore_exists(db_session: Session) -> bool:
+    """Return True if an active restore job is already running. (MEDIUM #16)"""
+    return (
+        db_session.query(models.Job)
+        .filter(
+            models.Job.job_type == "RESTORE",
+            models.Job.status.in_(["PENDING", "RUNNING"]),
+            models.Job.is_cancelled.is_(False),
+        )
+        .first()
+        is not None
+    )
+
+
 # --- Request/Response Schemas ---
 
 
@@ -257,6 +271,8 @@ def trigger_recovery_job(
     db_session: Session = Depends(get_db),
 ):
     """Initiates the background physical recovery process to the specified destination."""
+    if _active_restore_exists(db_session):
+        raise HTTPException(status_code=400, detail="A restore job is already running")
     destination_root = request_data.destination_path
 
     if not os.path.isabs(destination_root):

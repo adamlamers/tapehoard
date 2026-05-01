@@ -24,7 +24,7 @@
     import StatCard from '$lib/components/ui/StatCard.svelte';
     import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
     import { getDashboardStatsSystemDashboardStatsGet, triggerScanSystemScanPost, triggerIndexingSystemIndexHashPost, type DashboardStatsSchema } from '$lib/api';
-    import { cn, formatLocalDate, formatLocalTime } from '$lib/utils';
+    import { cn, formatLocalDate, formatLocalTime, formatSize } from '$lib/utils';
     import { toast } from 'svelte-sonner';
 
     let stats = $state<DashboardStatsSchema | null>(null);
@@ -72,17 +72,6 @@
 
     onMount(loadStats);
 
-    function formatSize(bytes: number) {
-        if (bytes === 0) return "0 B";
-        const units = ["B", "KB", "MB", "GB", "TB", "PB"];
-        let unitIndex = 0;
-        let size = bytes;
-        while (size >= 1024 && unitIndex < units.length - 1) {
-            size /= 1024;
-            unitIndex++;
-        }
-        return `${size.toFixed(1)} ${units[unitIndex]}`;
-    }
 </script>
 
 <svelte:head>

@@ -6,6 +6,7 @@
     import Dialog from './ui/Dialog.svelte';
     import { getJobDetailSystemJobsJobIdGet, getJobLogsSystemJobsJobIdLogsGet, type AppApiSystemJobSchema } from '$lib/api';
     import { cn, formatLocalTime, formatLocalDateTime, parseUTCDate } from '$lib/utils';
+    import { POLL_FAST } from '$lib/config';
 
     let { jobId, onClear } = $props<{
         jobId: number;
@@ -76,7 +77,7 @@
 
     onMount(() => {
         loadJob();
-        pollInterval = setInterval(pollJob, 2000);
+        pollInterval = setInterval(pollJob, POLL_FAST);
     });
 
     onDestroy(() => {

@@ -424,7 +424,7 @@ class ScannerService:
 
     def _monitor_iowait(self):
         """Polls system I/O pressure to enable dynamic back-off."""
-        while True:
+        while self.is_running or self.is_hashing:
             try:
                 cpu_times = psutil.cpu_times_percent(interval=1)
                 iowait_value = getattr(cpu_times, "iowait", 0.0)

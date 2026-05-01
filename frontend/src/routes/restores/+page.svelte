@@ -35,7 +35,7 @@
         type RestoreManifestSchema,
         type CartFileItemSchema
     } from '$lib/api';
-    import { cn } from '$lib/utils';
+    import { cn, formatSize } from '$lib/utils';
     import { toast } from 'svelte-sonner';
 
     let currentPath = $state('ROOT');
@@ -148,18 +148,6 @@
             console.error("Failed to clear queue:", error);
             toast.error("Failed to clear recovery queue");
         }
-    }
-
-    function formatSize(bytes: number) {
-        if (bytes === 0) return "0 B";
-        const units = ["B", "KB", "MB", "GB", "TB"];
-        let unitIndex = 0;
-        let size = bytes;
-        while (size >= 1024 && unitIndex < units.length - 1) {
-            size /= 1024;
-            unitIndex++;
-        }
-        return `${size.toFixed(1)} ${units[unitIndex]}`;
     }
 
     onMount(loadData);

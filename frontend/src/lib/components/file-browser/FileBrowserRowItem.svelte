@@ -18,7 +18,7 @@
         import { Checkbox } from "$lib/components/ui/checkbox";
         import { Button } from "$lib/components/ui/button";
         import type { FileItem } from "$lib/types";
-        import { cn } from "$lib/utils";
+        import { cn, formatSize } from "$lib/utils";
 
         let {
                 item,
@@ -72,19 +72,6 @@
                                 return File;
                 }
         });
-
-        function formatSize(bytes?: number) {
-                if (bytes === undefined) return "--";
-                if (bytes === 0) return "0 B";
-                const units = ["B", "KB", "MB", "GB", "TB"];
-                let unitIndex = 0;
-                let size = bytes;
-                while (size >= 1024 && unitIndex < units.length - 1) {
-                        size /= 1024;
-                        unitIndex++;
-                }
-                return `${size.toFixed(1)} ${units[unitIndex]}`;
-        }
 
         function formatDate(mtime?: number | string | null) {
                 if (!mtime) return "--";

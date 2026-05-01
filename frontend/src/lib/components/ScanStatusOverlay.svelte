@@ -3,6 +3,7 @@
     import { RotateCw, Activity, CheckCircle2 } from 'lucide-svelte';
     import { Card } from '$lib/components/ui/card';
     import { getScanStatusSystemScanStatusGet, type ScanStatusSchema } from '$lib/api';
+    import { POLL_FAST } from '$lib/config';
     import { toast } from 'svelte-sonner';
 
     let scanStatus = $state<ScanStatusSchema | null>(null);
@@ -31,7 +32,7 @@
 
     onMount(() => {
         updateScanStatus();
-        pollInterval = setInterval(updateScanStatus, 2000);
+        pollInterval = setInterval(updateScanStatus, POLL_FAST);
     });
 
     onDestroy(() => {
@@ -106,7 +107,7 @@
             </div>
         </Card>
     </div>
-{:else if showCompleted}
+{:else if showCompleted && scanStatus}
     <div class="fixed bottom-6 right-6 z-[100] w-[420px] animate-in fade-in slide-in-from-bottom-4">
         <Card class="bg-bg-secondary border-border-color shadow-2xl overflow-hidden">
             <header class="px-5 py-4 border-b border-border-color bg-bg-tertiary/30 relative overflow-hidden">
@@ -118,7 +119,7 @@
                     <div class="flex-1">
                         <h3 class="text-sm font-semibold text-text-primary">Scan completed</h3>
                         <p class="text-xs text-text-secondary mt-0.5">
-                            {scanStatus!.files_processed.toLocaleString()} files indexed
+                            {scanStatus.files_processed.toLocaleString()} files indexed
                         </p>
                     </div>
                 </div>

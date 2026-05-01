@@ -36,7 +36,8 @@
     import Dialog from '$lib/components/ui/Dialog.svelte';
     import { Card } from '$lib/components/ui/card';
     import { Input } from '$lib/components/ui/input';
-    import { cn } from '$lib/utils';
+    import { cn, formatSize } from '$lib/utils';
+    import { POLL_SLOW } from '$lib/config';
     import {
         listStorageFleetInventoryMediaGet,
         registerNewMediaInventoryMediaPost,
@@ -212,7 +213,7 @@
             console.error("Failed to load storage providers:", error);
         }
 
-        pollInterval = setInterval(() => loadMedia(true), 3000);
+        pollInterval = setInterval(() => loadMedia(true), POLL_SLOW);
     });
 
     onDestroy(() => {
@@ -378,11 +379,6 @@
         }
     }
 
-    function formatSize(bytes: number) {
-        const gb = bytes / (1024 * 1024 * 1024);
-        if (gb >= 1000) return `${(gb / 1024).toFixed(2)} TB`;
-        return `${gb.toFixed(0)} GB`;
-    }
 </script>
 
 {#snippet ConfigIcon(type: string)}

@@ -26,10 +26,10 @@ class FilesystemState(Base):
         Boolean, default=False
     )  # True if confirmed missing from disk
     missing_acknowledged_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, nullable=True
+        DateTime, nullable=True, index=True
     )  # User acknowledged this missing file; hide from discrepancies
     last_seen_timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
     )
 
     versions: Mapped[List["FileVersion"]] = relationship(back_populates="file_state")

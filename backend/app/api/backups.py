@@ -13,6 +13,20 @@ from app.services.scanner import JobManager
 router = APIRouter(prefix="/backups", tags=["Backups"])
 
 
+def _active_backup_exists(db_session: Session) -> bool:
+    """Return True if an active backup job is already running. (MEDIUM #16)"""
+    return (
+        db_session.query(models.Job)
+        .filter(
+            models.Job.job_type == "BACKUP",
+            models.Job.status.in_(["PENDING", "RUNNING"]),
+            models.Job.is_cancelled.is_(False),
+        )
+        .first()
+        is not None
+    )
+
+
 # --- Request/Response Schemas ---
 
 
@@ -35,6 +49,8 @@ def trigger_auto_backup(
     db_session: Session = Depends(get_db),
 ):
     """Initiates a background archival job that utilizes all active media to backup as much as possible."""
+    if _active_backup_exists(db_session):
+        raise HTTPException(status_code=400, detail="A backup job is already running")
     active_media = (
         db_session.query(models.StorageMedia)
         .filter(models.StorageMedia.status == "active")
@@ -86,6 +102,9 @@ def trigger_backup_job(
     db_session: Session = Depends(get_db),
 ):
     """Initiates a background archival job for a specific storage medium."""
+    if _active_backup_exists(db_session):
+        raise HTTPException(status_code=400, detail="A backup job is already running")
+
     media_record = db_session.get(models.StorageMedia, media_id)
     if not media_record:
         raise HTTPException(status_code=404, detail="Storage media not found.")

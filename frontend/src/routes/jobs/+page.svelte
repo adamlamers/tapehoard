@@ -18,6 +18,7 @@
     import { Button } from '$lib/components/ui/button';
     import PageHeader from '$lib/components/ui/PageHeader.svelte';
     import SectionHeader from '$lib/components/ui/SectionHeader.svelte';
+    import { POLL_SLOW } from '$lib/config';
     import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
     import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
     import EmptyState from '$lib/components/ui/EmptyState.svelte';
@@ -253,7 +254,7 @@
     onMount(() => {
         loadInitialJobs();
         loadStats();
-        pollInterval = setInterval(pollActiveJobs, 3000);
+        pollInterval = setInterval(pollActiveJobs, POLL_SLOW);
     });
 
     onDestroy(() => {

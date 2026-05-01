@@ -19,7 +19,7 @@
     import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
     import Treemap from '$lib/components/Treemap.svelte';
     import { getSystemAnalyticsInventoryInsightsGet } from '$lib/api';
-    import { cn } from '$lib/utils';
+    import { cn, formatSize } from '$lib/utils';
     import { toast } from 'svelte-sonner';
     import { goto } from '$app/navigation';
 
@@ -36,18 +36,6 @@
         } finally {
             loading = false;
         }
-    }
-
-    function formatSize(bytes: number) {
-        if (!bytes) return "0 B";
-        const units = ["B", "KB", "MB", "GB", "TB", "PB"];
-        let unitIndex = 0;
-        let size = bytes;
-        while (size >= 1024 && unitIndex < units.length - 1) {
-            size /= 1024;
-            unitIndex++;
-        }
-        return `${size.toFixed(1)} ${units[unitIndex]}`;
     }
 
     function mapDirectoryTree(nodes: any[]): any[] {

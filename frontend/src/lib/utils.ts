@@ -38,3 +38,19 @@ export function formatLocalDateTime(dateStr: string | null | undefined): string 
     if (!date) return "--";
     return date.toLocaleString();
 }
+
+/**
+ * Formats a byte count into a human-readable string (KB, MB, GB, TB).
+ * (MEDIUM #28 — consolidated from 5+ duplicate implementations)
+ */
+export function formatSize(bytes: number): string {
+    if (bytes === 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let unitIndex = 0;
+    let size = bytes;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex++;
+    }
+    return `${size.toFixed(1)} ${units[unitIndex]}`;
+}

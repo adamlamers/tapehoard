@@ -32,7 +32,7 @@
         type CartItemSchema
     } from '$lib/api';
     import { toast } from 'svelte-sonner';
-    import { cn, formatLocalDate, formatLocalDateTime } from '$lib/utils';
+    import { cn, formatLocalDate, formatLocalDateTime, formatSize } from '$lib/utils';
 
     import { page } from '$app/state';
 
@@ -241,17 +241,6 @@
         }
     }
 
-    function formatSize(bytes: number) {
-        if (bytes === 0) return "0 B";
-        const units = ["B", "KB", "MB", "GB", "TB"];
-        let unitIndex = 0;
-        let size = bytes;
-        while (size >= 1024 && unitIndex < units.length - 1) {
-            size /= 1024;
-            unitIndex++;
-        }
-        return `${size.toFixed(1)} ${units[unitIndex]}`;
-    }
 </script>
 
 <svelte:head>

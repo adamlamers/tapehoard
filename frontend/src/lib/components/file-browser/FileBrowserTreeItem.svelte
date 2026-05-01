@@ -31,11 +31,9 @@
         // Initialize state from props
         onMount(() => {
                 if (node.expanded) {
-                    console.log(`[TreeItem] ${node.path} initializing expanded`);
                     expanded = true;
                 }
                 if (node.children && node.children.length > 0) {
-                    console.log(`[TreeItem] ${node.path} initializing with ${node.children.length} children`);
                     children = node.children;
                     loaded = true;
                 }
@@ -53,7 +51,6 @@
         // Auto-load if expanded
         $effect(() => {
                 if (expanded && !loaded && !loading) {
-                        console.log(`[TreeItem] ${node.path} is expanded but not loaded. Loading subdirs...`);
                         loadSubdirs();
                 }
         });
@@ -61,7 +58,6 @@
         async function loadSubdirs() {
                 if (loaded || loading) return;
 
-                console.log(`[TreeItem] ${node.path} fetching subdirs (mode=${mode})...`);
                 loading = true;
                 try {
                         const fetchFn = (mode === "host" || mode === "live") ? getSystemTreeSystemTreeGet : getArchiveTreeInventoryTreeGet;
@@ -70,8 +66,6 @@
                         });
 
                         const data = response.data as any[];
-                        console.log(`[TreeItem] ${node.path} received ${data?.length || 0} items from backend`);
-
                         if (data && Array.isArray(data)) {
                                 children = data.map((d: any) => ({
                                         name: d.name,
@@ -92,7 +86,6 @@
 
         async function toggle() {
                 expanded = !expanded;
-                console.log(`[TreeItem] ${node.path} toggled expanded=${expanded}`);
         }
 
         function select() {

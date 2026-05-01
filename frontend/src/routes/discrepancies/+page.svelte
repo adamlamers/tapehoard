@@ -21,7 +21,7 @@
     import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
     import StatCard from '$lib/components/ui/StatCard.svelte';
     import EmptyState from '$lib/components/ui/EmptyState.svelte';
-    import { cn, formatLocalDate } from '$lib/utils';
+    import { cn, formatLocalDate, formatSize as formatSizeUtil } from '$lib/utils';
     import { toast } from 'svelte-sonner';
     import {
         listDiscrepanciesSystemDiscrepanciesGet,
@@ -190,17 +190,7 @@
     const selectedWithBackups = $derived(selectedItems.filter(d => d.has_versions));
     const selectedWithoutBackups = $derived(selectedItems.filter(d => !d.has_versions));
 
-    function formatSize(bytes: number) {
-        if (bytes === 0) return "0 B";
-        const units = ["B", "KB", "MB", "GB", "TB"];
-        let unitIndex = 0;
-        let size = bytes;
-        while (size >= 1024 && unitIndex < units.length - 1) {
-            size /= 1024;
-            unitIndex++;
-        }
-        return `${size.toFixed(1)} ${units[unitIndex]}`;
-    }
+    const formatSize = formatSizeUtil;
 
     function formatPath(path: string) {
         const parts = path.split('/');
@@ -402,131 +392,10 @@
                                                     type="checkbox"
                                                     class="rounded border-border-color/30 bg-transparent cursor-pointer shrink-0"
                                                     checked={selectedIds.has(item.id)}
-                                                    onchange={(e) => e.currentTarget.checked ? toggleSelect(item.id) : toggleSelect(item.id)}
-                                                />
+                                                    onchange={() => toggleSelect(item.id)}
+                                                 />
 
-                                                <StatusBadge variant="error">Missing</StatusBadge>
-
-                                                <div class="flex-1 min-w-0">
-                                                    {#if typeof path === 'string'}
-                                                        <span class="text-sm font-medium text-text-primary mono truncate block" title={item.path}>
-                                                            {path}
-                                                        </span>
-                                                    {:else}
-                                                        <div class="flex flex-col gap-0.5">
-                                                            <span class="text-xs font-medium text-text-secondary mono leading-tight" title={item.path}>
-                                                                {path.head}
-                                                            </span>
-                                                            <span class="text-sm font-medium text-text-primary mono leading-tight" title={item.path}>
-                                                                {path.tail}
-                                                            </span>
-                                                        </div>
-                                                    {/if}
-                                                    <p class="text-xs text-text-secondary mt-0.5 opacity-60">{formatSize(item.size)} · Last seen: {item.last_seen_timestamp ? formatLocalDate(item.last_seen_timestamp) : '—'}</p>
-                                                </div>
-
-                                                <div class="flex items-center gap-1.5 shrink-0">
-                                                    {#if item.has_versions}
-                                                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-success-color/10 text-success-color">
-                                                            <ShieldCheck size={11} />
-                                                            <span class="text-[10px] font-medium">On archive</span>
-                                                        </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            class="h-8 w-8 text-success-color hover:bg-success-color/10 opacity-40 group-hover:opacity-100 transition-opacity"
-                                                            onclick={() => addToRecoveryQueue(item.id)}
-                                                            disabled={recovering === item.id}
-                                                            title="Add to recovery queue"
-                                                        >
-                                                            {#if recovering === item.id}
-                                                                <RotateCw size={14} class="animate-spin" />
-                                                            {:else}
-                                                                <HardDriveDownload size={14} />
-                                                            {/if}
-                                                        </Button>
-                                                    {:else}
-                                                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 text-yellow-500">
-                                                            <EyeOff size={11} />
-                                                            <span class="text-[10px] font-medium">No backup</span>
-                                                        </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            class="h-8 w-8 text-yellow-500 hover:bg-yellow-500/10 opacity-40 group-hover:opacity-100 transition-opacity"
-                                                            onclick={() => acknowledgeLoss(item.id)}
-                                                            disabled={acknowledging === item.id}
-                                                            title="Acknowledge loss"
-                                                        >
-                                                            {#if acknowledging === item.id}
-                                                                <RotateCw size={14} class="animate-spin" />
-                                                            {:else}
-                                                                <ShieldCheck size={14} />
-                                                            {/if}
-                                                        </Button>
-                                                    {/if}
-                                                </div>
-                                            </div>
-                                        </Card>
-                                    {/each}
-                                {/if}
-                            </div>
-                        {/each}
-                    </div>
-                </section>
-            {/if}
-
-            <!-- PENDING ITEMS SECTION -->
-            {#if pendingItems.length > 0}
-                <section class="space-y-4">
-                    <div class="flex items-center gap-3">
-                        <SectionHeader title="Pending confirmation" icon={FileQuestion} iconColor="text-yellow-500" class="flex-1" />
-                        <button
-                            class="text-[10px] font-medium text-text-secondary uppercase tracking-wider hover:text-text-primary transition-colors px-2"
-                            onclick={selectAllPending}
-                        >
-                            {allPendingSelected ? 'Deselect all' : 'Select all'}
-                        </button>
-                    </div>
-
-                    <div class="grid grid-cols-1 gap-3">
-                        {#each groupedItems.filter(g => g.items.some(i => !i.is_deleted)) as group}
-                            <div class="space-y-2">
-                                <div class="flex items-center gap-2 px-1">
-                                    <button
-                                        class="flex items-center gap-2 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
-                                        onclick={() => toggleCollapse('pending-' + group.directory)}
-                                    >
-                                        {#if collapsedDirs['pending-' + group.directory]}
-                                            <ChevronRight size={14} />
-                                        {:else}
-                                            <ChevronDown size={14} />
-                                        {/if}
-                                        <FolderOpen size={14} />
-                                        <span class="mono text-xs">{group.directory}</span>
-                                        <span class="text-[10px] font-normal opacity-40">({group.items.filter(i => !i.is_deleted).length})</span>
-                                    </button>
-                                    <button
-                                        class="text-[10px] text-text-secondary opacity-40 hover:opacity-70 hover:text-text-primary transition-colors ml-auto"
-                                        onclick={() => selectAllInGroup(group.items.filter(i => !i.is_deleted))}
-                                    >
-                                        {group.items.filter(i => !i.is_deleted).every(i => selectedIds.has(i.id)) ? 'Deselect group' : 'Select group'}
-                                    </button>
-                                </div>
-
-                                {#if !collapsedDirs['pending-' + group.directory]}
-                                    {#each group.items.filter(i => !i.is_deleted) as item (item.id)}
-                                        {@const path = formatPath(item.path)}
-                                        <Card class="px-5 py-3 bg-bg-secondary/40 border-border-color/40 hover:bg-bg-secondary transition-colors group">
-                                            <div class="flex items-center gap-4">
-                                                <input
-                                                    type="checkbox"
-                                                    class="rounded border-border-color/30 bg-transparent cursor-pointer shrink-0"
-                                                    checked={selectedIds.has(item.id)}
-                                                    onchange={(e) => e.currentTarget.checked ? toggleSelect(item.id) : toggleSelect(item.id)}
-                                                />
-
-                                                <StatusBadge variant="warning">Pending</StatusBadge>
+                                                 <StatusBadge variant="error">Missing</StatusBadge>
 
                                                 <div class="flex-1 min-w-0">
                                                     {#if typeof path === 'string'}

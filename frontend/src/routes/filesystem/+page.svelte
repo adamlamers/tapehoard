@@ -16,6 +16,7 @@
     } from '$lib/api';
     import { toast } from "svelte-sonner";
     import { cn, formatLocalTime } from "$lib/utils";
+    import { POLL_SLOW } from '$lib/config';
     import { page } from '$app/state';
 
     // Current directory state
@@ -139,7 +140,7 @@
 
         await loadFiles(currentPath);
         await updateScanStatus();
-        pollInterval = setInterval(updateScanStatus, 3000);
+        pollInterval = setInterval(updateScanStatus, POLL_SLOW);
     });
 
     onDestroy(() => {
