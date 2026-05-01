@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -7,6 +7,7 @@ class TreeNodeSchema(BaseModel):
     name: str
     path: str
     has_children: bool = True
+    children: List["TreeNodeSchema"] = Field(default_factory=list)
 
 
 class ItemMetadataSchema(BaseModel):

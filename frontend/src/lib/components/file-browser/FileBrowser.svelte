@@ -18,6 +18,14 @@
         import FileBrowserRowItem from "./FileBrowserRowItem.svelte";
         import type { FileItem, Breadcrumb } from "$lib/types";
         import { cn } from "$lib/utils";
+        import {
+            getSystemTreeSystemTreeGet,
+            getArchiveTreeInventoryTreeGet,
+            browseSystemPathSystemBrowseGet,
+            browseArchiveIndexInventoryBrowseGet,
+            getDiscrepanciesTreeGet,
+            browseDiscrepanciesGet,
+        } from "$lib/api";
 
         let {
                 currentPath = $bindable("ROOT"),
@@ -26,6 +34,8 @@
                 onNavigate = (path: string) => {},
                 onToggleTrack = (item: FileItem) => {},
                 onSelect = (item: FileItem) => {},
+                onUndoDismiss = (item: FileItem) => {},
+                onDelete = (item: FileItem) => {},
                 mode = "host",
                 isSearching = false,
                 pendingChanges = new Map<string, boolean>()
@@ -36,7 +46,9 @@
                 onNavigate?: (path: string) => void;
                 onToggleTrack?: (item: FileItem) => void;
                 onSelect?: (item: FileItem) => void;
-                mode?: "host" | "index" | "cart" | "live";
+                onUndoDismiss?: (item: FileItem) => void;
+                onDelete?: (item: FileItem) => void;
+                mode?: "host" | "index" | "cart" | "live" | "discrepancies";
                 isSearching?: boolean;
                 pendingChanges?: Map<string, boolean>;
         }>();
@@ -173,9 +185,18 @@
                 hasChildren: true
         });
 
+        const discrepancyRoot = $derived({
+                name: "Discrepancies",
+                path: "ROOT",
+                expanded: true,
+                children: [],
+                hasChildren: true
+        });
+
         const activeRoot = $derived(
                 mode === "host" ? sourceDataRoot :
                 mode === "index" ? virtualIndexRoot :
+                mode === "discrepancies" ? discrepancyRoot :
                 recoveryQueueRoot
         );
 
@@ -559,6 +580,8 @@
                                                                         onClick={(e) => handleRowClick(e, item)}
                                                                         onDoubleClick={() => handleRowDoubleClick(item)}
                                                                         onToggleTrack={() => onToggleTrack(item)}
+                                                                        onUndoDismiss={() => onUndoDismiss(item)}
+                                                                        onDelete={() => onDelete(item)}
                                                                 />
                                                         {/each}
                                                 {/if}

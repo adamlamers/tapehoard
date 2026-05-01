@@ -510,6 +510,20 @@ export const browseRecoveryQueueVirtualFsRestoresQueueBrowseGet = <ThrowOnError 
 export const getRecoveryQueueTreeRestoresQueueTreeGet = <ThrowOnError extends boolean = false>(options?: Options<GetRecoveryQueueTreeRestoresQueueTreeGetData, ThrowOnError>) => (options?.client ?? client).get<GetRecoveryQueueTreeRestoresQueueTreeGetResponses, GetRecoveryQueueTreeRestoresQueueTreeGetErrors, ThrowOnError>({ url: '/restores/queue/tree', ...options });
 
 /**
+ * Get Discrepancies Tree
+ *
+ * Returns a nested tree structure for the discrepancies view, grouped by source root.
+ */
+export const getDiscrepanciesTreeGet = <ThrowOnError extends boolean = false>(options?: Options<GetDiscrepanciesTreeGetData, ThrowOnError>) => (options?.client ?? client).get<GetDiscrepanciesTreeGetResponses, GetDiscrepanciesTreeGetErrors, ThrowOnError>({ url: '/system/discrepancies/tree', ...options });
+
+/**
+ * Browse Discrepancies
+ *
+ * Browse the discrepancies filesystem with optional path prefix filtering.
+ */
+export const browseDiscrepanciesGet = <ThrowOnError extends boolean = false>(options?: Options<BrowseDiscrepanciesGetData, ThrowOnError>) => (options?.client ?? client).get<BrowseDiscrepanciesGetResponses, BrowseDiscrepanciesGetErrors, ThrowOnError>({ url: '/system/discrepancies/browse', ...options });
+
+/**
  * Health Heartbeat
  *
  * Simple health check endpoint for monitoring.

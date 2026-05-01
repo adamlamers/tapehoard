@@ -11,6 +11,10 @@ export interface FileItem {
     sha256_hash?: string | null;
     vulnerable?: boolean;
     indeterminate?: boolean;
+    // Discrepancy fields
+    discrepancy_id?: number;
+    is_deleted?: boolean;
+    has_versions?: boolean;
 }
 
 export interface TreeNode {
@@ -18,6 +22,8 @@ export interface TreeNode {
     path: string;
     children?: TreeNode[];
     expanded?: boolean;
+    hasChildren?: boolean;
+    discrepancy_count?: number;
 }
 
 export interface Breadcrumb {

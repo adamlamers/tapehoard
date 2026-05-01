@@ -1399,3 +1399,134 @@ def delete_file_record(file_id: int, db_session: Session = Depends(get_db)):
     db_session.delete(record)
     db_session.commit()
     return {"message": f"File record '{file_path}' permanently deleted"}
+
+
+# --- Discrepancy Tree & Browse Endpoints ---
+
+
+@router.get("/discrepancies/tree", response_model=List[TreeNodeSchema])
+def get_discrepancies_tree(db_session: Session = Depends(get_db)):
+    """Returns tree of directories that contain discrepancy files, grouped by source root."""
+    from app.api.inventory import TreeNodeSchema, get_source_roots
+
+    roots = get_source_roots(db_session)
+
+    # Query all discrepancy files
+    records = (
+        db_session.query(models.FilesystemState)
+        .filter(
+            models.FilesystemState.is_ignored.is_(False),
+            models.FilesystemState.missing_acknowledged_at.is_(None),
+            (
+                models.FilesystemState.is_deleted.is_(True)
+                | models.FilesystemState.sha256_hash.is_(None)
+            ),
+        )
+        .all()
+    )
+
+    # Build directory nodes keyed by directory path
+    dir_nodes: Dict[str, TreeNodeSchema] = {}
+    for record in records:
+        directory = (
+            record.file_path.rsplit("/", 1)[0] if "/" in record.file_path else ""
+        )
+        if directory not in dir_nodes:
+            dir_nodes[directory] = TreeNodeSchema(
+                name=directory.split("/")[-1] or directory,
+                path=directory,
+                has_children=True,
+                children=[],
+            )
+        dir_nodes[directory].children.append(
+            TreeNodeSchema(
+                name=record.file_path.split("/")[-1],
+                path=record.file_path,
+                has_children=False,
+            )
+        )
+
+    # Build top-level nodes from source roots
+    result = []
+    for root in roots:
+        root_dirs = [d for d in dir_nodes.keys() if d.startswith(root) or d == root]
+        if root_dirs:
+            children = [dir_nodes[d] for d in sorted(root_dirs)]
+            result.append(
+                TreeNodeSchema(
+                    name=root, path=root, has_children=True, children=children
+                )
+            )
+
+    return result
+
+
+@router.get("/discrepancies/browse", response_model=List[DiscrepancySchema])
+def browse_discrepancies(
+    path: Optional[str] = None, db_session: Session = Depends(get_db)
+):
+    """Returns discrepancy files under a given directory path."""
+    # Reuse the query logic from list_discrepancies
+    deleted_records = db_session.query(models.FilesystemState).filter(
+        models.FilesystemState.is_deleted.is_(True),
+        models.FilesystemState.is_ignored.is_(False),
+        models.FilesystemState.missing_acknowledged_at.is_(None),
+    )
+
+    unhashed_missing = db_session.query(models.FilesystemState).filter(
+        models.FilesystemState.sha256_hash.is_(None),
+        models.FilesystemState.is_ignored.is_(False),
+        models.FilesystemState.is_deleted.is_(False),
+        models.FilesystemState.missing_acknowledged_at.is_(None),
+    )
+
+    # Batch-load valid version flags
+    all_records = deleted_records.all() + unhashed_missing.all()
+    record_ids = {r.id for r in all_records}
+    ids_with_valid_versions = set()
+    if record_ids:
+        valid_version_rows = (
+            db_session.query(models.FileVersion.filesystem_state_id)
+            .join(models.StorageMedia)
+            .filter(
+                models.FileVersion.filesystem_state_id.in_(record_ids),
+                models.StorageMedia.status.in_(["active", "full"]),
+            )
+            .distinct()
+            .all()
+        )
+        ids_with_valid_versions = {row[0] for row in valid_version_rows}
+
+    # Filter by path prefix if specified
+    results = []
+    seen_ids = set()
+    for record in all_records:
+        if record.id in seen_ids:
+            continue
+        seen_ids.add(record.id)
+
+        # Filter by path prefix
+        if (
+            path
+            and not record.file_path.startswith(path + "/")
+            and record.file_path != path
+        ):
+            continue
+
+        has_valid_versions = record.id in ids_with_valid_versions
+
+        if record.is_deleted or not os.path.exists(record.file_path):
+            results.append(
+                DiscrepancySchema(
+                    id=record.id,
+                    path=record.file_path,
+                    size=record.size,
+                    mtime=datetime.fromtimestamp(record.mtime, tz=timezone.utc),
+                    last_seen_timestamp=record.last_seen_timestamp,
+                    sha256_hash=record.sha256_hash,
+                    is_deleted=record.is_deleted,
+                    has_versions=has_valid_versions,
+                )
+            )
+
+    return results

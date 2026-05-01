@@ -5,7 +5,7 @@
         import type { TreeNode } from "$lib/types";
         import { cn } from "$lib/utils";
         import FileBrowserTreeItem from "./FileBrowserTreeItem.svelte";
-        import { getSystemTreeSystemTreeGet, getArchiveTreeInventoryTreeGet } from "$lib/api";
+        import { getSystemTreeSystemTreeGet, getArchiveTreeInventoryTreeGet, getDiscrepanciesTreeGet } from "$lib/api";
 
         let {
                 node,
@@ -20,7 +20,7 @@
                 onSelect?: (path: string) => void;
                 level?: number;
                 isSpecial?: boolean;
-                mode?: "host" | "index" | "live";
+                mode?: "host" | "index" | "live" | "discrepancies";
         }>();
 
         let expanded = $state(false);
@@ -60,10 +60,17 @@
 
                 loading = true;
                 try {
-                        const fetchFn = (mode === "host" || mode === "live") ? getSystemTreeSystemTreeGet : getArchiveTreeInventoryTreeGet;
-                        const response = await fetchFn({
-                                query: { path: node.path }
-                        });
+                        let response;
+                        if (mode === "discrepancies") {
+                                response = await getDiscrepanciesTreeGet({
+                                        query: { path: node.path }
+                                });
+                        } else {
+                                const fetchFn = (mode === "host" || mode === "live") ? getSystemTreeSystemTreeGet : getArchiveTreeInventoryTreeGet;
+                                response = await fetchFn({
+                                        query: { path: node.path }
+                                });
+                        }
 
                         const data = response.data as any[];
                         if (data && Array.isArray(data)) {
@@ -72,7 +79,8 @@
                                         path: d.path,
                                         children: [],
                                         expanded: false,
-                                        hasChildren: d.has_children
+                                        hasChildren: d.has_children,
+                                        discrepancy_count: d.discrepancy_count
                                 }));
                         }
                         loaded = true;
@@ -136,6 +144,11 @@
                         <span class="text-[13px] font-medium truncate">
                                 {node.name === "ROOT" ? "Virtual Root" : node.name}
                         </span>
+                        {#if node.discrepancy_count && node.discrepancy_count > 0}
+                                <span class="ml-auto bg-red-500/20 text-red-400 text-[10px] px-1.5 py-0.5 rounded-full font-medium">
+                                        {node.discrepancy_count}
+                                </span>
+                        {/if}
                 </div>
 
                 {#if loading}

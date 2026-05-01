@@ -817,6 +817,7 @@ class ScannerService:
                                     target_record = path_to_record.get(file_path)
                                     if not target_record:
                                         continue
+
                                     if file_path in batch_results:
                                         target_record.sha256_hash = batch_results[
                                             file_path

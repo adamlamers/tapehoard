@@ -1354,6 +1354,66 @@ export type GetSystemTreeSystemTreeGetResponses = {
 
 export type GetSystemTreeSystemTreeGetResponse = GetSystemTreeSystemTreeGetResponses[keyof GetSystemTreeSystemTreeGetResponses];
 
+export type GetDiscrepanciesTreeGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Path
+         */
+        path?: string | null;
+    };
+    url: '/system/discrepancies/tree';
+};
+
+export type GetDiscrepanciesTreeGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetDiscrepanciesTreeGetError = GetDiscrepanciesTreeGetErrors[keyof GetDiscrepanciesTreeGetErrors];
+
+export type GetDiscrepanciesTreeGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: Array<TreeNodeSchema>;
+};
+
+export type GetDiscrepanciesTreeGetResponse = GetDiscrepanciesTreeGetResponses[keyof GetDiscrepanciesTreeGetResponses];
+
+export type BrowseDiscrepanciesGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Path
+         */
+        path?: string | null;
+    };
+    url: '/system/discrepancies/browse';
+};
+
+export type BrowseDiscrepanciesGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BrowseDiscrepanciesGetError = BrowseDiscrepanciesGetErrors[keyof BrowseDiscrepanciesGetErrors];
+
+export type BrowseDiscrepanciesGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: BrowseResponseSchema;
+};
+
+export type BrowseDiscrepanciesGetResponse = BrowseDiscrepanciesGetResponses[keyof BrowseDiscrepanciesGetResponses];
+
 export type ListDiscrepanciesSystemDiscrepanciesGetData = {
     body?: never;
     path?: never;

@@ -13,7 +13,9 @@
                 ShieldCheck,
                 ShieldAlert,
                 Square,
-                EyeOff
+                EyeOff,
+                Undo2,
+                Trash2
         } from "lucide-svelte";
         import { Checkbox } from "$lib/components/ui/checkbox";
         import { Button } from "$lib/components/ui/button";
@@ -27,6 +29,8 @@
                 onClick = (e: MouseEvent) => {},
                 onDoubleClick = () => {},
                 onToggleTrack = () => {},
+                onUndoDismiss = () => {},
+                onDelete = () => {},
                 mode = "host",
                 colWidths = { mtime: 200, type: 150, size: 120 }
         } = $props<{
@@ -36,7 +40,9 @@
                 onClick?: (e: MouseEvent) => void;
                 onDoubleClick?: () => void;
                 onToggleTrack?: () => void;
-                mode?: "host" | "index" | "live" | "cart";
+                onUndoDismiss?: () => void;
+                onDelete?: () => void;
+                mode?: "host" | "index" | "live" | "cart" | "discrepancies";
                 colWidths?: { mtime: number; type: number; size: number };
         }>();
 
@@ -200,6 +206,20 @@
                                                 </div>
                                         {/if}
                                 {/if}
+                                {#if mode === "discrepancies"}
+                                        {#if item.is_deleted}
+                                                <span class="inline-flex items-center gap-1 bg-red-500/10 text-red-400 text-[10px] px-1.5 py-0.5 rounded border border-red-500/20 font-medium">
+                                                        <Trash2 size={10} />
+                                                        Deleted
+                                                </span>
+                                        {/if}
+                                        {#if item.has_versions}
+                                                <span class="inline-flex items-center gap-1 bg-green-500/10 text-green-400 text-[10px] px-1.5 py-0.5 rounded border border-green-500/20 font-medium">
+                                                        <ShieldCheck size={10} />
+                                                        Has Versions
+                                                </span>
+                                        {/if}
+                                {/if}
                         </div>
                 </div>
         </div>
@@ -229,13 +249,40 @@
         </div>
 
         <!-- QUICK ACTIONS -->
-        <div class="w-10 shrink-0 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button
-                        variant="ghost"
-                        size="icon"
-                        class="h-7 w-7 text-text-secondary hover:text-text-primary hover:bg-white/10"
-                >
-                        <MoreVertical size={14} />
-                </Button>
+        <div class="w-24 shrink-0 flex items-center justify-end gap-1 px-2">
+                {#if mode === "discrepancies"}
+                        {#if item.discrepancy_id}
+                                <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        class="h-7 w-7 text-text-secondary hover:text-blue-400 hover:bg-blue-500/10"
+                                        onclick={(e) => { e.stopPropagation(); onUndoDismiss(); }}
+                                        title="Undo dismiss"
+                                >
+                                        <Undo2 size={14} />
+                                </Button>
+                        {/if}
+                        {#if item.is_deleted}
+                                <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        class="h-7 w-7 text-text-secondary hover:text-red-400 hover:bg-red-500/10"
+                                        onclick={(e) => { e.stopPropagation(); onDelete(); }}
+                                        title="Delete permanently"
+                                >
+                                        <Trash2 size={14} />
+                                </Button>
+                        {/if}
+                {:else}
+                        <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        class="h-7 w-7 text-text-secondary hover:text-text-primary hover:bg-white/10"
+                                >
+                                        <MoreVertical size={14} />
+                                </Button>
+                        </div>
+                {/if}
         </div>
 </div>
