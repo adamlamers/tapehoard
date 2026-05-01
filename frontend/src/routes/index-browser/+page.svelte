@@ -314,18 +314,18 @@
                             <!-- Core Stats -->
                             <div class="grid grid-cols-2 gap-4">
                                 <div class="space-y-1">
-                                    <span class="text-5xs font-medium text-text-secondary opacity-50 block uppercase tracking-wider">
+                                    <span class="text-xs font-medium text-text-secondary opacity-60 block">
                                         {selectedItemMetadata.type === 'directory' ? 'Aggregate Size' : 'File Size'}
                                     </span>
                                     <span class="text-xs font-semibold text-text-primary mono">{formatSize(selectedItemMetadata.size)}</span>
                                 </div>
                                 <div class="space-y-1">
-                                    <span class="text-5xs font-medium text-text-secondary opacity-50 block uppercase tracking-wider">Last Indexed</span>
+                                    <span class="text-xs font-medium text-text-secondary opacity-60 block">Last Indexed</span>
                                     <span class="text-xs font-semibold text-text-primary mono">{formatLocalDate(selectedItemMetadata.last_seen_timestamp)}</span>
                                 </div>
                                 {#if selectedItemMetadata.type === 'directory'}
                                     <div class="space-y-1 col-span-2">
-                                        <span class="text-5xs font-medium text-text-secondary opacity-50 block uppercase tracking-wider">Child Count</span>
+                                        <span class="text-xs font-medium text-text-secondary opacity-60 block">Child Count</span>
                                         <span class="text-xs font-semibold text-text-primary mono">{selectedItemMetadata.child_count?.toLocaleString()} Indexed Files</span>
                                     </div>
                                 {/if}
@@ -334,7 +334,7 @@
                             {#if selectedItemMetadata.type === 'file'}
                                 <!-- Hash -->
                                 <div class="space-y-2">
-                                    <span class="text-5xs font-medium text-text-secondary opacity-50 block uppercase tracking-wider">SHA-256 Fingerprint</span>
+                                    <span class="text-xs font-medium text-text-secondary opacity-60 block">SHA-256 Fingerprint</span>
                                     <div class="bg-bg-primary p-2.5 rounded-lg border border-border-color/50 break-all mono text-5xs text-blue-400/80 leading-relaxed">
                                         {selectedItemMetadata.sha256_hash || 'Pending computation...'}
                                     </div>
@@ -344,34 +344,37 @@
                                 <div class="space-y-3">
                                     <div class="flex items-center gap-2">
                                         <ShieldCheck size={12} class="text-success-color" />
-                                        <span class="text-5xs font-bold uppercase tracking-wider text-text-primary">Storage Locations</span>
+                                        <span class="text-xs font-medium text-text-secondary opacity-60">Storage Locations</span>
                                     </div>
 
                                     <div class="space-y-2">
                                         {#each selectedItemMetadata.versions || [] as version}
-                                            <div class="bg-bg-primary/50 border border-border-color rounded-lg p-2.5 group hover:border-blue-500/30 transition-all">
-                                                <div class="flex justify-between items-center mb-1.5">
-                                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-5xs font-bold border border-blue-500/20">
-                                                        {(version as any).media_id || (version as any).media_identifier}
+                                            <div class="bg-bg-primary/50 border border-border-color rounded-lg p-2 group hover:border-blue-500/30 transition-all">
+                                                <div class="flex items-center gap-2 mb-1">
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-xs font-semibold border border-blue-500/20 truncate">
+                                                        {(version as any).media_id}
                                                     </span>
-                                                    <span class="text-6xs font-medium text-text-secondary opacity-40 uppercase tracking-tighter">
+                                                    <span class="text-xs font-medium text-text-secondary opacity-40 uppercase tracking-tight ml-auto shrink-0">
                                                         {(version as any).media_type}
                                                     </span>
                                                 </div>
-                                                <div class="flex flex-col gap-1">
-                                                    <div class="flex items-center gap-2 text-5xs text-text-secondary">
-                                                        <FolderTree size={10} class="opacity-50" />
-                                                        <span class="mono">POS: {(version as any).archive_id || (version as any).file_number}</span>
+                                                <div class="flex flex-col gap-0.5 text-xs">
+                                                    <div class="flex items-center gap-1.5 text-text-secondary">
+                                                        <FolderTree size={10} class="opacity-50 shrink-0" />
+                                                        <span class="mono truncate">{(version as any).archive_id}</span>
+                                                        <span class="text-text-secondary opacity-40 text-[10px] ml-auto shrink-0">
+                                                            {(version as any).media_type === 'tape' ? 'POS' : 'Path'}
+                                                        </span>
                                                     </div>
-                                                    <div class="flex items-center gap-1.5 opacity-60 text-5xs">
-                                                        <Clock size={10} class="opacity-50" />
-                                                        <span>Archived: {formatLocalDateTime((version as any).timestamp || (version as any).created_at)}</span>
+                                                    <div class="flex items-center gap-1.5 opacity-60">
+                                                        <Clock size={10} class="opacity-50 shrink-0" />
+                                                        <span class="truncate">Archived: {formatLocalDateTime((version as any).timestamp || (version as any).created_at)}</span>
                                                     </div>
                                                 </div>
                                             </div>
                                         {:else}
                                             <div class="py-6 text-center border-2 border-dashed border-border-color rounded-xl opacity-30">
-                                                <p class="text-5xs font-bold uppercase tracking-wider">No versions stored on media.</p>
+                                                <p class="text-[10px] font-medium text-text-secondary uppercase tracking-tight">No versions stored on media.</p>
                                             </div>
                                         {/each}
                                     </div>
@@ -403,7 +406,7 @@
             {:else}
                 <div class="flex-1 border-2 border-dashed border-border-color rounded-xl flex flex-col items-center justify-center p-8 text-center opacity-20">
                     <Library size={40} class="mb-3 text-blue-500" />
-                    <p class="text-4xs font-bold uppercase tracking-wider leading-relaxed">
+                    <p class="text-xs font-medium text-text-secondary leading-relaxed">
                         Select an item from the index<br>to view detailed metadata and<br>storage locations.
                     </p>
                 </div>

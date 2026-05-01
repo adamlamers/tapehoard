@@ -163,7 +163,7 @@
         // --- Navigation Tree Definition ---
 
         const sourceDataRoot = $derived({
-                name: "All Sources",
+                name: "Source Root",
                 path: "ROOT",
                 expanded: true,
                 children: [],
@@ -216,6 +216,7 @@
         });
 
         const activeRoot = $derived(
+                mode === "live" ? sourceDataRoot :
                 mode === "host" ? sourceDataRoot :
                 mode === "index" ? virtualIndexRoot :
                 mode === "discrepancies" ? discrepancyRoot :
@@ -228,6 +229,7 @@
                 if (currentPath === "ROOT") {
                     let name = "All Sources";
                     if (mode === "index") name = "Archive Index";
+                    if (mode === "live" || mode === "host") name = "Source Root";
                     if (mode === "cart") name = "Data Recovery";
                     return [{ name, path: "ROOT" }];
                 }
@@ -237,6 +239,7 @@
 
                 let rootName = "All Sources";
                 if (mode === "index") rootName = "Archive Index";
+                if (mode === "live" || mode === "host") rootName = "Source Root";
                 if (mode === "cart") rootName = "Data Recovery";
                 crumbs.push({ name: rootName, path: "ROOT" });
 
