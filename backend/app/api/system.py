@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import pathspec
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, ConfigDict
@@ -1405,10 +1405,16 @@ def delete_file_record(file_id: int, db_session: Session = Depends(get_db)):
 
 
 @router.get("/discrepancies/tree", response_model=List[TreeNodeSchema])
-def get_discrepancies_tree(db_session: Session = Depends(get_db)):
+def get_discrepancies_tree(
+    path: Optional[str] = Query(
+        default="ROOT", description="Root path to get tree for"
+    ),
+    db_session: Session = Depends(get_db),
+):
     """Returns tree of directories that contain discrepancy files, grouped by source root."""
-    from app.api.inventory import TreeNodeSchema, get_source_roots
+    from app.api.inventory import get_source_roots
 
+    # Get source roots
     roots = get_source_roots(db_session)
 
     # Query all discrepancy files
@@ -1433,8 +1439,8 @@ def get_discrepancies_tree(db_session: Session = Depends(get_db)):
         )
         if directory not in dir_nodes:
             dir_nodes[directory] = TreeNodeSchema(
-                name=directory.split("/")[-1] or directory,
-                path=directory,
+                name=directory.split("/")[-1] or directory or "ROOT",
+                path=directory or "ROOT",
                 has_children=True,
                 children=[],
             )
@@ -1446,27 +1452,81 @@ def get_discrepancies_tree(db_session: Session = Depends(get_db)):
             )
         )
 
-    # Build top-level nodes from source roots
-    result = []
-    for root in roots:
-        root_dirs = [d for d in dir_nodes.keys() if d.startswith(root) or d == root]
-        if root_dirs:
-            children = [dir_nodes[d] for d in sorted(root_dirs)]
-            result.append(
-                TreeNodeSchema(
-                    name=root, path=root, has_children=True, children=children
+    # If path is "ROOT", return top-level nodes grouped by source root
+    if path == "ROOT":
+        result = []
+        seen = set()
+
+        # First add source roots that have discrepancies
+        for root in roots:
+            root_dirs = [d for d in dir_nodes.keys() if d.startswith(root) or d == root]
+            if root_dirs:
+                children = [dir_nodes[d] for d in sorted(root_dirs)]
+                result.append(
+                    TreeNodeSchema(
+                        name=root, path=root, has_children=True, children=children
+                    )
                 )
-            )
+                seen.update(root_dirs)
+
+        # Add directories that don't match any source root as themselves
+        for d in sorted(dir_nodes.keys()):
+            if d not in seen:
+                result.append(dir_nodes[d])
+
+        return result
+
+    # Return immediate children of the given path
+    result = []
+    for dir_path, node in sorted(dir_nodes.items()):
+        if dir_path == path:
+            return node.children
+        elif dir_path.startswith(path + "/"):
+            rel_path = dir_path[len(path) :].strip("/")
+            if "/" not in rel_path:
+                result.append(node)
+
+    return result
+
+    # Return immediate children of the given path
+    result = []
+    for dir_path, node in sorted(dir_nodes.items()):
+        if dir_path == path:
+            # This is the exact node - return its children
+            return node.children
+        elif dir_path.startswith(path + "/"):
+            # This is a subdirectory - check if it's an immediate child
+            rel_path = dir_path[len(path) :].strip("/")
+            if "/" not in rel_path:
+                # Immediate child
+                result.append(node)
+
+    return result
+
+    # Return immediate children of the given path
+    # Path could be a directory like "/data" - return its children
+    result = []
+    for dir_path, node in sorted(dir_nodes.items()):
+        if dir_path == path:
+            # This is the exact node - return its children
+            return node.children
+        elif dir_path.startswith(path + "/"):
+            # This is a subdirectory - check if it's an immediate child
+            rel_path = dir_path[len(path) :].strip("/")
+            if "/" not in rel_path:
+                # Immediate child
+                result.append(node)
 
     return result
 
 
-@router.get("/discrepancies/browse", response_model=List[DiscrepancySchema])
+@router.get("/discrepancies/browse", response_model=dict)
 def browse_discrepancies(
-    path: Optional[str] = None, db_session: Session = Depends(get_db)
+    path: Optional[str] = Query(default="ROOT", description="Directory path to browse"),
+    db_session: Session = Depends(get_db),
 ):
-    """Returns discrepancy files under a given directory path."""
-    # Reuse the query logic from list_discrepancies
+    """Returns discrepancy files and directories under a given directory path."""
+    # Query all discrepancy files
     deleted_records = db_session.query(models.FilesystemState).filter(
         models.FilesystemState.is_deleted.is_(True),
         models.FilesystemState.is_ignored.is_(False),
@@ -1497,25 +1557,69 @@ def browse_discrepancies(
         )
         ids_with_valid_versions = {row[0] for row in valid_version_rows}
 
-    # Filter by path prefix if specified
+    # Build a dict of all file paths
+    all_paths = {r.file_path: r for r in all_records}
+
+    # Find immediate children under the given path
     results = []
-    seen_ids = set()
-    for record in all_records:
-        if record.id in seen_ids:
+    seen_paths = set()
+
+    for file_path, record in all_paths.items():
+        if path == "ROOT":
+            # For ROOT, show top-level directories/files
+            if "/" in file_path:
+                # It's in a subdirectory - get top-level dir
+                parts = file_path.strip("/").split("/")
+                top_dir = parts[0]
+                child_path = "/" + top_dir
+                child_name = top_dir
+            else:
+                # File at root
+                child_path = file_path
+                child_name = file_path
+        else:
+            # Check if this file is under the requested path
+            if file_path != path and not file_path.startswith(path + "/"):
+                continue
+
+            # Get immediate child relative to path
+            rel_path = file_path[len(path) :].strip("/")
+            if "/" in rel_path:
+                # It's a subdirectory - get immediate child
+                child_name = rel_path.split("/")[0]
+                child_path = (
+                    path + "/" + child_name if path != "/" else "/" + child_name
+                )
+            else:
+                # It's a file
+                child_path = file_path
+                child_name = rel_path
+
+        # Skip duplicates
+        if child_path in seen_paths:
             continue
-        seen_ids.add(record.id)
+        seen_paths.add(child_path)
 
-        # Filter by path prefix
-        if (
-            path
-            and not record.file_path.startswith(path + "/")
-            and record.file_path != path
-        ):
-            continue
+        # Check if it's a directory or file
+        is_dir = any(
+            p != child_path and p.startswith(child_path + "/") for p in all_paths
+        )
 
-        has_valid_versions = record.id in ids_with_valid_versions
-
-        if record.is_deleted or not os.path.exists(record.file_path):
+        if is_dir:
+            # Count discrepancy files in this directory
+            file_count = sum(1 for p in all_paths if p.startswith(child_path + "/"))
+            results.append(
+                {
+                    "name": child_name,
+                    "path": child_path,
+                    "type": "directory",
+                    "has_children": file_count > 0,
+                    "discrepancy_count": file_count,
+                }
+            )
+        else:
+            # It's a file
+            has_valid_versions = record.id in ids_with_valid_versions
             results.append(
                 DiscrepancySchema(
                     id=record.id,
@@ -1529,4 +1633,4 @@ def browse_discrepancies(
                 )
             )
 
-    return results
+    return {"files": results}

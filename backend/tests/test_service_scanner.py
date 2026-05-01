@@ -165,18 +165,9 @@ def test_run_hashing_mocked(db_session, mocker):
     db_session.add(f)
     db_session.commit()
 
-    # Mock compute_sha256 to return a fixed hash
-    mocker.patch.object(ScannerService, "compute_sha256", return_value="mocked_hash")
-
     # run_hashing runs in a loop until work is done.
     # Since we aren't in 'is_running' state, it should process the 1 file and stop.
-    try:
-        scanner.run_hashing()
-    except Exception as e:
-        print(f"DEBUG: run_hashing raised exception: {e}")
-        import traceback
-
-        traceback.print_exc()
+    scanner.run_hashing()
 
     db_session.refresh(f)
     assert f.sha256_hash == "mocked_hash"

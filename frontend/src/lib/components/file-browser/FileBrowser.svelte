@@ -10,13 +10,14 @@
                 CheckSquare,
                 Square
         } from "lucide-svelte";
+        import { onMount } from 'svelte';
         import { Button } from "$lib/components/ui/button";
         import { Checkbox } from "$lib/components/ui/checkbox";
         import { ScrollArea } from "$lib/components/ui/scroll-area";
         import { Input } from "$lib/components/ui/input";
         import FileBrowserTreeItem from "./FileBrowserTreeItem.svelte";
         import FileBrowserRowItem from "./FileBrowserRowItem.svelte";
-        import type { FileItem, Breadcrumb } from "$lib/types";
+        import type { FileItem, TreeNode, Breadcrumb } from "$lib/types";
         import { cn } from "$lib/utils";
         import {
             getSystemTreeSystemTreeGet,
@@ -185,12 +186,33 @@
                 hasChildren: true
         });
 
-        const discrepancyRoot = $derived({
+        const discrepancyRoot = $state<TreeNode>({
                 name: "Discrepancies",
                 path: "ROOT",
-                expanded: true,
+                expanded: false,
                 children: [],
                 hasChildren: true
+        });
+
+        // Load discrepancy tree on mount
+        onMount(async () => {
+                if (mode === "discrepancies") {
+                        try {
+                                const response = await getDiscrepanciesTreeGet({ query: { path: "ROOT" } });
+                                if (response.data && Array.isArray(response.data)) {
+                                        discrepancyRoot.children = response.data.map((d: any) => ({
+                                                name: d.name,
+                                                path: d.path,
+                                                children: d.children || [],
+                                                expanded: false,
+                                                hasChildren: d.has_children
+                                        }));
+                                        discrepancyRoot.expanded = true;
+                                }
+                        } catch (error) {
+                                console.error("Failed to load discrepancy tree:", error);
+                        }
+                }
         });
 
         const activeRoot = $derived(

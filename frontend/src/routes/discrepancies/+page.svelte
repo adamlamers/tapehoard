@@ -35,24 +35,48 @@
             const response = await listDiscrepanciesSystemDiscrepanciesGet();
             if (response.data) {
                 discrepancies = response.data;
-                // Convert discrepancies to FileItem format for FileBrowser
-                files = response.data.map((d: DiscrepancySchema) => ({
-                    name: d.path.split('/').pop() || d.path,
-                    path: d.path,
-                    type: 'file',
-                    size: d.size,
-                    mtime: d.mtime ? new Date(d.mtime).getTime() / 1000 : undefined,
-                    discrepancy_id: d.id,
-                    is_deleted: d.is_deleted,
-                    has_versions: d.has_versions,
-                    ignored: false
-                }));
             }
+            await loadFiles(currentPath);
         } catch (error) {
             console.error("Failed to load discrepancies:", error);
             toast.error("Failed to load discrepancies");
         } finally {
             loading = false;
+        }
+    }
+
+    async function loadFiles(path: string) {
+        try {
+            const response = await browseDiscrepanciesGet({ query: { path } });
+            if (response.data?.files) {
+                files = response.data.files.map((d: any) => {
+                    // Check if it's a directory (has "type" property) or a file (has "id")
+                    if (d.type === 'directory') {
+                        // It's a directory
+                        return {
+                            name: d.name || d.path.split('/').pop() || d.path,
+                            path: d.path,
+                            type: 'directory',
+                            discrepancy_count: d.discrepancy_count || 0
+                        };
+                    } else {
+                        // It's a file (DiscrepancySchema)
+                        return {
+                            name: d.path.split('/').pop() || d.path,
+                            path: d.path,
+                            type: 'file',
+                            size: d.size,
+                            mtime: d.mtime ? new Date(d.mtime).getTime() / 1000 : undefined,
+                            discrepancy_id: d.id,
+                            is_deleted: d.is_deleted,
+                            has_versions: d.has_versions,
+                            ignored: false
+                        };
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("Failed to browse discrepancies:", error);
         }
     }
 
@@ -82,12 +106,21 @@
         }
     }
 
-    async function navigateTo(path: string) {
+    function navigateTo(path: string) {
         currentPath = path;
+        loadFiles(path);
     }
 
     const missingItems = $derived(discrepancies.filter(d => d.is_deleted));
     const pendingItems = $derived(discrepancies.filter(d => !d.is_deleted));
+
+    // Statistics
+    const missingWithNoBackup = $derived(
+        discrepancies.filter(d => d.is_deleted && !d.has_versions).length
+    );
+    const missingWithBackup = $derived(
+        discrepancies.filter(d => d.is_deleted && d.has_versions).length
+    );
 
     onMount(loadDiscrepancies);
 </script>
@@ -96,7 +129,7 @@
     <title>Discrepancies - TapeHoard</title>
 </svelte:head>
 
-<div class="flex flex-col gap-6 flex-1 min-h-0 animate-in fade-in duration-700">
+<div class="flex flex-col gap-6 h-full animate-in fade-in duration-700">
     <PageHeader
         title="Discrepancies"
         description="Files missing from disk or confirmed deleted"
@@ -130,12 +163,22 @@
     {:else}
         <!-- Summary Statistics -->
         <div class="grid grid-cols-2 gap-3 shrink-0">
-            <StatCard label="Missing from disk" value={missingItems.length} subLabel="Files the scanner did not find" variant="error" />
-            <StatCard label="Pending confirmation" value={pendingItems.length} subLabel="Tracked files not yet confirmed" variant="warning" />
+            <StatCard
+                label="Missing with no backup"
+                value={missingWithNoBackup}
+                subLabel="Files missing from disk with no copies on archive media"
+                variant="error"
+            />
+            <StatCard
+                label="Missing with backup"
+                value={missingWithBackup}
+                subLabel="Files missing from disk but have copies on archive media"
+                variant="warning"
+            />
         </div>
 
         <!-- FileBrowser Component in discrepancies mode -->
-        <div class="flex-1 min-h-0 overflow-hidden">
+        <div class="flex-1 min-h-[600px] bg-bg-secondary border border-border-color shadow-2xl rounded-lg flex flex-col relative overflow-hidden">
             <FileBrowser
                 bind:currentPath={currentPath}
                 files={files}

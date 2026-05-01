@@ -753,7 +753,7 @@ class ScannerService:
                 FETCH_LIMIT = HASH_BATCH_SIZE * 4
 
                 while self.is_hashing:
-                    # Find unindexed work (exclude deleted files)
+                    # Find unindexed work (exclude deleted files - they cannot be hashed)
                     hashing_targets = (
                         db_session.query(models.FilesystemState)
                         .filter(
