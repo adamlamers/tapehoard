@@ -256,7 +256,7 @@
                                         variant="ghost"
                                         size="icon"
                                         class="h-7 w-7 text-text-secondary hover:text-blue-400 hover:bg-blue-500/10"
-                                        onclick={(e) => { e.stopPropagation(); onUndoDismiss(); }}
+                                        onclick={(e: MouseEvent) => { e.stopPropagation(); onUndoDismiss(); }}
                                         title="Undo dismiss"
                                 >
                                         <Undo2 size={14} />
@@ -267,7 +267,7 @@
                                         variant="ghost"
                                         size="icon"
                                         class="h-7 w-7 text-text-secondary hover:text-red-400 hover:bg-red-500/10"
-                                        onclick={(e) => { e.stopPropagation(); onDelete(); }}
+                                        onclick={(e: MouseEvent) => { e.stopPropagation(); onDelete(); }}
                                         title="Delete permanently"
                                 >
                                         <Trash2 size={14} />

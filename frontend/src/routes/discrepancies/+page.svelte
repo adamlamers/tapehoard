@@ -17,8 +17,8 @@
         browseDiscrepanciesGet,
         getDiscrepanciesTreeGet,
         type DiscrepancySchema,
-        type FileItem
     } from '$lib/api';
+    import { type FileItem } from '$lib/types';
     import { POLL_FAST } from '$lib/config';
 
     let discrepancies = $state<DiscrepancySchema[]>([]);
@@ -39,9 +39,9 @@
                 files = response.data.map((d: DiscrepancySchema) => ({
                     name: d.path.split('/').pop() || d.path,
                     path: d.path,
-                    type: d.is_deleted ? 'file' : 'file',
+                    type: 'file',
                     size: d.size,
-                    mtime: d.mtime,
+                    mtime: d.mtime ? new Date(d.mtime).getTime() / 1000 : undefined,
                     discrepancy_id: d.id,
                     is_deleted: d.is_deleted,
                     has_versions: d.has_versions,
