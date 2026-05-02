@@ -200,7 +200,11 @@ def _discover_files_fast(
 
     # -printf format: path\tsize\tmtime (tab-separated; split from right for safety)
     find_binary = _FAST_FIND_BINARY
-    assert find_binary is not None
+    if find_binary is None:
+        logger.warning(
+            "Fast file discovery requested but no compatible `find` binary found"
+        )
+        return 0, 0
     cmd = [
         find_binary,
         root_base,
