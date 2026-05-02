@@ -45,10 +45,13 @@ def test_cloud_secret_fallback(mocker):
     """Verifies that the provider prioritizes local config over global settings for passphrases."""
     from app.core.config import settings
 
+    # Mock boto3.client to avoid slow initialization in unit tests
+    mocker.patch("app.providers.cloud.boto3")
+
     # Mock global settings
     mocker.patch.object(settings, "encryption_passphrase", "global-fallback")
 
-    # CASE 1: Local config provides passphrase
+    # CASE1: Local config provides passphrase
     config_local = {"bucket_name": "b", "encryption_passphrase": "local-override"}
     provider_local = CloudStorageProvider(config_local)
     assert provider_local.passphrase == "local-override"

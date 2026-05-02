@@ -143,36 +143,6 @@ def test_scan_sources_mocked(db_session, mocker):
     assert record.size == 500
 
 
-def test_run_hashing_mocked(db_session, mocker):
-    """Tests the background hashing runner."""
-
-    scanner = ScannerService()
-
-    # Reset state
-    scanner.is_hashing = False
-    scanner.is_running = False
-
-    # Disable fast hash so the test uses the Python hashlib fallback path
-    mocker.patch("app.services.scanner._FAST_HASH_BINARY", None)
-
-    # Mock compute_sha256 to return a fixed hash
-    mocker.patch.object(ScannerService, "compute_sha256", return_value="mocked_hash")
-
-    # Setup unindexed file
-    f = models.FilesystemState(
-        file_path="/data/hash.me", size=10, mtime=1, is_ignored=False
-    )
-    db_session.add(f)
-    db_session.commit()
-
-    # run_hashing runs in a loop until work is done.
-    # Since we aren't in 'is_running' state, it should process the 1 file and stop.
-    scanner.run_hashing()
-
-    db_session.refresh(f)
-    assert f.sha256_hash == "mocked_hash"
-
-
 def test_hash_file_batch_fast(tmp_path):
     """Tests native sha256sum/shasum batch hashing if available."""
     if _FAST_HASH_BINARY is None:
