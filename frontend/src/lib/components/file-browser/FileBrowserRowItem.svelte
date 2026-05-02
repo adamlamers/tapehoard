@@ -14,7 +14,6 @@
                 ShieldAlert,
                 Square,
                 EyeOff,
-                Undo2,
                 Trash2
         } from "lucide-svelte";
         import { Checkbox } from "$lib/components/ui/checkbox";
@@ -29,7 +28,7 @@
                 onClick = (e: MouseEvent) => {},
                 onDoubleClick = () => {},
                 onToggleTrack = () => {},
-                onUndoDismiss = () => {},
+                onAddToCart = () => {},
                 onDelete = () => {},
                 mode = "host",
                 colWidths = { mtime: 200, type: 150, size: 120 }
@@ -40,7 +39,7 @@
                 onClick?: (e: MouseEvent) => void;
                 onDoubleClick?: () => void;
                 onToggleTrack?: () => void;
-                onUndoDismiss?: () => void;
+                onAddToCart?: () => void;
                 onDelete?: () => void;
                 mode?: "host" | "index" | "live" | "cart" | "discrepancies";
                 colWidths?: { mtime: number; type: number; size: number };
@@ -251,15 +250,15 @@
         <!-- QUICK ACTIONS -->
         <div class="w-24 shrink-0 flex items-center justify-end gap-1 px-2">
                 {#if mode === "discrepancies"}
-                        {#if item.discrepancy_id}
+                        {#if item.discrepancy_id && item.has_versions && !item.is_deleted}
                                 <Button
                                         variant="ghost"
                                         size="icon"
-                                        class="h-7 w-7 text-text-secondary hover:text-blue-400 hover:bg-blue-500/10"
-                                        onclick={(e: MouseEvent) => { e.stopPropagation(); onUndoDismiss(); }}
-                                        title="Undo dismiss"
+                                        class="h-7 w-7 text-text-secondary hover:text-green-400 hover:bg-green-500/10"
+                                        onclick={(e: MouseEvent) => { e.stopPropagation(); onAddToCart(); }}
+                                        title="Add to restore cart"
                                 >
-                                        <Undo2 size={14} />
+                                        <CassetteTape size={14} />
                                 </Button>
                         {/if}
                         {#if item.is_deleted}

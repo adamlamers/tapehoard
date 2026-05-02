@@ -80,16 +80,15 @@
         }
     }
 
-    async function undoDismiss(item: FileItem) {
+    async function addToCart(item: FileItem) {
         if (!item.discrepancy_id) return;
         try {
-            await dismissDiscrepancySystemDiscrepanciesFileIdDismissPost({
+            await addFileToRecoveryQueueRestoresQueueFileFileIdPost({
                 path: { file_id: item.discrepancy_id }
             });
-            toast.success("Dismissal undone");
-            await loadDiscrepancies();
+            toast.success("Added to restore cart");
         } catch (error: any) {
-            toast.error(error.body?.detail || "Failed to undo dismiss");
+            toast.error(error.body?.detail || "Failed to add to restore cart");
         }
     }
 
@@ -184,7 +183,7 @@
                 files={files}
                 mode="discrepancies"
                 onNavigate={navigateTo}
-                onUndoDismiss={undoDismiss}
+                onAddToCart={addToCart}
                 onDelete={deletePermanently}
             />
         </div>

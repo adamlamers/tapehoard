@@ -330,8 +330,8 @@ test.describe('Discrepancies', () => {
     await expect(page.getByText('Files missing from disk or confirmed deleted')).toBeVisible();
 
     console.log('Step 3: Verify summary cards are visible');
-    await expect(page.locator('span').filter({ hasText: 'Missing from disk' }).first()).toBeVisible();
-    await expect(page.locator('span').filter({ hasText: 'Pending confirmation' }).first()).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: 'Missing with no backup' }).first()).toBeVisible();
+    await expect(page.locator('span').filter({ hasText: 'Missing with backup' }).first()).toBeVisible();
 
     await requestContext.dispose();
   });

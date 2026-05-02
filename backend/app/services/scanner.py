@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import psutil
 from loguru import logger
 from sqlalchemy.orm import Session
-from sqlalchemy.orm.exc import StaleDataError
+from sqlalchemy.orm.exc import ObjectDeletedError, StaleDataError
 
 from app.db import models
 from app.db.database import SessionLocal
@@ -911,6 +911,16 @@ class ScannerService:
                     )
                     JobManager.complete_job(hashing_job.id)
 
+        except ObjectDeletedError:
+            logger.debug(
+                "Background hashing aborted: Job was deleted by another process"
+            )
+            # Exit gracefully - another process cancelled this job
+            try:
+                with self._metrics_lock:
+                    self.is_hashing = False
+            except Exception:
+                pass
         except Exception as e:
             logger.error(f"Background hashing failed: {e}")
             # Try to report failure, but don't blow up if JobManager fails too

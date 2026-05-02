@@ -35,7 +35,7 @@
                 onNavigate = (path: string) => {},
                 onToggleTrack = (item: FileItem) => {},
                 onSelect = (item: FileItem) => {},
-                onUndoDismiss = (item: FileItem) => {},
+                onAddToCart = (item: FileItem) => {},
                 onDelete = (item: FileItem) => {},
                 mode = "host",
                 isSearching = false,
@@ -47,7 +47,7 @@
                 onNavigate?: (path: string) => void;
                 onToggleTrack?: (item: FileItem) => void;
                 onSelect?: (item: FileItem) => void;
-                onUndoDismiss?: (item: FileItem) => void;
+                onAddToCart?: (item: FileItem) => void;
                 onDelete?: (item: FileItem) => void;
                 mode?: "host" | "index" | "cart" | "live" | "discrepancies";
                 isSearching?: boolean;
@@ -605,7 +605,7 @@
                                                                         onClick={(e) => handleRowClick(e, item)}
                                                                         onDoubleClick={() => handleRowDoubleClick(item)}
                                                                         onToggleTrack={() => onToggleTrack(item)}
-                                                                        onUndoDismiss={() => onUndoDismiss(item)}
+                                                                        onAddToCart={() => onAddToCart(item)}
                                                                         onDelete={() => onDelete(item)}
                                                                 />
                                                         {/each}
