@@ -679,8 +679,8 @@ class ArchiverService:
                 if chunk_file.startswith("backup_") and chunk_file.endswith(".tar"):
                     try:
                         os.remove(os.path.join(self.staging_directory, chunk_file))
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Failed to remove staging file {chunk_file}: {e}")
 
     def run_restore(self, db_session: Session, destination_root: str, job_id: int):
         """Orchestrates the retrieval and reassembly of data from storage providers."""
@@ -825,8 +825,10 @@ class ArchiverService:
                                         final_path,
                                         (v.file_state.mtime, v.file_state.mtime),
                                     )
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    logger.debug(
+                                        f"Failed to restore mtime for {final_path}: {e}"
+                                    )
 
                             processed_bytes += v.offset_end - v.offset_start
                             JobManager.update_job(
@@ -900,8 +902,10 @@ class ArchiverService:
                                                 os.chown(
                                                     final_path, member.uid, member.gid
                                                 )
-                                            except Exception:
-                                                pass
+                                            except Exception as e:
+                                                logger.debug(
+                                                    f"Failed to restore ownership for {final_path}: {e}"
+                                                )
                                         except Exception as meta_err:
                                             logger.debug(
                                                 f"Failed to apply metadata to {final_path}: {meta_err}"
