@@ -14,8 +14,8 @@
         batchHardDeleteSystemDiscrepanciesBatchDeletePost,
         addFileToRecoveryQueueRestoresQueueFileFileIdPost,
         batchAddToRecoveryQueueRestoresQueueBatchPost,
-        browseDiscrepanciesGet,
-        getDiscrepanciesTreeGet,
+        browseDiscrepanciesSystemDiscrepanciesBrowseGet,
+        getDiscrepanciesTreeSystemDiscrepanciesTreeGet,
         type DiscrepancySchema,
     } from '$lib/api';
     import { type FileItem } from '$lib/types';
@@ -47,9 +47,9 @@
 
     async function loadFiles(path: string) {
         try {
-            const response = await browseDiscrepanciesGet({ query: { path } });
-            if (response.data?.files) {
-                files = response.data.files.map((d: any) => {
+            const response = await browseDiscrepanciesSystemDiscrepanciesBrowseGet({ query: { path } });
+            if (response.data && (response.data as any).files) {
+                files = (response.data as any).files.map((d: any) => {
                     // Check if it's a directory (has "type" property) or a file (has "id")
                     if (d.type === 'directory') {
                         // It's a directory

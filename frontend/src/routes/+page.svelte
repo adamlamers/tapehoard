@@ -162,6 +162,14 @@
                                 <p class="text-[10px] font-medium text-text-secondary uppercase opacity-40">Pending archival</p>
                             </div>
                         </div>
+
+                        <div class="space-y-4">
+                            <div class="flex flex-col gap-1.5">
+                                <span class="text-xs text-text-secondary opacity-60 block">Missing files</span>
+                                <h4 class="text-3xl font-bold text-orange-400 mono tabular-nums">{(stats.discrepancies_count || 0).toLocaleString()}</h4>
+                                <p class="text-[10px] font-medium text-text-secondary uppercase opacity-40">Unresolved discrepancies</p>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mt-8 pt-6 border-t border-border-color/30 grid grid-cols-2 gap-6">

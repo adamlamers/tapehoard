@@ -567,8 +567,82 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
             {"path": dup[0], "size": dup[1], "copies": dup[2], "saved": dup[3]}
             for dup in duplicate_offenders
         ],
-        "directories": convert_tree_to_list(nested_dir_map, 10),
     }
+
+
+@router.get("/directories")
+def get_directory_treemap(db_session: Session = Depends(get_db)):
+    """Returns directory tree data for treemap visualization."""
+    # Directory aggregation - same as insights but only directories
+    directory_aggregation_sql = text("""
+        SELECT
+            RTRIM(file_path, REPLACE(file_path, '/', '')) as dir_path,
+            SUM(size) as byte_total,
+            MAX(mtime) as latest_mtime
+        FROM filesystem_state
+        WHERE is_ignored = 0
+        GROUP BY dir_path
+    """)
+    all_directories = db_session.execute(directory_aggregation_sql).fetchall()
+
+    # Hierarchical tree construction
+    nested_dir_map = {}
+    for path_str, size_val, mtime_val in all_directories:
+        if not path_str:
+            continue
+        path_segments = [p for p in path_str.split("/") if p]
+
+        current_node = nested_dir_map
+        accumulated_path = ""
+        for segment in path_segments:
+            if not accumulated_path:
+                accumulated_path = (
+                    "/" + segment if path_str.startswith("/") else segment
+                )
+            else:
+                accumulated_path += "/" + segment
+
+            if segment not in current_node:
+                current_node[segment] = {
+                    "size": 0,
+                    "mtime": 0,
+                    "children": {},
+                    "fullPath": accumulated_path,
+                }
+            current_node[segment]["size"] += size_val or 0
+            current_node[segment]["mtime"] = max(
+                current_node[segment]["mtime"], mtime_val or 0
+            )
+            current_node = current_node[segment]["children"]
+
+    # Collapse unhelpful single-child roots
+    while len(nested_dir_map) == 1:
+        root_key = list(nested_dir_map.keys())[0]
+        if not nested_dir_map[root_key]["children"]:
+            break
+        nested_dir_map = nested_dir_map[root_key]["children"]
+
+    def convert_tree_to_list(tree_dict, max_depth, current_depth=0):
+        if current_depth >= max_depth:
+            return []
+        output_list = []
+        for key, value in tree_dict.items():
+            children_list = convert_tree_to_list(
+                value["children"], max_depth, current_depth + 1
+            )
+            output_list.append(
+                {
+                    "path": key,
+                    "size": value["size"],
+                    "mtime": value["mtime"],
+                    "fullPath": value["fullPath"],
+                    "children": children_list,
+                }
+            )
+        output_list.sort(key=lambda x: x["size"], reverse=True)
+        return output_list[:15]
+
+    return convert_tree_to_list(nested_dir_map, 10)
 
 
 @router.get("/detect")

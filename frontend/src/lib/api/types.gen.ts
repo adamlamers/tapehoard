@@ -171,6 +171,10 @@ export type DashboardStatsSchema = {
      */
     unprotected_data_size: number;
     /**
+     * Discrepancies Count
+     */
+    discrepancies_count: number;
+    /**
      * Media Distribution
      */
     media_distribution: {
@@ -684,6 +688,10 @@ export type TreeNodeSchema = {
      * Has Children
      */
     has_children?: boolean;
+    /**
+     * Children
+     */
+    children?: Array<TreeNodeSchema>;
 };
 
 /**
@@ -1354,66 +1362,6 @@ export type GetSystemTreeSystemTreeGetResponses = {
 
 export type GetSystemTreeSystemTreeGetResponse = GetSystemTreeSystemTreeGetResponses[keyof GetSystemTreeSystemTreeGetResponses];
 
-export type GetDiscrepanciesTreeGetData = {
-    body?: never;
-    path?: never;
-    query?: {
-        /**
-         * Path
-         */
-        path?: string | null;
-    };
-    url: '/system/discrepancies/tree';
-};
-
-export type GetDiscrepanciesTreeGetErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetDiscrepanciesTreeGetError = GetDiscrepanciesTreeGetErrors[keyof GetDiscrepanciesTreeGetErrors];
-
-export type GetDiscrepanciesTreeGetResponses = {
-    /**
-     * Successful Response
-     */
-    200: Array<TreeNodeSchema>;
-};
-
-export type GetDiscrepanciesTreeGetResponse = GetDiscrepanciesTreeGetResponses[keyof GetDiscrepanciesTreeGetResponses];
-
-export type BrowseDiscrepanciesGetData = {
-    body?: never;
-    path?: never;
-    query?: {
-        /**
-         * Path
-         */
-        path?: string | null;
-    };
-    url: '/system/discrepancies/browse';
-};
-
-export type BrowseDiscrepanciesGetErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type BrowseDiscrepanciesGetError = BrowseDiscrepanciesGetErrors[keyof BrowseDiscrepanciesGetErrors];
-
-export type BrowseDiscrepanciesGetResponses = {
-    /**
-     * Successful Response
-     */
-    200: BrowseResponseSchema;
-};
-
-export type BrowseDiscrepanciesGetResponse = BrowseDiscrepanciesGetResponses[keyof BrowseDiscrepanciesGetResponses];
-
 export type ListDiscrepanciesSystemDiscrepanciesGetData = {
     body?: never;
     path?: never;
@@ -1557,6 +1505,34 @@ export type DismissDiscrepancySystemDiscrepanciesFileIdDismissPostResponses = {
     200: unknown;
 };
 
+export type UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostData = {
+    body?: never;
+    path: {
+        /**
+         * File Id
+         */
+        file_id: number;
+    };
+    query?: never;
+    url: '/system/discrepancies/{file_id}/undo-dismiss';
+};
+
+export type UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostError = UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostErrors[keyof UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostErrors];
+
+export type UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type DeleteFileRecordSystemDiscrepanciesFileIdDeleteData = {
     body?: never;
     path: {
@@ -1584,6 +1560,76 @@ export type DeleteFileRecordSystemDiscrepanciesFileIdDeleteResponses = {
      */
     200: unknown;
 };
+
+export type GetDiscrepanciesTreeSystemDiscrepanciesTreeGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Path
+         *
+         * Root path to get tree for
+         */
+        path?: string | null;
+    };
+    url: '/system/discrepancies/tree';
+};
+
+export type GetDiscrepanciesTreeSystemDiscrepanciesTreeGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetDiscrepanciesTreeSystemDiscrepanciesTreeGetError = GetDiscrepanciesTreeSystemDiscrepanciesTreeGetErrors[keyof GetDiscrepanciesTreeSystemDiscrepanciesTreeGetErrors];
+
+export type GetDiscrepanciesTreeSystemDiscrepanciesTreeGetResponses = {
+    /**
+     * Response Get Discrepancies Tree System Discrepancies Tree Get
+     *
+     * Successful Response
+     */
+    200: Array<TreeNodeSchema>;
+};
+
+export type GetDiscrepanciesTreeSystemDiscrepanciesTreeGetResponse = GetDiscrepanciesTreeSystemDiscrepanciesTreeGetResponses[keyof GetDiscrepanciesTreeSystemDiscrepanciesTreeGetResponses];
+
+export type BrowseDiscrepanciesSystemDiscrepanciesBrowseGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Path
+         *
+         * Directory path to browse
+         */
+        path?: string | null;
+    };
+    url: '/system/discrepancies/browse';
+};
+
+export type BrowseDiscrepanciesSystemDiscrepanciesBrowseGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BrowseDiscrepanciesSystemDiscrepanciesBrowseGetError = BrowseDiscrepanciesSystemDiscrepanciesBrowseGetErrors[keyof BrowseDiscrepanciesSystemDiscrepanciesBrowseGetErrors];
+
+export type BrowseDiscrepanciesSystemDiscrepanciesBrowseGetResponses = {
+    /**
+     * Response Browse Discrepancies System Discrepancies Browse Get
+     *
+     * Successful Response
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type BrowseDiscrepanciesSystemDiscrepanciesBrowseGetResponse = BrowseDiscrepanciesSystemDiscrepanciesBrowseGetResponses[keyof BrowseDiscrepanciesSystemDiscrepanciesBrowseGetResponses];
 
 export type ListStorageProvidersInventoryProvidersGetData = {
     body?: never;
@@ -1782,6 +1828,20 @@ export type GetSystemAnalyticsInventoryInsightsGetData = {
 };
 
 export type GetSystemAnalyticsInventoryInsightsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type GetDirectoryTreemapInventoryDirectoriesGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/inventory/directories';
+};
+
+export type GetDirectoryTreemapInventoryDirectoriesGetResponses = {
     /**
      * Successful Response
      */

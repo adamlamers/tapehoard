@@ -18,13 +18,16 @@
     import StatCard from '$lib/components/ui/StatCard.svelte';
     import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
     import Treemap from '$lib/components/Treemap.svelte';
-    import { getSystemAnalyticsInventoryInsightsGet } from '$lib/api';
+    import { getSystemAnalyticsInventoryInsightsGet, getDirectoryTreemapInventoryDirectoriesGet } from '$lib/api';
     import { cn, formatSize } from '$lib/utils';
     import { toast } from 'svelte-sonner';
     import { goto } from '$app/navigation';
 
     let insights = $state<any>(null);
     let loading = $state(true);
+    let dirTreemapLoaded = $state(false);
+    let dirTreemapLoading = $state(false);
+    let dirTreemapData = $state<any[]>([]);
 
     async function loadInsights() {
         loading = true;
@@ -35,6 +38,22 @@
             toast.error("Failed to generate analytics");
         } finally {
             loading = false;
+        }
+    }
+
+    async function loadDirTreemap() {
+        if (dirTreemapLoaded) return;
+        dirTreemapLoading = true;
+        try {
+            const response = await getDirectoryTreemapInventoryDirectoriesGet();
+            if (response.data) {
+                dirTreemapData = mapDirectoryTree(response.data as any[]);
+                dirTreemapLoaded = true;
+            }
+        } catch (error) {
+            toast.error("Failed to load directory treemap");
+        } finally {
+            dirTreemapLoading = false;
         }
     }
 
@@ -150,14 +169,29 @@
 
                 <!-- DIRECTORY BREAKDOWN (Full Width) -->
                 <Card class="p-5 shadow-xl flex flex-col gap-8 lg:col-span-2">
-                    <SectionHeader title="Space by directory" icon={FolderTree} iconColor="text-emerald-500" />
-
-                    <div class="flex-1 flex flex-col min-h-0 min-h-[500px]">
-                        <Treemap
-                            items={mapDirectoryTree(insights.directories)}
-                            onSelect={handleDirectorySelect}
-                        />
+                    <div class="flex items-center justify-between">
+                        <SectionHeader title="Space by directory" icon={FolderTree} iconColor="text-emerald-500" />
+                        {#if !dirTreemapLoaded}
+                            <Button variant="outline" size="sm" onclick={loadDirTreemap} disabled={dirTreemapLoading}>
+                                {dirTreemapLoading ? 'Loading...' : 'Load directory treemap'}
+                            </Button>
+                        {/if}
                     </div>
+
+                    {#if dirTreemapLoaded}
+                        <div class="flex-1 flex flex-col min-h-0 min-h-[500px]">
+                            <Treemap
+                                items={dirTreemapData}
+                                onSelect={handleDirectorySelect}
+                            />
+                        </div>
+                    {:else}
+                        <div class="flex-1 flex items-center justify-center min-h-[300px] border-2 border-dashed border-border-color rounded-xl">
+                            <Button variant="outline" onclick={loadDirTreemap} disabled={dirTreemapLoading}>
+                                {dirTreemapLoading ? 'Loading...' : 'Click to load directory treemap'}
+                            </Button>
+                        </div>
+                    {/if}
                 </Card>
             </div>
         </div>

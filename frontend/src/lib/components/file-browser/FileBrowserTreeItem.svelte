@@ -5,7 +5,7 @@
         import type { TreeNode } from "$lib/types";
         import { cn } from "$lib/utils";
         import FileBrowserTreeItem from "./FileBrowserTreeItem.svelte";
-        import { getSystemTreeSystemTreeGet, getArchiveTreeInventoryTreeGet, getDiscrepanciesTreeGet } from "$lib/api";
+        import { getSystemTreeSystemTreeGet, getArchiveTreeInventoryTreeGet, getDiscrepanciesTreeSystemDiscrepanciesTreeGet } from "$lib/api";
 
         let {
                 node,
@@ -62,7 +62,7 @@
                 try {
                         let response;
                         if (mode === "discrepancies") {
-                                response = await getDiscrepanciesTreeGet({
+                                response = await getDiscrepanciesTreeSystemDiscrepanciesTreeGet({
                                         query: { path: node.path }
                                 });
                         } else {

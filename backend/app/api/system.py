@@ -46,6 +46,7 @@ class DashboardStatsSchema(BaseModel):
     ignored_data_size: int
     unprotected_files_count: int
     unprotected_data_size: int
+    discrepancies_count: int
     media_distribution: Dict[str, int]
     last_scan_time: Optional[datetime]
     redundancy_ratio: float
@@ -253,7 +254,9 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
                 SELECT fv.filesystem_state_id FROM file_versions fv
                 JOIN storage_media sm ON sm.id = fv.media_id
                 WHERE sm.status IN ('active', 'full')
-            ) THEN size ELSE 0 END) as archived_size
+            ) THEN size ELSE 0 END) as archived_size,
+            SUM(CASE WHEN is_deleted = 1 THEN 1 ELSE 0 END) as missing_count,
+            SUM(CASE WHEN is_deleted = 1 AND missing_acknowledged_at IS NULL AND is_ignored = 0 THEN 1 ELSE 0 END) as active_discrepancies_count
         FROM filesystem_state
     """)
 
@@ -265,10 +268,14 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
         hashed_count = res[6] or 0
         eligible_count = res[7] or 0
         archived_size = res[8] or 0
+        # missing_count = res[9] or 0
+        active_discrepancies_count = res[10] or 0
     else:
         total_count = total_size = ignored_count = ignored_size = unprotected_count = (
             unprotected_size
-        ) = hashed_count = eligible_count = archived_size = 0
+        ) = hashed_count = eligible_count = archived_size = (
+            active_discrepancies_count
+        ) = 0
 
     media_counts = {
         "LTO": db_session.query(models.StorageMedia)
@@ -310,6 +317,7 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
         ignored_data_size=ignored_size,
         unprotected_files_count=unprotected_count,
         unprotected_data_size=unprotected_size,
+        discrepancies_count=active_discrepancies_count,
         media_distribution=media_counts,
         last_scan_time=last_scan.completed_at if last_scan else None,
         redundancy_ratio=round(redundancy_percentage, 1),
