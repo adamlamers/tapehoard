@@ -30,7 +30,9 @@ app = FastAPI(
 
 # Configure Cross-Origin Resource Sharing (CORS)
 # Use TAPEHOARD_CORS_ORIGINS env var (comma-separated) in production
-cors_origins = os.getenv("TAPEHOARD_CORS_ORIGINS", "*").split(",")
+# Default allows all origins (*), but explicitly add localhost:5174 for Playwright tests
+cors_default = "*,http://localhost:5174,http://localhost:5173"
+cors_origins = os.getenv("TAPEHOARD_CORS_ORIGINS", cors_default).split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in cors_origins if o.strip()],

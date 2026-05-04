@@ -953,35 +953,94 @@ def get_archive_tree(path: Optional[str] = None, db_session: Session = Depends(g
 
 @router.get("/metadata", response_model=ItemMetadataSchema)
 def get_archive_item_metadata(path: str, db_session: Session = Depends(get_db)):
-    """Retrieves full version history and location details for an indexed file."""
+    """Retrieves full version history and location details for an indexed file or directory."""
     item = (
         db_session.query(models.FilesystemState)
         .filter(models.FilesystemState.file_path == path)
         .first()
     )
-    if not item:
+
+    if item:
+        # Exact file match
+        versions = []
+        for v in item.versions:
+            versions.append(
+                {
+                    "media_id": v.media.identifier,
+                    "media_type": v.media.media_type,
+                    "archive_id": v.file_number,
+                    "created_at": v.created_at,
+                    "is_split": v.is_split,
+                    "offset": v.offset_start,
+                }
+            )
+
+        return ItemMetadataSchema(
+            id=item.id,
+            path=item.file_path,
+            type="file",
+            size=item.size,
+            mtime=datetime.fromtimestamp(item.mtime, tz=timezone.utc),
+            last_seen_timestamp=item.last_seen_timestamp,
+            sha256_hash=item.sha256_hash,
+            is_ignored=item.is_ignored,
+            versions=versions,
+        )
+
+    # No exact match — check if this is a directory with archived children
+    prefix = path if path.endswith("/") else path + "/"
+    dir_stats = db_session.execute(
+        text("""
+            SELECT
+                COUNT(*) as child_count,
+                SUM(size) as total_size,
+                MAX(mtime) as latest_mtime,
+                MAX(last_seen_timestamp) as latest_seen
+            FROM filesystem_state
+            WHERE file_path LIKE :prefix
+        """),
+        {"prefix": f"{prefix}%"},
+    ).fetchone()
+
+    if not dir_stats or dir_stats[0] == 0:
         raise HTTPException(status_code=404, detail="File not found in index.")
 
+    # Aggregate unique media locations for all children
+    media_rows = db_session.execute(
+        text("""
+            SELECT DISTINCT
+                sm.identifier as media_id,
+                sm.media_type,
+                MIN(fv.created_at) as earliest_created
+            FROM file_versions fv
+            JOIN storage_media sm ON sm.id = fv.media_id
+            JOIN filesystem_state fs ON fs.id = fv.filesystem_state_id
+            WHERE fs.file_path LIKE :prefix
+            GROUP BY sm.identifier, sm.media_type
+        """),
+        {"prefix": f"{prefix}%"},
+    ).fetchall()
+
     versions = []
-    for v in item.versions:
+    for row in media_rows:
         versions.append(
             {
-                "media_id": v.media.identifier,
-                "media_type": v.media.media_type,
-                "archive_id": v.file_number,
-                "created_at": v.created_at,
-                "is_split": v.is_split,
-                "offset": v.offset_start,
+                "media_id": row[0],
+                "media_type": row[1],
+                "archive_id": "—",
+                "created_at": row[2],
+                "is_split": False,
+                "offset": 0,
             }
         )
 
     return ItemMetadataSchema(
-        id=item.id,
-        path=item.file_path,
-        size=item.size,
-        mtime=datetime.fromtimestamp(item.mtime, tz=timezone.utc),
-        last_seen_timestamp=item.last_seen_timestamp,
-        sha256_hash=item.sha256_hash,
-        is_ignored=item.is_ignored,
+        id=-1,
+        path=path,
+        type="directory",
+        size=dir_stats[1] or 0,
+        mtime=datetime.fromtimestamp(dir_stats[2] or 0, tz=timezone.utc),
+        last_seen_timestamp=dir_stats[3],
+        child_count=dir_stats[0],
         versions=versions,
     )

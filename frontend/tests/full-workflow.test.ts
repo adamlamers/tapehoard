@@ -121,7 +121,9 @@ test.describe('TapeHoard Golden Path', () => {
     console.log('Step 7: Verify Protection');
     await page.goto('/index-browser');
     await page.waitForLoadState('networkidle');
-    await page.getByText(SOURCE_ROOT).first().dblclick();
+    // Click on the item in the file list (not the tree)
+    // Tree items have role="treeitem", file list rows have role="button"
+    await page.getByRole('button', { name: SOURCE_ROOT }).first().dblclick();
     await page.getByText('subfolder').first().dblclick();
     await expect(page.getByText('test_file_2.txt')).toBeVisible();
     await expect(page.getByText('TAPE001')).toBeVisible();

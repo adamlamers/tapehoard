@@ -1291,9 +1291,21 @@ def _resolve_ids_from_action(
     if action.ids:
         return action.ids
     if action.path_prefix:
+        prefix = action.path_prefix
+        if not prefix.endswith("/"):
+            # If there are files under this path in the index, treat it as a directory
+            has_children = (
+                db_session.query(models.FilesystemState)
+                .filter(models.FilesystemState.file_path.startswith(prefix + "/"))
+                .first()
+                is not None
+            )
+            if has_children:
+                prefix += "/"
+
         records = (
             db_session.query(models.FilesystemState)
-            .filter(models.FilesystemState.file_path.startswith(action.path_prefix))
+            .filter(models.FilesystemState.file_path.startswith(prefix))
             .all()
         )
         return [r.id for r in records]
