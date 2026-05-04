@@ -1,6 +1,6 @@
 import { expect, request } from '@playwright/test';
 
-export const API_URL = 'http://localhost:8001';
+export const API_URL = 'http://127.0.0.1:8001';
 export const SOURCE_ROOT = '/tmp/tapehoard_e2e_source';
 export const MOCK_LTO_PATH = '/tmp/tapehoard_e2e_mock_lto';
 export const RESTORE_DEST = '/tmp/tapehoard_e2e_restore';

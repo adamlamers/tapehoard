@@ -7,11 +7,11 @@
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
     import type { FileItem } from '$lib/types';
     import {
-        browseSystemPathSystemBrowseGet,
+        filesystemBrowse,
         batchUpdateTrackingSystemTrackBatchPost,
         triggerScanSystemScanPost,
         getScanStatusSystemScanStatusGet,
-        searchSystemIndexSystemSearchGet,
+        filesystemSearch,
         type ScanStatusSchema
     } from '$lib/api';
     import { toast } from "svelte-sonner";
@@ -40,7 +40,7 @@
         if (searchQuery.trim().length >= 3) return;
         loading = true;
         try {
-            const response = await browseSystemPathSystemBrowseGet({
+            const response = await filesystemBrowse({
                 query: { path }
             });
             if (response.data) {
@@ -66,7 +66,7 @@
     async function searchFiles(query: string) {
         searchLoading = true;
         try {
-            const response = await searchSystemIndexSystemSearchGet({
+            const response = await filesystemSearch({
                 query: { q: query, path: currentPath }
             });
             if (response.data) {

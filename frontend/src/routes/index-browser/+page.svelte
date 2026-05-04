@@ -21,13 +21,13 @@
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
     import type { FileItem } from '$lib/types';
     import {
-        browseArchiveIndexInventoryBrowseGet,
-        getArchiveItemMetadataInventoryMetadataGet,
+        archiveBrowse,
+        archiveMetadata,
         listRecoveryQueueRestoresQueueGet,
         addFileToRecoveryQueueRestoresQueueFileFileIdPost,
         removeFromRecoveryQueueRestoresQueueItemItemIdDelete,
         addDirectoryToRecoveryQueueRestoresQueueDirectoryPost,
-        searchArchiveIndexInventorySearchGet,
+        archiveSearch,
         type ItemMetadataSchema,
         type CartItemSchema
     } from '$lib/api';
@@ -76,7 +76,7 @@
         if (searchQuery.trim().length >= 3) return;
         loading = true;
         try {
-            const response = await browseArchiveIndexInventoryBrowseGet({
+            const response = await archiveBrowse({
                 query: { path }
             });
             if (response.data) {
@@ -103,7 +103,7 @@
     async function searchFiles(query: string) {
         searchLoading = true;
         try {
-            const response = await searchArchiveIndexInventorySearchGet({
+            const response = await archiveSearch({
                 query: { q: query, path: currentPath }
             });
             if (response.data) {
@@ -147,7 +147,7 @@
     async function fetchMetadata(item: FileItem) {
         metadataLoading = true;
         try {
-            const response = await getArchiveItemMetadataInventoryMetadataGet({
+            const response = await archiveMetadata({
                 query: { path: item.path }
             });
             if (response.data) {
@@ -188,7 +188,7 @@
             } else {
                 if (item.type === 'file') {
                     // Fetch metadata to get the DB ID
-                    const metaResponse = await getArchiveItemMetadataInventoryMetadataGet({
+                    const metaResponse = await archiveMetadata({
                         query: { path: item.path }
                     });
 

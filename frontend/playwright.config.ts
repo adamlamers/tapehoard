@@ -36,13 +36,13 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: [
     {
-       command: 'cd ../backend && rm -f e2e_test.db* && DATABASE_URL="sqlite:///e2e_test.db" TAPEHOARD_TEST_MODE="true" TAPEHOARD_CORS_ORIGINS="*,http://localhost:5174" uv run python -m app.start_test_server --host 0.0.0.0 --port 8001',
-      url: 'http://localhost:8001/health',
+       command: 'cd ../backend && rm -f e2e_test.db* && DATABASE_URL="sqlite:///e2e_test.db" TAPEHOARD_TEST_MODE="true" TAPEHOARD_CORS_ORIGINS="*,http://localhost:5174,http://127.0.0.1:5174" uv run python -m app.start_test_server --host 127.0.0.1 --port 8001',
+      url: 'http://127.0.0.1:8001/health',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
     },
     {
-      command: 'VITE_API_URL=http://localhost:8001 npm run dev -- --port 5174',
+      command: 'VITE_API_URL=http://127.0.0.1:8001 npm run dev -- --port 5174',
       url: 'http://localhost:5174',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,

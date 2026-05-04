@@ -1064,7 +1064,7 @@ export type GetScanStatusSystemScanStatusGetResponses = {
 
 export type GetScanStatusSystemScanStatusGetResponse = GetScanStatusSystemScanStatusGetResponses[keyof GetScanStatusSystemScanStatusGetResponses];
 
-export type BrowseSystemPathSystemBrowseGetData = {
+export type FilesystemBrowseData = {
     body?: never;
     path?: never;
     query?: {
@@ -1076,25 +1076,25 @@ export type BrowseSystemPathSystemBrowseGetData = {
     url: '/system/browse';
 };
 
-export type BrowseSystemPathSystemBrowseGetErrors = {
+export type FilesystemBrowseErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type BrowseSystemPathSystemBrowseGetError = BrowseSystemPathSystemBrowseGetErrors[keyof BrowseSystemPathSystemBrowseGetErrors];
+export type FilesystemBrowseError = FilesystemBrowseErrors[keyof FilesystemBrowseErrors];
 
-export type BrowseSystemPathSystemBrowseGetResponses = {
+export type FilesystemBrowseResponses = {
     /**
      * Successful Response
      */
     200: BrowseResponseSchema;
 };
 
-export type BrowseSystemPathSystemBrowseGetResponse = BrowseSystemPathSystemBrowseGetResponses[keyof BrowseSystemPathSystemBrowseGetResponses];
+export type FilesystemBrowseResponse = FilesystemBrowseResponses[keyof FilesystemBrowseResponses];
 
-export type SearchSystemIndexSystemSearchGetData = {
+export type FilesystemSearchData = {
     body?: never;
     path?: never;
     query: {
@@ -1114,25 +1114,25 @@ export type SearchSystemIndexSystemSearchGetData = {
     url: '/system/search';
 };
 
-export type SearchSystemIndexSystemSearchGetErrors = {
+export type FilesystemSearchErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SearchSystemIndexSystemSearchGetError = SearchSystemIndexSystemSearchGetErrors[keyof SearchSystemIndexSystemSearchGetErrors];
+export type FilesystemSearchError = FilesystemSearchErrors[keyof FilesystemSearchErrors];
 
-export type SearchSystemIndexSystemSearchGetResponses = {
+export type FilesystemSearchResponses = {
     /**
-     * Response Search System Index System Search Get
+     * Response Filesystem Search
      *
      * Successful Response
      */
     200: Array<FileItemSchema>;
 };
 
-export type SearchSystemIndexSystemSearchGetResponse = SearchSystemIndexSystemSearchGetResponses[keyof SearchSystemIndexSystemSearchGetResponses];
+export type FilesystemSearchResponse = FilesystemSearchResponses[keyof FilesystemSearchResponses];
 
 export type BatchUpdateTrackingSystemTrackBatchPostData = {
     body: BatchTrackRequest;
@@ -1330,7 +1330,7 @@ export type ImportDatabaseIndexSystemDatabaseImportPostResponses = {
     200: unknown;
 };
 
-export type GetSystemTreeSystemTreeGetData = {
+export type FilesystemTreeData = {
     body?: never;
     path?: never;
     query?: {
@@ -1342,25 +1342,25 @@ export type GetSystemTreeSystemTreeGetData = {
     url: '/system/tree';
 };
 
-export type GetSystemTreeSystemTreeGetErrors = {
+export type FilesystemTreeErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetSystemTreeSystemTreeGetError = GetSystemTreeSystemTreeGetErrors[keyof GetSystemTreeSystemTreeGetErrors];
+export type FilesystemTreeError = FilesystemTreeErrors[keyof FilesystemTreeErrors];
 
-export type GetSystemTreeSystemTreeGetResponses = {
+export type FilesystemTreeResponses = {
     /**
-     * Response Get System Tree System Tree Get
+     * Response Filesystem Tree
      *
      * Successful Response
      */
     200: Array<TreeNodeSchema>;
 };
 
-export type GetSystemTreeSystemTreeGetResponse = GetSystemTreeSystemTreeGetResponses[keyof GetSystemTreeSystemTreeGetResponses];
+export type FilesystemTreeResponse = FilesystemTreeResponses[keyof FilesystemTreeResponses];
 
 export type ListDiscrepanciesSystemDiscrepanciesGetData = {
     body?: never;
@@ -1862,7 +1862,7 @@ export type DetectUnregisteredMediaInventoryDetectGetResponses = {
     200: unknown;
 };
 
-export type BrowseArchiveIndexInventoryBrowseGetData = {
+export type ArchiveBrowseData = {
     body?: never;
     path?: never;
     query?: {
@@ -1871,26 +1871,26 @@ export type BrowseArchiveIndexInventoryBrowseGetData = {
          */
         path?: string;
     };
-    url: '/inventory/browse';
+    url: '/archive/browse';
 };
 
-export type BrowseArchiveIndexInventoryBrowseGetErrors = {
+export type ArchiveBrowseErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type BrowseArchiveIndexInventoryBrowseGetError = BrowseArchiveIndexInventoryBrowseGetErrors[keyof BrowseArchiveIndexInventoryBrowseGetErrors];
+export type ArchiveBrowseError = ArchiveBrowseErrors[keyof ArchiveBrowseErrors];
 
-export type BrowseArchiveIndexInventoryBrowseGetResponses = {
+export type ArchiveBrowseResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type SearchArchiveIndexInventorySearchGetData = {
+export type ArchiveSearchData = {
     body?: never;
     path?: never;
     query: {
@@ -1903,26 +1903,26 @@ export type SearchArchiveIndexInventorySearchGetData = {
          */
         path?: string | null;
     };
-    url: '/inventory/search';
+    url: '/archive/search';
 };
 
-export type SearchArchiveIndexInventorySearchGetErrors = {
+export type ArchiveSearchErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type SearchArchiveIndexInventorySearchGetError = SearchArchiveIndexInventorySearchGetErrors[keyof SearchArchiveIndexInventorySearchGetErrors];
+export type ArchiveSearchError = ArchiveSearchErrors[keyof ArchiveSearchErrors];
 
-export type SearchArchiveIndexInventorySearchGetResponses = {
+export type ArchiveSearchResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetArchiveTreeInventoryTreeGetData = {
+export type ArchiveTreeData = {
     body?: never;
     path?: never;
     query?: {
@@ -1931,30 +1931,30 @@ export type GetArchiveTreeInventoryTreeGetData = {
          */
         path?: string | null;
     };
-    url: '/inventory/tree';
+    url: '/archive/tree';
 };
 
-export type GetArchiveTreeInventoryTreeGetErrors = {
+export type ArchiveTreeErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetArchiveTreeInventoryTreeGetError = GetArchiveTreeInventoryTreeGetErrors[keyof GetArchiveTreeInventoryTreeGetErrors];
+export type ArchiveTreeError = ArchiveTreeErrors[keyof ArchiveTreeErrors];
 
-export type GetArchiveTreeInventoryTreeGetResponses = {
+export type ArchiveTreeResponses = {
     /**
-     * Response Get Archive Tree Inventory Tree Get
+     * Response Archive Tree
      *
      * Successful Response
      */
     200: Array<TreeNodeSchema>;
 };
 
-export type GetArchiveTreeInventoryTreeGetResponse = GetArchiveTreeInventoryTreeGetResponses[keyof GetArchiveTreeInventoryTreeGetResponses];
+export type ArchiveTreeResponse = ArchiveTreeResponses[keyof ArchiveTreeResponses];
 
-export type GetArchiveItemMetadataInventoryMetadataGetData = {
+export type ArchiveMetadataData = {
     body?: never;
     path?: never;
     query: {
@@ -1963,26 +1963,26 @@ export type GetArchiveItemMetadataInventoryMetadataGetData = {
          */
         path: string;
     };
-    url: '/inventory/metadata';
+    url: '/archive/metadata';
 };
 
-export type GetArchiveItemMetadataInventoryMetadataGetErrors = {
+export type ArchiveMetadataErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetArchiveItemMetadataInventoryMetadataGetError = GetArchiveItemMetadataInventoryMetadataGetErrors[keyof GetArchiveItemMetadataInventoryMetadataGetErrors];
+export type ArchiveMetadataError = ArchiveMetadataErrors[keyof ArchiveMetadataErrors];
 
-export type GetArchiveItemMetadataInventoryMetadataGetResponses = {
+export type ArchiveMetadataResponses = {
     /**
      * Successful Response
      */
     200: ItemMetadataSchema;
 };
 
-export type GetArchiveItemMetadataInventoryMetadataGetResponse = GetArchiveItemMetadataInventoryMetadataGetResponses[keyof GetArchiveItemMetadataInventoryMetadataGetResponses];
+export type ArchiveMetadataResponse = ArchiveMetadataResponses[keyof ArchiveMetadataResponses];
 
 export type TriggerAutoBackupBackupsTriggerAutoPostData = {
     body?: never;

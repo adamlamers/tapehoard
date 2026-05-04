@@ -33,6 +33,8 @@ lint:
     cd backend && uv run ty check
     @echo "Type checking Svelte..."
     cd frontend && npm run check
+    @echo "Running pre-commit hooks..."
+    git hook run pre-commit
 
 # Run all backend tests
 pytest:

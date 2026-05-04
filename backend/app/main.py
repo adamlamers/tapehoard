@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from loguru import logger
 
-from app.api import backups, inventory, restores, system
+from app.api import archive, backups, inventory, restores, system
 
 
 @asynccontextmanager
@@ -44,6 +44,7 @@ app.add_middleware(
 # Register API Routers
 app.include_router(system.router)
 app.include_router(inventory.router)
+app.include_router(archive.router)
 app.include_router(backups.router)
 app.include_router(restores.router)
 

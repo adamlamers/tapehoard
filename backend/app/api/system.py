@@ -640,7 +640,9 @@ def _get_last_scan_time(db_session: Session) -> Optional[datetime]:
     return last_scan.completed_at if last_scan else None
 
 
-@router.get("/browse", response_model=BrowseResponseSchema)
+@router.get(
+    "/browse", response_model=BrowseResponseSchema, operation_id="filesystem_browse"
+)
 def browse_system_path(
     path: Optional[str] = None, db_session: Session = Depends(get_db)
 ):
@@ -729,6 +731,15 @@ def browse_system_path(
         except OSError:
             pass
 
+    # Aggregate sizes for directories from indexed rows
+    dir_sizes: dict[str, int] = {}
+    for file_path, size, _mtime, _sha256_hash, _is_ignored in rows:
+        relative = file_path[len(target_prefix) :]
+        if "/" in relative:
+            immediate_name = relative.split("/")[0]
+            child_path = target_prefix + immediate_name
+            dir_sizes[child_path] = dir_sizes.get(child_path, 0) + (size or 0)
+
     results = []
     seen = set()
 
@@ -747,6 +758,7 @@ def browse_system_path(
                         name=immediate_name,
                         path=child_path,
                         type="directory",
+                        size=dir_sizes.get(child_path, 0),
                         ignored=dir_ignored,
                     )
                 )
@@ -769,7 +781,9 @@ def browse_system_path(
     return BrowseResponseSchema(files=results, last_scan_time=last_scan_time)
 
 
-@router.get("/search", response_model=List[FileItemSchema])
+@router.get(
+    "/search", response_model=List[FileItemSchema], operation_id="filesystem_search"
+)
 def search_system_index(
     q: str,
     path: Optional[str] = None,
@@ -1167,10 +1181,11 @@ async def import_database_index(file: Any, db_session: Session = Depends(get_db)
     return {"message": "Import logic restricted for safety."}
 
 
-@router.get("/tree", response_model=List[TreeNodeSchema])
+@router.get(
+    "/tree", response_model=List[TreeNodeSchema], operation_id="filesystem_tree"
+)
 def get_system_tree(path: Optional[str] = None, db_session: Session = Depends(get_db)):
     """Returns a recursive tree view of the system for configuration."""
-    from app.api.inventory import TreeNodeSchema
 
     roots = get_source_roots(db_session)
     if path is None or path == "ROOT":
@@ -1432,7 +1447,7 @@ def get_discrepancies_tree(
     db_session: Session = Depends(get_db),
 ):
     """Returns tree of directories that contain discrepancy files, grouped by source root."""
-    from app.api.inventory import get_source_roots
+    from app.api.archive import get_source_roots
 
     # Get source roots
     roots = get_source_roots(db_session)

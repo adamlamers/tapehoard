@@ -49,7 +49,7 @@ test.describe('Discrepancies', () => {
     for (const f of [...testFiles, 'ui_missing.txt']) {
       const filePath = path.join(SOURCE_ROOT, f);
       const encodedPath = encodeURIComponent(filePath);
-      const metaResp = await requestContext.get(`${API_URL}/inventory/metadata?path=${encodedPath}`);
+      const metaResp = await requestContext.get(`${API_URL}/archive/metadata?path=${encodedPath}`);
       if (metaResp.ok()) {
         const meta = await metaResp.json();
         fileIds[f] = meta.id;
@@ -161,7 +161,7 @@ test.describe('Discrepancies', () => {
       for (const f of files) {
         const filePath = path.join(SOURCE_ROOT, f);
         const encodedPath = encodeURIComponent(filePath);
-        const metaResp = await requestContext.get(`${API_URL}/inventory/metadata?path=${encodedPath}`);
+        const metaResp = await requestContext.get(`${API_URL}/archive/metadata?path=${encodedPath}`);
         if (metaResp.ok()) {
           const meta = await metaResp.json();
           ids.push(meta.id);
@@ -218,7 +218,7 @@ test.describe('Discrepancies', () => {
       for (const f of files) {
         const filePath = path.join(SOURCE_ROOT, f);
         const encodedPath = encodeURIComponent(filePath);
-        const metaResp = await requestContext.get(`${API_URL}/inventory/metadata?path=${encodedPath}`);
+        const metaResp = await requestContext.get(`${API_URL}/archive/metadata?path=${encodedPath}`);
         if (metaResp.ok()) {
           const meta = await metaResp.json();
           ids.push(meta.id);
@@ -274,7 +274,7 @@ test.describe('Discrepancies', () => {
       for (const f of files) {
         const filePath = path.join(SOURCE_ROOT, f);
         const encodedPath = encodeURIComponent(filePath);
-        const metaResp = await requestContext.get(`${API_URL}/inventory/metadata?path=${encodedPath}`);
+        const metaResp = await requestContext.get(`${API_URL}/archive/metadata?path=${encodedPath}`);
         if (metaResp.ok()) {
           const meta = await metaResp.json();
           ids.push(meta.id);

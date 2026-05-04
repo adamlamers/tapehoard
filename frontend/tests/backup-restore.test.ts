@@ -49,7 +49,7 @@ test.describe('Backup & Restore', () => {
       expect(backupJob.status).toBe('COMPLETED');
     }).toPass({ timeout: 30000 });
 
-    const metaResp = await requestContext.get(`${API_URL}/inventory/metadata`, {
+    const metaResp = await requestContext.get(`${API_URL}/archive/metadata`, {
       params: { path: path.join(SOURCE_ROOT, 'backup_test.txt') }
     });
     expect(metaResp.ok()).toBe(true);
@@ -132,7 +132,7 @@ test.describe('Backup & Restore', () => {
       expect(backupJob.status).toBe('COMPLETED');
     }).toPass({ timeout: 30000 });
 
-    const metaResp = await requestContext.get(`${API_URL}/inventory/metadata`, {
+    const metaResp = await requestContext.get(`${API_URL}/archive/metadata`, {
       params: { path: path.join(SOURCE_ROOT, 'backup_test.txt') }
     });
     expect(metaResp.ok()).toBe(true);
@@ -187,7 +187,7 @@ test.describe('Backup & Restore', () => {
       expect(backupJob.status).toBe('COMPLETED');
     }).toPass({ timeout: 30000 });
 
-    const metaResp = await requestContext.get(`${API_URL}/inventory/metadata`, {
+    const metaResp = await requestContext.get(`${API_URL}/archive/metadata`, {
       params: { path: path.join(SOURCE_ROOT, 'backup_test.txt') }
     });
     expect(metaResp.ok()).toBe(true);
@@ -236,7 +236,7 @@ test.describe('Backup & Restore', () => {
       expect(backupJob.status).toBe('COMPLETED');
     }).toPass({ timeout: 30000 });
 
-    const metaResp = await requestContext.get(`${API_URL}/inventory/metadata`, {
+    const metaResp = await requestContext.get(`${API_URL}/archive/metadata`, {
       params: { path: path.join(SOURCE_ROOT, 'backup_test.txt') }
     });
     expect(metaResp.ok()).toBe(true);

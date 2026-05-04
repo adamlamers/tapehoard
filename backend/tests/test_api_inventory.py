@@ -110,7 +110,7 @@ def test_browse_index_root(client, db_session):
     db_session.commit()
 
     # Root should show source_data if it has versions
-    response = client.get("/inventory/browse?path=ROOT")
+    response = client.get("/archive/browse?path=ROOT")
     assert response.status_code == 200
     data = response.json()
     assert len(data) > 0
@@ -153,7 +153,7 @@ def test_search_index(client, db_session):
     # but conftest uses a real temp file.
     db_session.commit()
 
-    response = client.get("/inventory/search?q=important")
+    response = client.get("/archive/search?q=important")
     assert response.status_code == 200
     # If FTS5 is working, it should return results.
 
@@ -169,6 +169,6 @@ def test_get_metadata(client, db_session):
     db_session.add(file1)
     db_session.commit()
 
-    response = client.get("/inventory/metadata?path=data/meta.txt")
+    response = client.get("/archive/metadata?path=data/meta.txt")
     assert response.status_code == 200
     assert response.json()["path"] == "data/meta.txt"

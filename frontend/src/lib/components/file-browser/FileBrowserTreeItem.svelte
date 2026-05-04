@@ -5,7 +5,7 @@
         import type { TreeNode } from "$lib/types";
         import { cn } from "$lib/utils";
         import FileBrowserTreeItem from "./FileBrowserTreeItem.svelte";
-        import { getSystemTreeSystemTreeGet, getArchiveTreeInventoryTreeGet, getDiscrepanciesTreeSystemDiscrepanciesTreeGet } from "$lib/api";
+        import { filesystemTree, archiveTree, getDiscrepanciesTreeSystemDiscrepanciesTreeGet } from "$lib/api";
 
         let {
                 node,
@@ -66,7 +66,7 @@
                                         query: { path: node.path }
                                 });
                         } else {
-                                const fetchFn = (mode === "host" || mode === "live") ? getSystemTreeSystemTreeGet : getArchiveTreeInventoryTreeGet;
+                                const fetchFn = (mode === "host" || mode === "live") ? filesystemTree : archiveTree;
                                 response = await fetchFn({
                                         query: { path: node.path }
                                 });

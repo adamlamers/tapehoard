@@ -192,7 +192,7 @@ test.describe('TapeHoard Golden Path', () => {
 
     // Get the file ID from the metadata endpoint
     const encodedPath = encodeURIComponent(testFilePath);
-    const metaResp = await requestContext.get(`${API_URL}/inventory/metadata?path=${encodedPath}`);
+    const metaResp = await requestContext.get(`${API_URL}/archive/metadata?path=${encodedPath}`);
     expect(metaResp.ok()).toBe(true);
     const meta = await metaResp.json();
     const fileId = meta.id;

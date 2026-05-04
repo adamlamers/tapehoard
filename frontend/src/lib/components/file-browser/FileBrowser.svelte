@@ -20,10 +20,10 @@
         import type { FileItem, TreeNode, Breadcrumb } from "$lib/types";
         import { cn, naturalSortCompare } from "$lib/utils";
         import {
-            getSystemTreeSystemTreeGet,
-            getArchiveTreeInventoryTreeGet,
-            browseSystemPathSystemBrowseGet,
-            browseArchiveIndexInventoryBrowseGet,
+            filesystemTree,
+            archiveTree,
+            filesystemBrowse,
+            archiveBrowse,
             getDiscrepanciesTreeSystemDiscrepanciesTreeGet,
             browseDiscrepanciesSystemDiscrepanciesBrowseGet,
         } from "$lib/api";
