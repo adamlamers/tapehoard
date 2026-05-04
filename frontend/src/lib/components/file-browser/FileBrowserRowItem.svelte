@@ -28,6 +28,7 @@
                 onClick = (e: MouseEvent) => {},
                 onDoubleClick = () => {},
                 onToggleTrack = () => {},
+                onToggleSelect = () => {},
                 onAddToCart = () => {},
                 onDelete = () => {},
                 mode = "host",
@@ -39,6 +40,7 @@
                 onClick?: (e: MouseEvent) => void;
                 onDoubleClick?: () => void;
                 onToggleTrack?: () => void;
+                onToggleSelect?: () => void;
                 onAddToCart?: () => void;
                 onDelete?: () => void;
                 mode?: "host" | "index" | "live" | "cart" | "discrepancies";
@@ -122,12 +124,16 @@
         ondblclick={(e) => { e.stopPropagation(); onDoubleClick(); }}
         onkeydown={(e) => e.key === "Enter" && onDoubleClick()}
 >
-        <!-- TRACKING STATUS / SELECTION -->
+        <!-- SELECTION CHECKBOX -->
         <div
                 class="flex h-10 w-12 shrink-0 items-center justify-center border-r border-border-color/10"
                 onclick={(e) => {
                         e.stopPropagation();
-                        onToggleTrack();
+                        if (mode === 'discrepancies') {
+                                onToggleSelect();
+                        } else {
+                                onToggleTrack();
+                        }
                 }}
                 onkeydown={(e) => e.key === " " && e.stopPropagation()}
                 role="none"
@@ -150,6 +156,11 @@
                                         <Square size={16} />
                                 </div>
                         {/if}
+                {:else if mode === 'discrepancies'}
+                        <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={onToggleSelect}
+                        />
                 {:else}
                         <Checkbox
                                 checked={item.selected}

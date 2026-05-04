@@ -25,8 +25,7 @@
     let files = $state<FileItem[]>([]);
     let loading = $state(true);
     let currentPath = $state("ROOT");
-    let selectedIds = $state<Set<number>>(new Set());
-    let batchAction = $state<'acknowledge' | 'recover' | null>(null);
+    let selectedPaths = $state<Set<string>>(new Set());
     let batchLoading = $state(false);
 
     async function loadDiscrepancies() {
@@ -105,6 +104,78 @@
         }
     }
 
+    async function batchDismiss() {
+        const ids = getDiscrepancyIdsFromPaths(selectedPaths);
+        if (ids.length === 0) {
+            toast.error("No files selected");
+            return;
+        }
+        batchLoading = true;
+        try {
+            await batchDismissSystemDiscrepanciesBatchDismissPost({
+                body: { ids }
+            });
+            toast.success(`Dismissed ${ids.length} files`);
+            selectedPaths = new Set();
+            await loadDiscrepancies();
+        } catch (error: any) {
+            toast.error(error.body?.detail || "Failed to dismiss files");
+        } finally {
+            batchLoading = false;
+        }
+    }
+
+    async function batchDelete() {
+        const ids = getDiscrepancyIdsFromPaths(selectedPaths);
+        if (ids.length === 0) {
+            toast.error("No files selected");
+            return;
+        }
+        batchLoading = true;
+        try {
+            await batchHardDeleteSystemDiscrepanciesBatchDeletePost({
+                body: { ids }
+            });
+            toast.success(`Deleted ${ids.length} file records`);
+            selectedPaths = new Set();
+            await loadDiscrepancies();
+        } catch (error: any) {
+            toast.error(error.body?.detail || "Failed to delete files");
+        } finally {
+            batchLoading = false;
+        }
+    }
+
+    async function batchAddToCart() {
+        const ids = getDiscrepancyIdsFromPaths(selectedPaths);
+        if (ids.length === 0) {
+            toast.error("No files selected");
+            return;
+        }
+        batchLoading = true;
+        try {
+            await batchAddToRecoveryQueueRestoresQueueBatchPost({
+                body: { ids }
+            });
+            toast.success(`Added ${ids.length} files to restore cart`);
+            selectedPaths = new Set();
+        } catch (error: any) {
+            toast.error(error.body?.detail || "Failed to add files to cart");
+        } finally {
+            batchLoading = false;
+        }
+    }
+
+    function getDiscrepancyIdsFromPaths(paths: Set<string>): number[] {
+        const ids: number[] = [];
+        for (const item of files) {
+            if (paths.has(item.path) && item.discrepancy_id) {
+                ids.push(item.discrepancy_id);
+            }
+        }
+        return ids;
+    }
+
     function navigateTo(path: string) {
         currentPath = path;
         loadFiles(path);
@@ -176,10 +247,32 @@
             />
         </div>
 
+        <!-- Batch Actions Bar -->
+        {#if selectedPaths.size > 0}
+            <div class="flex items-center gap-3 p-3 bg-bg-tertiary/50 rounded-lg border border-border-color">
+                <span class="text-sm text-text-secondary">
+                    {selectedPaths.size} file(s) selected
+                </span>
+                <div class="flex gap-2 ml-auto">
+                    <Button size="sm" variant="outline" onclick={batchDismiss} disabled={batchLoading}>
+                        Dismiss Selected
+                    </Button>
+                    <Button size="sm" variant="outline" onclick={batchAddToCart} disabled={batchLoading}>
+                        <HardDriveDownload size={14} class="mr-1" />
+                        Add to Cart
+                    </Button>
+                    <Button size="sm" variant="destructive" onclick={batchDelete} disabled={batchLoading}>
+                        Delete Records
+                    </Button>
+                </div>
+            </div>
+        {/if}
+
         <!-- FileBrowser Component in discrepancies mode -->
         <div class="flex-1 min-h-[600px] bg-bg-secondary border border-border-color shadow-2xl rounded-lg flex flex-col relative overflow-hidden">
             <FileBrowser
                 bind:currentPath={currentPath}
+                bind:selectedPaths={selectedPaths}
                 files={files}
                 mode="discrepancies"
                 onNavigate={navigateTo}

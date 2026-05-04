@@ -1485,6 +1485,8 @@ def get_discrepancies_tree(
         return result
 
     # Return immediate children of the given path
+    if path is None:
+        return []
     result = []
     for dir_path, node in sorted(dir_nodes.items()):
         if dir_path == path:
@@ -1587,16 +1589,19 @@ def browse_discrepancies(
                 child_name = file_path
         else:
             # Check if this file is under the requested path
-            if file_path != path and not file_path.startswith(path + "/"):
+            if path is None or (
+                file_path != path and not file_path.startswith(path + "/")
+            ):
                 continue
 
             # Get immediate child relative to path
-            rel_path = file_path[len(path) :].strip("/")
+            path_str = path or ""
+            rel_path = file_path[len(path_str) :].strip("/")
             if "/" in rel_path:
                 # It's a subdirectory - get immediate child
                 child_name = rel_path.split("/")[0]
                 child_path = (
-                    path + "/" + child_name if path != "/" else "/" + child_name
+                    path_str + "/" + child_name if path_str != "/" else "/" + child_name
                 )
             else:
                 # It's a file

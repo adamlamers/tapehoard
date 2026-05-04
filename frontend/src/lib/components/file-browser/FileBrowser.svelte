@@ -32,6 +32,7 @@
                 currentPath = $bindable("ROOT"),
                 searchQuery = $bindable(""),
                 files = [],
+                selectedPaths = $bindable(new Set<string>()),
                 onNavigate = (path: string) => {},
                 onToggleTrack = (item: FileItem) => {},
                 onSelect = (item: FileItem) => {},
@@ -44,6 +45,7 @@
                 currentPath?: string;
                 searchQuery?: string;
                 files?: FileItem[];
+                selectedPaths?: Set<string>;
                 onNavigate?: (path: string) => void;
                 onToggleTrack?: (item: FileItem) => void;
                 onSelect?: (item: FileItem) => void;
@@ -54,7 +56,6 @@
                 pendingChanges?: Map<string, boolean>;
         }>();
 
-        let selectedPaths = $state<Set<string>>(new Set());
         let lastSelectedPath = $state<string | null>(null);
         let sortColumn = $state<"name" | "size" | "mtime" | "type">("name");
         let sortDirection = $state<"asc" | "desc">("asc");
@@ -284,6 +285,13 @@
         }
 
         function handleRowClick(e: MouseEvent, item: FileItem) {
+                // For discrepancies mode, row click navigates (dirs) or shows metadata (files)
+                // Checkbox handles selection
+                if (mode === 'discrepancies') {
+                        onSelect(item);
+                        return;
+                }
+
                 if (e.shiftKey && lastSelectedPath) {
                         const lastIndex = filteredFiles.findIndex((f: FileItem) => f.path === lastSelectedPath);
                         const currentIndex = filteredFiles.findIndex((f: FileItem) => f.path === item.path);
@@ -321,12 +329,49 @@
                 }
         }
 
+        // Recursively add directory and all its children to selection
+        function addItemAndChildren(path: string, newSelection: Set<string>) {
+                newSelection.add(path);
+                // Find all files/dirs that are children of this path
+                for (const f of (files as FileItem[])) {
+                        if (f.path.startsWith(path + "/") || f.path === path) {
+                                newSelection.add(f.path);
+                        }
+                }
+        }
+
+        // Recursively remove directory and all its children from selection
+        function removeItemAndChildren(path: string, newSelection: Set<string>) {
+                newSelection.delete(path);
+                for (const f of (files as FileItem[])) {
+                        if (f.path.startsWith(path + "/")) {
+                                newSelection.delete(f.path);
+                        }
+                }
+        }
+
         function handleSelectAll(checked: boolean | "indeterminate") {
                 if (checked === true) {
-                        selectedPaths = new Set(filteredFiles.map((f: FileItem) => f.path));
+                        const newSelection = new Set<string>();
+                        for (const f of (filteredFiles as FileItem[])) {
+                                addItemAndChildren(f.path, newSelection);
+                        }
+                        selectedPaths = newSelection;
                 } else {
                         selectedPaths = new Set();
                 }
+        }
+
+        function handleToggleItem(item: FileItem) {
+                const newSelection = new Set(selectedPaths as Set<string>);
+                if (newSelection.has(item.path)) {
+                        // Deselecting - remove item and all children if it's a directory
+                        removeItemAndChildren(item.path, newSelection);
+                } else {
+                        // Selecting - add item and all children if it's a directory
+                        addItemAndChildren(item.path, newSelection);
+                }
+                selectedPaths = newSelection;
         }
 
         let isEditingPath = $state(false);
@@ -605,6 +650,7 @@
                                                                         onClick={(e) => handleRowClick(e, item)}
                                                                         onDoubleClick={() => handleRowDoubleClick(item)}
                                                                         onToggleTrack={() => onToggleTrack(item)}
+                                                                        onToggleSelect={() => handleToggleItem(item)}
                                                                         onAddToCart={() => onAddToCart(item)}
                                                                         onDelete={() => onDelete(item)}
                                                                 />
