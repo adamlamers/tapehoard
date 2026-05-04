@@ -50,8 +50,9 @@
         loading = true;
         try {
             const settingsRes = await getSettings();
-            if (settingsRes.data?.restore_destinations) {
-                restoreDests = JSON.parse(settingsRes.data.restore_destinations);
+            const settingsData = settingsRes.data as Record<string, string>;
+            if (settingsData?.restore_destinations) {
+                restoreDests = JSON.parse(settingsData.restore_destinations);
                 if (restoreDests.length > 0 && !selectedDest) selectedDest = restoreDests[0];
             }
 

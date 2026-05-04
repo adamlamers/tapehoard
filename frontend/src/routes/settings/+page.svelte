@@ -14,6 +14,7 @@
         RotateCw,
         ArrowRight,
         ShieldAlert,
+        ShieldCheck,
         FolderSearch,
         Download,
         Upload,
@@ -30,10 +31,12 @@
         updateSettings,
         testNotification,
         exportDatabase,
-        importDatabase
+        importDatabase,
+        testExclusions,
+        downloadExclusionReport
     } from "$lib/api";
     import { toast } from "svelte-sonner";
-    import { cn } from "$lib/utils";
+    import { cn, formatSize } from "$lib/utils";
     import { beforeNavigate } from '$app/navigation';
     import type { Navigation } from '@sveltejs/kit';
 
@@ -80,6 +83,22 @@
     let saving = $state(false);
     let exporting = $state(false);
     let importing = $state(false);
+    let testingExclusions = $state(false);
+    let exclusionResults = $state<{
+        total_files: number;
+        total_size: number;
+        matched_count: number;
+        matched_size: number;
+        sample: Array<{
+            name: string;
+            path: string;
+            type: string;
+            size: number;
+            mtime: number;
+            ignored: boolean;
+            sha256_hash: string | null;
+        }>;
+    } | null>(null);
 
     // Path Picker state
     let pickerType = $state<"root" | "dest" | null>(null);
@@ -117,7 +136,7 @@
         try {
             const response = await getSettings();
             if (response.data) {
-                const data = response.data;
+                const data = response.data as Record<string, string>;
                 if (data.source_roots) sourceRoots = JSON.parse(data.source_roots);
                 if (data.restore_destinations) restoreDestinations = JSON.parse(data.restore_destinations);
                 if (data.tape_drives) tapeDrives = JSON.parse(data.tape_drives);
@@ -204,6 +223,44 @@
             toast.success("Test notification dispatched");
         } catch (error) {
             toast.error("Notification test failed");
+        }
+    }
+
+    async function handleTestExclusions() {
+        testingExclusions = true;
+        exclusionResults = null;
+        try {
+            const response = await testExclusions({
+                body: { patterns: globalExclusions, limit: 10 }
+            });
+            if (response.data) {
+                exclusionResults = response.data as any;
+            }
+        } catch (error: any) {
+            toast.error(error.body?.detail || "Failed to test exclusions");
+        } finally {
+            testingExclusions = false;
+        }
+    }
+
+    async function handleDownloadExclusionReport() {
+        try {
+            const response = await downloadExclusionReport({
+                body: { patterns: globalExclusions, limit: 10 }
+            });
+            if (response.data) {
+                const blob = await (response.data as any).blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `exclusion_report_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                toast.success("Exclusion report downloaded");
+            }
+        } catch (error) {
+            toast.error("Download failed");
         }
     }
 
@@ -315,7 +372,7 @@
                     </div>
 
                 {:else if activeTab === 'exclusions'}
-                    <div class="animate-in slide-in-from-bottom-4 duration-500">
+                    <div class="animate-in slide-in-from-bottom-4 duration-500 space-y-6">
                         <Card class="p-5 shadow-xl">
                             <SectionHeader title="Exclusion policy" icon={ListX} iconColor="text-orange-500" class="mb-6 px-0" />
                             <div class="space-y-5">
@@ -339,6 +396,100 @@
                                         {/each}
                                     </div>
                                 </div>
+
+                                <div class="flex gap-3">
+                                    <Button
+                                        variant="outline"
+                                        class="h-10 px-4 text-sm font-medium border-orange-500/30 text-orange-500 hover:bg-orange-500/5"
+                                        onclick={handleTestExclusions}
+                                        disabled={testingExclusions || !globalExclusions.trim()}
+                                    >
+                                        {#if testingExclusions}
+                                            <RotateCw size={14} class="mr-2 animate-spin" /> Testing...
+                                        {:else}
+                                            <FolderSearch size={14} class="mr-2" /> Test exception list
+                                        {/if}
+                                    </Button>
+                                    {#if exclusionResults && exclusionResults.matched_count > 0}
+                                        <Button
+                                            variant="outline"
+                                            class="h-10 px-4 text-sm font-medium border-border-color hover:border-blue-500/40 hover:bg-blue-500/5"
+                                            onclick={handleDownloadExclusionReport}
+                                        >
+                                            <Download size={14} class="mr-2" /> Download CSV report
+                                        </Button>
+                                    {/if}
+                                </div>
+
+                                {#if exclusionResults}
+                                    <div class="space-y-4">
+                                        <div class="grid grid-cols-3 gap-4">
+                                            <div class="bg-bg-primary/50 rounded-xl p-4 border border-border-color/60">
+                                                <span class="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Indexed files</span>
+                                                <p class="text-2xl font-bold text-text-primary mono mt-1">{exclusionResults.total_files.toLocaleString()}</p>
+                                                <p class="text-xs text-text-secondary mono mt-1">{formatSize(exclusionResults.total_size)}</p>
+                                            </div>
+                                            <div class="bg-orange-500/5 rounded-xl p-4 border border-orange-500/20">
+                                                <span class="text-[10px] font-medium text-orange-500 uppercase tracking-wide">Would be excluded</span>
+                                                <p class="text-2xl font-bold text-orange-500 mono mt-1">{exclusionResults.matched_count.toLocaleString()}</p>
+                                                <p class="text-xs text-orange-500 mono mt-1">{formatSize(exclusionResults.matched_size)}</p>
+                                            </div>
+                                            <div class="bg-bg-primary/50 rounded-xl p-4 border border-border-color/60">
+                                                <span class="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Match rate</span>
+                                                <p class="text-2xl font-bold text-text-primary mono mt-1">
+                                                    {exclusionResults.total_files > 0
+                                                        ? Math.round((exclusionResults.matched_count / exclusionResults.total_files) * 100)
+                                                        : 0}%
+                                                </p>
+                                                <p class="text-xs text-text-secondary mono mt-1">
+                                                    {exclusionResults.total_size > 0
+                                                        ? Math.round((exclusionResults.matched_size / exclusionResults.total_size) * 100)
+                                                        : 0}% by size
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {#if exclusionResults.sample.length > 0}
+                                            <div class="bg-bg-primary/30 rounded-xl border border-border-color/60 overflow-hidden">
+                                                <div class="px-4 py-3 border-b border-border-color/60 bg-bg-primary/50">
+                                                    <span class="text-xs font-semibold text-text-primary">Sample of matched files ({exclusionResults.sample.length} shown)</span>
+                                                </div>
+                                                <div class="overflow-x-auto">
+                                                    <table class="w-full text-xs">
+                                                        <thead>
+                                                            <tr class="border-b border-border-color/40">
+                                                                <th class="px-4 py-2 text-left text-text-secondary font-medium">Path</th>
+                                                                <th class="px-4 py-2 text-right text-text-secondary font-medium w-24">Size</th>
+                                                                <th class="px-4 py-2 text-right text-text-secondary font-medium w-20">Type</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {#each exclusionResults.sample as file}
+                                                                <tr class="border-b border-border-color/20 last:border-0">
+                                                                    <td class="px-4 py-2 text-text-primary font-mono truncate max-w-xs">{file.path}</td>
+                                                                    <td class="px-4 py-2 text-right text-text-secondary mono">{file.size?.toLocaleString() || '—'}</td>
+                                                                    <td class="px-4 py-2 text-right">
+                                                                        <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-medium {file.type === 'directory' ? 'bg-blue-500/10 text-blue-500' : 'bg-text-secondary/10 text-text-secondary'}">
+                                                                            {file.type}
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+                                                            {/each}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        {:else if exclusionResults.matched_count === 0}
+                                            <div class="p-4 bg-green-500/5 border border-dashed border-green-500/30 rounded-xl flex gap-4 items-start">
+                                                <ShieldCheck size={20} class="text-green-500 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <span class="text-xs font-bold text-green-500 uppercase tracking-wider">No matches</span>
+                                                    <p class="text-xs text-text-secondary leading-relaxed font-medium">None of the current indexed files match these exclusion patterns.</p>
+                                                </div>
+                                            </div>
+                                        {/if}
+                                    </div>
+                                {/if}
 
                                 <div class="p-4 bg-orange-500/5 border border-dashed border-orange-500/30 rounded-xl flex gap-4 items-start">
                                     <ShieldAlert size={20} class="text-orange-500 shrink-0 mt-0.5" />

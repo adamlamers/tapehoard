@@ -663,6 +663,20 @@ export type StorageProviderSchema = {
 };
 
 /**
+ * TestExclusionsRequest
+ */
+export type TestExclusionsRequest = {
+    /**
+     * Patterns
+     */
+    patterns: string;
+    /**
+     * Limit
+     */
+    limit?: number;
+};
+
+/**
  * TestNotificationRequest
  */
 export type TestNotificationRequest = {
@@ -751,7 +765,7 @@ export type AppApiBackupsJobSchema = {
 /**
  * JobSchema
  */
-export type AppApiSystemJobSchema = {
+export type AppApiCommonJobSchema = {
     /**
      * Id
      */
@@ -855,7 +869,7 @@ export type ListJobsResponses = {
      *
      * Successful Response
      */
-    200: Array<AppApiSystemJobSchema>;
+    200: Array<AppApiCommonJobSchema>;
 };
 
 export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
@@ -913,7 +927,7 @@ export type GetJobResponses = {
     /**
      * Successful Response
      */
-    200: AppApiSystemJobSchema;
+    200: AppApiCommonJobSchema;
 };
 
 export type GetJobResponse = GetJobResponses[keyof GetJobResponses];
@@ -1171,7 +1185,7 @@ export type GetSettingsResponses = {
      * Successful Response
      */
     200: {
-        [key: string]: string;
+        [key: string]: unknown;
     };
 };
 
@@ -1194,6 +1208,52 @@ export type UpdateSettingsErrors = {
 export type UpdateSettingsError = UpdateSettingsErrors[keyof UpdateSettingsErrors];
 
 export type UpdateSettingsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type TestExclusionsData = {
+    body: TestExclusionsRequest;
+    path?: never;
+    query?: never;
+    url: '/system/settings/test-exclusions';
+};
+
+export type TestExclusionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TestExclusionsError = TestExclusionsErrors[keyof TestExclusionsErrors];
+
+export type TestExclusionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type DownloadExclusionReportData = {
+    body: TestExclusionsRequest;
+    path?: never;
+    query?: never;
+    url: '/system/settings/test-exclusions/download';
+};
+
+export type DownloadExclusionReportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DownloadExclusionReportError = DownloadExclusionReportErrors[keyof DownloadExclusionReportErrors];
+
+export type DownloadExclusionReportResponses = {
     /**
      * Successful Response
      */

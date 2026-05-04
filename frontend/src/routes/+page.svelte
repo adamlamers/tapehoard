@@ -23,14 +23,17 @@
     import SectionHeader from '$lib/components/ui/SectionHeader.svelte';
     import StatCard from '$lib/components/ui/StatCard.svelte';
     import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
-    import { getDashboardStats, triggerScan, triggerIndexing, type DashboardStatsSchema } from '$lib/api';
+    import { getDashboardStats, getScanStatus, triggerScan, triggerIndexing, type DashboardStatsSchema, type ScanStatusSchema } from '$lib/api';
     import { cn, formatLocalDate, formatLocalTime, formatSize } from '$lib/utils';
     import { toast } from 'svelte-sonner';
+    import { POLL_FAST } from '$lib/config';
 
     let stats = $state<DashboardStatsSchema | null>(null);
     let loading = $state(true);
     let scanning = $state(false);
     let indexing = $state(false);
+    let scanStatus = $state<ScanStatusSchema | null>(null);
+    let pollInterval: any;
 
     async function loadStats() {
         loading = true;
@@ -43,6 +46,23 @@
             console.error("Failed to load dashboard stats:", error);
         } finally {
             loading = false;
+        }
+    }
+
+    async function checkScanStatus() {
+        try {
+            const response = await getScanStatus();
+            if (response.data) {
+                const wasRunning = scanStatus?.is_running;
+                scanStatus = response.data;
+
+                // Auto-refresh stats when scan completes
+                if (wasRunning && !scanStatus.is_running) {
+                    await loadStats();
+                }
+            }
+        } catch (error) {
+            console.error("Failed to get scan status:", error);
         }
     }
 
@@ -70,7 +90,14 @@
         }
     }
 
-    onMount(loadStats);
+    onMount(() => {
+        loadStats();
+        checkScanStatus();
+        pollInterval = setInterval(checkScanStatus, POLL_FAST);
+        return () => {
+            if (pollInterval) clearInterval(pollInterval);
+        };
+    });
 
 </script>
 
@@ -104,6 +131,26 @@
             </Button>
         {/snippet}
     </PageHeader>
+
+    {#if scanStatus?.is_running}
+        <div class="bg-blue-500/5 border border-blue-500/20 rounded-xl px-5 py-3 flex items-center gap-4">
+            <RotateCw size={16} class="text-blue-500 animate-spin" />
+            <div class="flex-1">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-text-primary">Scan in progress</span>
+                    <span class="text-xs text-text-secondary mono">
+                        {scanStatus.files_processed.toLocaleString()} / {scanStatus.total_files_found.toLocaleString()} files
+                    </span>
+                </div>
+                <div class="w-full bg-bg-primary h-1.5 rounded-full overflow-hidden mt-2">
+                    <div
+                        class="bg-blue-500 h-full transition-all duration-1000"
+                        style="width: {scanStatus.total_files_found ? Math.round((scanStatus.files_processed / scanStatus.total_files_found) * 100) : 0}%"
+                    ></div>
+                </div>
+            </div>
+        </div>
+    {/if}
 
     <div class="space-y-6">
         {#if loading && !stats}

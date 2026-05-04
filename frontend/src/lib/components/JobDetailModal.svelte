@@ -4,7 +4,7 @@
     import { Button } from './ui/button';
     import { Card } from './ui/card';
     import Dialog from './ui/Dialog.svelte';
-    import { getJob, getJobLogs, type AppApiSystemJobSchema } from '$lib/api';
+    import { getJob, getJobLogs, type AppApiCommonJobSchema } from '$lib/api';
     import { cn, formatLocalTime, formatLocalDateTime, parseUTCDate } from '$lib/utils';
     import { POLL_FAST } from '$lib/config';
 
@@ -13,7 +13,7 @@
         onClear: () => void;
     }>();
 
-    let job = $state<AppApiSystemJobSchema | null>(null);
+    let job = $state<AppApiCommonJobSchema | null>(null);
     let logs = $state<{ id: number; message: string; timestamp: string }[]>([]);
     let loading = $state(true);
     let pollInterval: any;

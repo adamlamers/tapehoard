@@ -29,12 +29,12 @@
         getJobStats,
         cancelJob as cancelJobApi,
         retryJob as retryJobApi,
-        type AppApiSystemJobSchema
+        type AppApiCommonJobSchema
     } from '$lib/api';
     import { cn, formatLocalTime, parseUTCDate } from '$lib/utils';
     import { toast } from 'svelte-sonner';
 
-    let jobs = $state<AppApiSystemJobSchema[]>([]);
+    let jobs = $state<AppApiCommonJobSchema[]>([]);
     let totalJobs = $state(0);
     let loading = $state(true);
     let loadingMore = $state(false);
@@ -236,7 +236,7 @@
     }
 
     const groupedHistorical = $derived(() => {
-        const groups: Record<string, AppApiSystemJobSchema[]> = {
+        const groups: Record<string, AppApiCommonJobSchema[]> = {
             'Today': [],
             'Yesterday': [],
             'This week': [],
