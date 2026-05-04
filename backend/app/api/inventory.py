@@ -31,8 +31,12 @@ class ReorderMediaRequest(BaseModel):
 # --- Core Logic ---
 
 
-@router.get("/providers", response_model=List[StorageProviderSchema])
-def list_storage_providers():
+@router.get(
+    "/providers",
+    response_model=List[StorageProviderSchema],
+    operation_id="list_providers",
+)
+def list_providers():
     """Returns a registry of all available storage providers and their configurations."""
     from app.providers.cloud import CloudStorageProvider
     from app.providers.hdd import OfflineHDDProvider
@@ -58,8 +62,8 @@ def list_storage_providers():
     ]
 
 
-@router.get("/media", response_model=List[MediaSchema])
-def list_storage_fleet(refresh: bool = False, db_session: Session = Depends(get_db)):
+@router.get("/media", response_model=List[MediaSchema], operation_id="list_media")
+def list_media(refresh: bool = False, db_session: Session = Depends(get_db)):
     """Returns all registered media assets with real-time hardware status."""
     from app.services.archiver import archiver_manager
 
@@ -144,8 +148,8 @@ def list_storage_fleet(refresh: bool = False, db_session: Session = Depends(get_
     return results
 
 
-@router.post("/media/reorder")
-def reorder_archival_priority(
+@router.post("/media/reorder", operation_id="reorder_media")
+def reorder_media(
     request_data: ReorderMediaRequest, db_session: Session = Depends(get_db)
 ):
     """Updates the global archival priority order for the media fleet."""
@@ -158,8 +162,8 @@ def reorder_archival_priority(
     return {"message": "Archival priority synchronized."}
 
 
-@router.post("/media", response_model=MediaSchema)
-def register_new_media(
+@router.post("/media", response_model=MediaSchema, operation_id="create_media")
+def create_media(
     request_data: MediaCreateSchema, db_session: Session = Depends(get_db)
 ):
     """Adds a new physical storage medium to the inventory."""
@@ -197,8 +201,10 @@ def register_new_media(
     )
 
 
-@router.patch("/media/{media_id}", response_model=MediaSchema)
-def update_media_asset(
+@router.patch(
+    "/media/{media_id}", response_model=MediaSchema, operation_id="update_media"
+)
+def update_media(
     media_id: int,
     request_data: MediaUpdateSchema,
     db_session: Session = Depends(get_db),
@@ -252,8 +258,8 @@ def update_media_asset(
     )
 
 
-@router.delete("/media/{media_id}")
-def delete_media_asset(media_id: int, db_session: Session = Depends(get_db)):
+@router.delete("/media/{media_id}", operation_id="delete_media")
+def delete_media(media_id: int, db_session: Session = Depends(get_db)):
     """Removes a media asset and all associated version history from the index."""
     media_record = db_session.get(models.StorageMedia, media_id)
     if not media_record:
@@ -269,8 +275,8 @@ def delete_media_asset(media_id: int, db_session: Session = Depends(get_db)):
     return {"message": "Media and associated history successfully purged."}
 
 
-@router.post("/media/{media_id}/initialize")
-def initialize_storage_hardware(
+@router.post("/media/{media_id}/initialize", operation_id="initialize_media")
+def initialize_media(
     media_id: int, force: bool = False, db_session: Session = Depends(get_db)
 ):
     """Prepares hardware for use by the system (wipes and labels media)."""
@@ -320,8 +326,8 @@ def initialize_storage_hardware(
 # --- Browsing & Analytics (Optimized) ---
 
 
-@router.get("/insights")
-def get_system_analytics(db_session: Session = Depends(get_db)):
+@router.get("/insights", operation_id="get_analytics")
+def get_analytics(db_session: Session = Depends(get_db)):
     """Computes high-signal system metrics with optimized single-pass queries."""
 
     # 1. Deduplication & Scale (Only counting unignored files)
@@ -546,8 +552,8 @@ def get_system_analytics(db_session: Session = Depends(get_db)):
     }
 
 
-@router.get("/directories")
-def get_directory_treemap(db_session: Session = Depends(get_db)):
+@router.get("/directories", operation_id="get_treemap")
+def get_treemap(db_session: Session = Depends(get_db)):
     """Returns directory tree data for treemap visualization."""
     # Directory aggregation - same as insights but only directories
     directory_aggregation_sql = text("""
@@ -621,8 +627,8 @@ def get_directory_treemap(db_session: Session = Depends(get_db)):
     return convert_tree_to_list(nested_dir_map, 10)
 
 
-@router.get("/detect")
-def detect_unregistered_media(db_session: Session = Depends(get_db)):
+@router.get("/detect", operation_id="detect_media")
+def detect_media(db_session: Session = Depends(get_db)):
     """Scans all configured hardware providers for newly inserted, unregistered media."""
     from app.services.archiver import archiver_manager
 

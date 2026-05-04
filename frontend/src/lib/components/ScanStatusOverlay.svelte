@@ -2,7 +2,7 @@
     import { onMount, onDestroy } from 'svelte';
     import { RotateCw, Activity, CheckCircle2 } from 'lucide-svelte';
     import { Card } from '$lib/components/ui/card';
-    import { getScanStatusSystemScanStatusGet, type ScanStatusSchema } from '$lib/api';
+    import { getScanStatus, type ScanStatusSchema } from '$lib/api';
     import { POLL_FAST } from '$lib/config';
     import { toast } from 'svelte-sonner';
 
@@ -13,7 +13,7 @@
 
     async function updateScanStatus() {
         try {
-            const response = await getScanStatusSystemScanStatusGet();
+            const response = await getScanStatus();
             if (response.data) {
                 const wasRunning = scanStatus?.is_running;
                 scanStatus = response.data;

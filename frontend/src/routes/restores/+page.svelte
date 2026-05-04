@@ -24,13 +24,13 @@
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
     import type { FileItem } from '$lib/types';
     import {
-        listRecoveryQueueRestoresQueueGet,
-        calculateRecoveryManifestRestoresManifestGet,
-        removeFromRecoveryQueueRestoresQueueItemItemIdDelete,
-        clearRecoveryQueueRestoresQueueClearPost,
-        getSystemSettingsSystemSettingsGet,
-        triggerRecoveryJobRestoresTriggerPost,
-        browseRecoveryQueueVirtualFsRestoresQueueBrowseGet,
+        getRestoreQueue,
+        getRestoreManifest,
+        removeFromRestoreQueue,
+        clearRestoreQueue,
+        getSettings,
+        triggerRestore,
+        browseRestoreQueue,
         type CartItemSchema,
         type RestoreManifestSchema,
         type CartFileItemSchema
@@ -49,7 +49,7 @@
     async function loadData() {
         loading = true;
         try {
-            const settingsRes = await getSystemSettingsSystemSettingsGet();
+            const settingsRes = await getSettings();
             if (settingsRes.data?.restore_destinations) {
                 restoreDests = JSON.parse(settingsRes.data.restore_destinations);
                 if (restoreDests.length > 0 && !selectedDest) selectedDest = restoreDests[0];
@@ -70,7 +70,7 @@
 
     async function refreshManifest() {
         try {
-            const manifestRes = await calculateRecoveryManifestRestoresManifestGet();
+            const manifestRes = await getRestoreManifest();
             if (manifestRes.data) manifest = manifestRes.data;
         } catch (err) {
             console.error("Failed to load manifest:", err);
@@ -80,7 +80,7 @@
     async function loadCartFiles(path: string) {
         loading = true;
         try {
-            const response = await browseRecoveryQueueVirtualFsRestoresQueueBrowseGet({
+            const response = await browseRestoreQueue({
                 query: { path }
             });
             if (response.data) {
@@ -113,7 +113,7 @@
 
         restoring = true;
         try {
-            await triggerRecoveryJobRestoresTriggerPost({
+            await triggerRestore({
                 body: { destination_path: selectedDest }
             });
             toast.success("Recovery job initiated! Check System Activity for progress.");
@@ -139,7 +139,7 @@
     async function clearCart() {
         if (!confirm("Are you sure you want to clear the entire recovery queue?")) return;
         try {
-            await clearRecoveryQueueRestoresQueueClearPost();
+            await clearRestoreQueue();
             cartFiles = [];
             manifest = null;
             await loadData();

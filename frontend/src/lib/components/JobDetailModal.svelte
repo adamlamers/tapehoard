@@ -4,7 +4,7 @@
     import { Button } from './ui/button';
     import { Card } from './ui/card';
     import Dialog from './ui/Dialog.svelte';
-    import { getJobDetailSystemJobsJobIdGet, getJobLogsSystemJobsJobIdLogsGet, type AppApiSystemJobSchema } from '$lib/api';
+    import { getJob, getJobLogs, type AppApiSystemJobSchema } from '$lib/api';
     import { cn, formatLocalTime, formatLocalDateTime, parseUTCDate } from '$lib/utils';
     import { POLL_FAST } from '$lib/config';
 
@@ -22,8 +22,8 @@
         loading = true;
         try {
             const [jobRes, logsRes] = await Promise.all([
-                getJobDetailSystemJobsJobIdGet({ path: { job_id: jobId } }),
-                getJobLogsSystemJobsJobIdLogsGet({ path: { job_id: jobId } })
+                getJob({ path: { job_id: jobId } }),
+                getJobLogs({ path: { job_id: jobId } })
             ]);
             if (jobRes.data) job = jobRes.data;
             if (logsRes.data) logs = logsRes.data;
@@ -39,8 +39,8 @@
 
         try {
             const [jobRes, logsRes] = await Promise.all([
-                getJobDetailSystemJobsJobIdGet({ path: { job_id: jobId } }),
-                getJobLogsSystemJobsJobIdLogsGet({ path: { job_id: jobId } })
+                getJob({ path: { job_id: jobId } }),
+                getJobLogs({ path: { job_id: jobId } })
             ]);
             if (jobRes.data) {
                 const wasRunning = job.status === 'RUNNING' || job.status === 'PENDING';

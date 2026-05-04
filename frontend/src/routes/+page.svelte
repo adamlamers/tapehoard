@@ -23,7 +23,7 @@
     import SectionHeader from '$lib/components/ui/SectionHeader.svelte';
     import StatCard from '$lib/components/ui/StatCard.svelte';
     import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
-    import { getDashboardStatsSystemDashboardStatsGet, triggerScanSystemScanPost, triggerIndexingSystemIndexHashPost, type DashboardStatsSchema } from '$lib/api';
+    import { getDashboardStats, triggerScan, triggerIndexing, type DashboardStatsSchema } from '$lib/api';
     import { cn, formatLocalDate, formatLocalTime, formatSize } from '$lib/utils';
     import { toast } from 'svelte-sonner';
 
@@ -35,7 +35,7 @@
     async function loadStats() {
         loading = true;
         try {
-            const response = await getDashboardStatsSystemDashboardStatsGet();
+            const response = await getDashboardStats();
             if (response.data) {
                 stats = response.data;
             }
@@ -49,7 +49,7 @@
     async function startIndexing() {
         indexing = true;
         try {
-            await triggerIndexingSystemIndexHashPost();
+            await triggerIndexing();
             toast.success("Background indexing job initiated");
         } catch (error: any) {
             toast.error(error.body?.detail || "Failed to start indexing");
@@ -61,7 +61,7 @@
     async function startScan() {
         scanning = true;
         try {
-            await triggerScanSystemScanPost();
+            await triggerScan();
             toast.success("Scan job initiated successfully");
         } catch (error: any) {
             toast.error(error.body?.detail || "Failed to start scan");

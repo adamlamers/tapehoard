@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostData, AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostErrors, AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostResponses, AddFileToRecoveryQueueRestoresQueueFileFileIdPostData, AddFileToRecoveryQueueRestoresQueueFileFileIdPostErrors, AddFileToRecoveryQueueRestoresQueueFileFileIdPostResponses, ArchiveBrowseData, ArchiveBrowseErrors, ArchiveBrowseResponses, ArchiveMetadataData, ArchiveMetadataErrors, ArchiveMetadataResponses, ArchiveSearchData, ArchiveSearchErrors, ArchiveSearchResponses, ArchiveTreeData, ArchiveTreeErrors, ArchiveTreeResponses, BatchAddToRecoveryQueueRestoresQueueBatchPostData, BatchAddToRecoveryQueueRestoresQueueBatchPostErrors, BatchAddToRecoveryQueueRestoresQueueBatchPostResponses, BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostData, BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostErrors, BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostResponses, BatchDismissSystemDiscrepanciesBatchDismissPostData, BatchDismissSystemDiscrepanciesBatchDismissPostErrors, BatchDismissSystemDiscrepanciesBatchDismissPostResponses, BatchHardDeleteSystemDiscrepanciesBatchDeletePostData, BatchHardDeleteSystemDiscrepanciesBatchDeletePostErrors, BatchHardDeleteSystemDiscrepanciesBatchDeletePostResponses, BatchUpdateTrackingSystemTrackBatchPostData, BatchUpdateTrackingSystemTrackBatchPostErrors, BatchUpdateTrackingSystemTrackBatchPostResponses, BrowseDiscrepanciesSystemDiscrepanciesBrowseGetData, BrowseDiscrepanciesSystemDiscrepanciesBrowseGetErrors, BrowseDiscrepanciesSystemDiscrepanciesBrowseGetResponses, BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetData, BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetErrors, BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetResponses, CalculateRecoveryManifestRestoresManifestGetData, CalculateRecoveryManifestRestoresManifestGetResponses, CancelJobSystemJobsJobIdCancelPostData, CancelJobSystemJobsJobIdCancelPostErrors, CancelJobSystemJobsJobIdCancelPostResponses, ClearRecoveryQueueRestoresQueueClearPostData, ClearRecoveryQueueRestoresQueueClearPostResponses, ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostData, ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostErrors, ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostResponses, DeleteFileRecordSystemDiscrepanciesFileIdDeleteData, DeleteFileRecordSystemDiscrepanciesFileIdDeleteErrors, DeleteFileRecordSystemDiscrepanciesFileIdDeleteResponses, DeleteMediaAssetInventoryMediaMediaIdDeleteData, DeleteMediaAssetInventoryMediaMediaIdDeleteErrors, DeleteMediaAssetInventoryMediaMediaIdDeleteResponses, DetectUnregisteredMediaInventoryDetectGetData, DetectUnregisteredMediaInventoryDetectGetResponses, DiscoverHardwareNodesSystemHardwareDiscoverGetData, DiscoverHardwareNodesSystemHardwareDiscoverGetResponses, DismissDiscrepancySystemDiscrepanciesFileIdDismissPostData, DismissDiscrepancySystemDiscrepanciesFileIdDismissPostErrors, DismissDiscrepancySystemDiscrepanciesFileIdDismissPostResponses, ExportDatabaseIndexSystemDatabaseExportGetData, ExportDatabaseIndexSystemDatabaseExportGetResponses, FilesystemBrowseData, FilesystemBrowseErrors, FilesystemBrowseResponses, FilesystemSearchData, FilesystemSearchErrors, FilesystemSearchResponses, FilesystemTreeData, FilesystemTreeErrors, FilesystemTreeResponses, GetDashboardStatsSystemDashboardStatsGetData, GetDashboardStatsSystemDashboardStatsGetResponses, GetDirectoryTreemapInventoryDirectoriesGetData, GetDirectoryTreemapInventoryDirectoriesGetResponses, GetDiscrepanciesTreeSystemDiscrepanciesTreeGetData, GetDiscrepanciesTreeSystemDiscrepanciesTreeGetErrors, GetDiscrepanciesTreeSystemDiscrepanciesTreeGetResponses, GetJobDetailSystemJobsJobIdGetData, GetJobDetailSystemJobsJobIdGetErrors, GetJobDetailSystemJobsJobIdGetResponses, GetJobLogsSystemJobsJobIdLogsGetData, GetJobLogsSystemJobsJobIdLogsGetErrors, GetJobLogsSystemJobsJobIdLogsGetResponses, GetJobsCountSystemJobsCountGetData, GetJobsCountSystemJobsCountGetResponses, GetJobsStatsSystemJobsStatsGetData, GetJobsStatsSystemJobsStatsGetResponses, GetRecoveryQueueTreeRestoresQueueTreeGetData, GetRecoveryQueueTreeRestoresQueueTreeGetErrors, GetRecoveryQueueTreeRestoresQueueTreeGetResponses, GetScanStatusSystemScanStatusGetData, GetScanStatusSystemScanStatusGetResponses, GetSystemAnalyticsInventoryInsightsGetData, GetSystemAnalyticsInventoryInsightsGetResponses, GetSystemSettingsSystemSettingsGetData, GetSystemSettingsSystemSettingsGetResponses, HealthHeartbeatHealthGetData, HealthHeartbeatHealthGetResponses, IgnoreHardwareNodeSystemHardwareIgnorePostData, IgnoreHardwareNodeSystemHardwareIgnorePostErrors, IgnoreHardwareNodeSystemHardwareIgnorePostResponses, ImportDatabaseIndexSystemDatabaseImportPostData, ImportDatabaseIndexSystemDatabaseImportPostErrors, ImportDatabaseIndexSystemDatabaseImportPostResponses, InitializeStorageHardwareInventoryMediaMediaIdInitializePostData, InitializeStorageHardwareInventoryMediaMediaIdInitializePostErrors, InitializeStorageHardwareInventoryMediaMediaIdInitializePostResponses, ListArchivalHistoryBackupsGetData, ListArchivalHistoryBackupsGetResponses, ListDiscrepanciesSystemDiscrepanciesGetData, ListDiscrepanciesSystemDiscrepanciesGetResponses, ListHostDirectoriesSystemLsGetData, ListHostDirectoriesSystemLsGetErrors, ListHostDirectoriesSystemLsGetResponses, ListJobsSystemJobsGetData, ListJobsSystemJobsGetErrors, ListJobsSystemJobsGetResponses, ListRecoveryQueueRestoresQueueGetData, ListRecoveryQueueRestoresQueueGetResponses, ListStorageFleetInventoryMediaGetData, ListStorageFleetInventoryMediaGetErrors, ListStorageFleetInventoryMediaGetResponses, ListStorageProvidersInventoryProvidersGetData, ListStorageProvidersInventoryProvidersGetResponses, RegisterNewMediaInventoryMediaPostData, RegisterNewMediaInventoryMediaPostErrors, RegisterNewMediaInventoryMediaPostResponses, RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteData, RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteErrors, RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteResponses, ReorderArchivalPriorityInventoryMediaReorderPostData, ReorderArchivalPriorityInventoryMediaReorderPostErrors, ReorderArchivalPriorityInventoryMediaReorderPostResponses, ResetTestEnvironmentSystemTestResetPostData, ResetTestEnvironmentSystemTestResetPostResponses, RetryJobSystemJobsJobIdRetryPostData, RetryJobSystemJobsJobIdRetryPostErrors, RetryJobSystemJobsJobIdRetryPostResponses, StreamJobsSystemJobsStreamGetData, StreamJobsSystemJobsStreamGetResponses, TestNotificationDispatchSystemNotificationsTestPostData, TestNotificationDispatchSystemNotificationsTestPostErrors, TestNotificationDispatchSystemNotificationsTestPostResponses, TriggerAutoBackupBackupsTriggerAutoPostData, TriggerAutoBackupBackupsTriggerAutoPostResponses, TriggerBackupJobBackupsTriggerMediaIdPostData, TriggerBackupJobBackupsTriggerMediaIdPostErrors, TriggerBackupJobBackupsTriggerMediaIdPostResponses, TriggerIndexingSystemIndexHashPostData, TriggerIndexingSystemIndexHashPostResponses, TriggerRecoveryJobRestoresTriggerPostData, TriggerRecoveryJobRestoresTriggerPostErrors, TriggerRecoveryJobRestoresTriggerPostResponses, TriggerScanSystemScanPostData, TriggerScanSystemScanPostResponses, UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostData, UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostErrors, UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostResponses, UpdateMediaAssetInventoryMediaMediaIdPatchData, UpdateMediaAssetInventoryMediaMediaIdPatchErrors, UpdateMediaAssetInventoryMediaMediaIdPatchResponses, UpdateSystemSettingSystemSettingsPostData, UpdateSystemSettingSystemSettingsPostErrors, UpdateSystemSettingSystemSettingsPostResponses } from './types.gen';
+import type { AddDirectoryToRestoreQueueData, AddDirectoryToRestoreQueueErrors, AddDirectoryToRestoreQueueResponses, AddFileToRestoreQueueData, AddFileToRestoreQueueErrors, AddFileToRestoreQueueResponses, ArchiveBrowseData, ArchiveBrowseErrors, ArchiveBrowseResponses, ArchiveMetadataData, ArchiveMetadataErrors, ArchiveMetadataResponses, ArchiveSearchData, ArchiveSearchErrors, ArchiveSearchResponses, ArchiveTreeData, ArchiveTreeErrors, ArchiveTreeResponses, BatchAddToRestoreQueueData, BatchAddToRestoreQueueErrors, BatchAddToRestoreQueueResponses, BatchConfirmDiscrepanciesData, BatchConfirmDiscrepanciesErrors, BatchConfirmDiscrepanciesResponses, BatchDeleteDiscrepanciesData, BatchDeleteDiscrepanciesErrors, BatchDeleteDiscrepanciesResponses, BatchDismissDiscrepanciesData, BatchDismissDiscrepanciesErrors, BatchDismissDiscrepanciesResponses, BatchTrackData, BatchTrackErrors, BatchTrackResponses, BrowseDiscrepanciesData, BrowseDiscrepanciesErrors, BrowseDiscrepanciesResponses, BrowseRestoreQueueData, BrowseRestoreQueueErrors, BrowseRestoreQueueResponses, CancelJobData, CancelJobErrors, CancelJobResponses, CheckHealthData, CheckHealthResponses, ClearRestoreQueueData, ClearRestoreQueueResponses, ConfirmDiscrepancyData, ConfirmDiscrepancyErrors, ConfirmDiscrepancyResponses, CreateMediaData, CreateMediaErrors, CreateMediaResponses, DeleteDiscrepancyData, DeleteDiscrepancyErrors, DeleteDiscrepancyResponses, DeleteMediaData, DeleteMediaErrors, DeleteMediaResponses, DetectMediaData, DetectMediaResponses, DiscoverHardwareData, DiscoverHardwareResponses, DismissDiscrepancyData, DismissDiscrepancyErrors, DismissDiscrepancyResponses, ExportDatabaseData, ExportDatabaseResponses, FilesystemBrowseData, FilesystemBrowseErrors, FilesystemBrowseResponses, FilesystemSearchData, FilesystemSearchErrors, FilesystemSearchResponses, FilesystemTreeData, FilesystemTreeErrors, FilesystemTreeResponses, GetAnalyticsData, GetAnalyticsResponses, GetDashboardStatsData, GetDashboardStatsResponses, GetDiscrepancyTreeData, GetDiscrepancyTreeErrors, GetDiscrepancyTreeResponses, GetJobCountData, GetJobCountResponses, GetJobData, GetJobErrors, GetJobLogsData, GetJobLogsErrors, GetJobLogsResponses, GetJobResponses, GetJobStatsData, GetJobStatsResponses, GetRestoreManifestData, GetRestoreManifestResponses, GetRestoreQueueData, GetRestoreQueueResponses, GetRestoreQueueTreeData, GetRestoreQueueTreeErrors, GetRestoreQueueTreeResponses, GetScanStatusData, GetScanStatusResponses, GetSettingsData, GetSettingsResponses, GetTreemapData, GetTreemapResponses, IgnoreHardwareData, IgnoreHardwareErrors, IgnoreHardwareResponses, ImportDatabaseData, ImportDatabaseErrors, ImportDatabaseResponses, InitializeMediaData, InitializeMediaErrors, InitializeMediaResponses, ListBackupsData, ListBackupsResponses, ListDirectoriesData, ListDirectoriesErrors, ListDirectoriesResponses, ListDiscrepanciesData, ListDiscrepanciesResponses, ListJobsData, ListJobsErrors, ListJobsResponses, ListMediaData, ListMediaErrors, ListMediaResponses, ListProvidersData, ListProvidersResponses, RemoveFromRestoreQueueData, RemoveFromRestoreQueueErrors, RemoveFromRestoreQueueResponses, ReorderMediaData, ReorderMediaErrors, ReorderMediaResponses, ResetTestEnvironmentData, ResetTestEnvironmentResponses, RetryJobData, RetryJobErrors, RetryJobResponses, StreamJobsData, StreamJobsResponses, TestNotificationData, TestNotificationErrors, TestNotificationResponses, TriggerAutoBackupData, TriggerAutoBackupResponses, TriggerBackupData, TriggerBackupErrors, TriggerBackupResponses, TriggerIndexingData, TriggerIndexingResponses, TriggerRestoreData, TriggerRestoreErrors, TriggerRestoreResponses, TriggerScanData, TriggerScanResponses, UndoDismissDiscrepancyData, UndoDismissDiscrepancyErrors, UndoDismissDiscrepancyResponses, UpdateMediaData, UpdateMediaErrors, UpdateMediaResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -23,91 +23,91 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
  *
  * Wipes the database and resets state for E2E testing.
  */
-export const resetTestEnvironmentSystemTestResetPost = <ThrowOnError extends boolean = false>(options?: Options<ResetTestEnvironmentSystemTestResetPostData, ThrowOnError>) => (options?.client ?? client).post<ResetTestEnvironmentSystemTestResetPostResponses, unknown, ThrowOnError>({ url: '/system/test/reset', ...options });
+export const resetTestEnvironment = <ThrowOnError extends boolean = false>(options?: Options<ResetTestEnvironmentData, ThrowOnError>) => (options?.client ?? client).post<ResetTestEnvironmentResponses, unknown, ThrowOnError>({ url: '/system/test/reset', ...options });
 
 /**
  * Get Dashboard Stats
  *
  * Computes high-level system statistics for the overview dashboard.
  */
-export const getDashboardStatsSystemDashboardStatsGet = <ThrowOnError extends boolean = false>(options?: Options<GetDashboardStatsSystemDashboardStatsGetData, ThrowOnError>) => (options?.client ?? client).get<GetDashboardStatsSystemDashboardStatsGetResponses, unknown, ThrowOnError>({ url: '/system/dashboard/stats', ...options });
+export const getDashboardStats = <ThrowOnError extends boolean = false>(options?: Options<GetDashboardStatsData, ThrowOnError>) => (options?.client ?? client).get<GetDashboardStatsResponses, unknown, ThrowOnError>({ url: '/system/dashboard/stats', ...options });
 
 /**
  * List Jobs
  *
  * Returns a paginated list of background archival and discovery jobs.
  */
-export const listJobsSystemJobsGet = <ThrowOnError extends boolean = false>(options?: Options<ListJobsSystemJobsGetData, ThrowOnError>) => (options?.client ?? client).get<ListJobsSystemJobsGetResponses, ListJobsSystemJobsGetErrors, ThrowOnError>({ url: '/system/jobs', ...options });
+export const listJobs = <ThrowOnError extends boolean = false>(options?: Options<ListJobsData, ThrowOnError>) => (options?.client ?? client).get<ListJobsResponses, ListJobsErrors, ThrowOnError>({ url: '/system/jobs', ...options });
 
 /**
- * Get Jobs Count
+ * Get Job Count
  *
  * Returns the total number of jobs recorded in the system.
  */
-export const getJobsCountSystemJobsCountGet = <ThrowOnError extends boolean = false>(options?: Options<GetJobsCountSystemJobsCountGetData, ThrowOnError>) => (options?.client ?? client).get<GetJobsCountSystemJobsCountGetResponses, unknown, ThrowOnError>({ url: '/system/jobs/count', ...options });
+export const getJobCount = <ThrowOnError extends boolean = false>(options?: Options<GetJobCountData, ThrowOnError>) => (options?.client ?? client).get<GetJobCountResponses, unknown, ThrowOnError>({ url: '/system/jobs/count', ...options });
 
 /**
- * Get Jobs Stats
+ * Get Job Stats
  *
  * Returns summary statistics for all jobs.
  */
-export const getJobsStatsSystemJobsStatsGet = <ThrowOnError extends boolean = false>(options?: Options<GetJobsStatsSystemJobsStatsGetData, ThrowOnError>) => (options?.client ?? client).get<GetJobsStatsSystemJobsStatsGetResponses, unknown, ThrowOnError>({ url: '/system/jobs/stats', ...options });
+export const getJobStats = <ThrowOnError extends boolean = false>(options?: Options<GetJobStatsData, ThrowOnError>) => (options?.client ?? client).get<GetJobStatsResponses, unknown, ThrowOnError>({ url: '/system/jobs/stats', ...options });
 
 /**
- * Get Job Detail
+ * Get Job
  *
  * Retrieves detailed metadata for a specific job.
  */
-export const getJobDetailSystemJobsJobIdGet = <ThrowOnError extends boolean = false>(options: Options<GetJobDetailSystemJobsJobIdGetData, ThrowOnError>) => (options.client ?? client).get<GetJobDetailSystemJobsJobIdGetResponses, GetJobDetailSystemJobsJobIdGetErrors, ThrowOnError>({ url: '/system/jobs/{job_id}', ...options });
+export const getJob = <ThrowOnError extends boolean = false>(options: Options<GetJobData, ThrowOnError>) => (options.client ?? client).get<GetJobResponses, GetJobErrors, ThrowOnError>({ url: '/system/jobs/{job_id}', ...options });
 
 /**
  * Get Job Logs
  *
  * Retrieves the full execution log for a specific job.
  */
-export const getJobLogsSystemJobsJobIdLogsGet = <ThrowOnError extends boolean = false>(options: Options<GetJobLogsSystemJobsJobIdLogsGetData, ThrowOnError>) => (options.client ?? client).get<GetJobLogsSystemJobsJobIdLogsGetResponses, GetJobLogsSystemJobsJobIdLogsGetErrors, ThrowOnError>({ url: '/system/jobs/{job_id}/logs', ...options });
+export const getJobLogs = <ThrowOnError extends boolean = false>(options: Options<GetJobLogsData, ThrowOnError>) => (options.client ?? client).get<GetJobLogsResponses, GetJobLogsErrors, ThrowOnError>({ url: '/system/jobs/{job_id}/logs', ...options });
 
 /**
  * Cancel Job
  *
  * Submits a cancellation request for an active job.
  */
-export const cancelJobSystemJobsJobIdCancelPost = <ThrowOnError extends boolean = false>(options: Options<CancelJobSystemJobsJobIdCancelPostData, ThrowOnError>) => (options.client ?? client).post<CancelJobSystemJobsJobIdCancelPostResponses, CancelJobSystemJobsJobIdCancelPostErrors, ThrowOnError>({ url: '/system/jobs/{job_id}/cancel', ...options });
+export const cancelJob = <ThrowOnError extends boolean = false>(options: Options<CancelJobData, ThrowOnError>) => (options.client ?? client).post<CancelJobResponses, CancelJobErrors, ThrowOnError>({ url: '/system/jobs/{job_id}/cancel', ...options });
 
 /**
  * Retry Job
  *
  * Retries a failed SCAN job by creating a new job of the same type.
  */
-export const retryJobSystemJobsJobIdRetryPost = <ThrowOnError extends boolean = false>(options: Options<RetryJobSystemJobsJobIdRetryPostData, ThrowOnError>) => (options.client ?? client).post<RetryJobSystemJobsJobIdRetryPostResponses, RetryJobSystemJobsJobIdRetryPostErrors, ThrowOnError>({ url: '/system/jobs/{job_id}/retry', ...options });
+export const retryJob = <ThrowOnError extends boolean = false>(options: Options<RetryJobData, ThrowOnError>) => (options.client ?? client).post<RetryJobResponses, RetryJobErrors, ThrowOnError>({ url: '/system/jobs/{job_id}/retry', ...options });
 
 /**
  * Stream Jobs
  *
  * Server-Sent Events (SSE) endpoint for real-time job status updates.
  */
-export const streamJobsSystemJobsStreamGet = <ThrowOnError extends boolean = false>(options?: Options<StreamJobsSystemJobsStreamGetData, ThrowOnError>) => (options?.client ?? client).get<StreamJobsSystemJobsStreamGetResponses, unknown, ThrowOnError>({ url: '/system/jobs/stream', ...options });
+export const streamJobs = <ThrowOnError extends boolean = false>(options?: Options<StreamJobsData, ThrowOnError>) => (options?.client ?? client).get<StreamJobsResponses, unknown, ThrowOnError>({ url: '/system/jobs/stream', ...options });
 
 /**
  * Trigger Scan
  *
  * Initiates a full metadata discovery scan of configured source roots.
  */
-export const triggerScanSystemScanPost = <ThrowOnError extends boolean = false>(options?: Options<TriggerScanSystemScanPostData, ThrowOnError>) => (options?.client ?? client).post<TriggerScanSystemScanPostResponses, unknown, ThrowOnError>({ url: '/system/scan', ...options });
+export const triggerScan = <ThrowOnError extends boolean = false>(options?: Options<TriggerScanData, ThrowOnError>) => (options?.client ?? client).post<TriggerScanResponses, unknown, ThrowOnError>({ url: '/system/scan', ...options });
 
 /**
  * Trigger Indexing
  *
  * Manually triggers a background hashing marathon for unindexed files.
  */
-export const triggerIndexingSystemIndexHashPost = <ThrowOnError extends boolean = false>(options?: Options<TriggerIndexingSystemIndexHashPostData, ThrowOnError>) => (options?.client ?? client).post<TriggerIndexingSystemIndexHashPostResponses, unknown, ThrowOnError>({ url: '/system/index/hash', ...options });
+export const triggerIndexing = <ThrowOnError extends boolean = false>(options?: Options<TriggerIndexingData, ThrowOnError>) => (options?.client ?? client).post<TriggerIndexingResponses, unknown, ThrowOnError>({ url: '/system/index/hash', ...options });
 
 /**
  * Get Scan Status
  *
  * Returns the real-time operational status of the scanner and hashing engines.
  */
-export const getScanStatusSystemScanStatusGet = <ThrowOnError extends boolean = false>(options?: Options<GetScanStatusSystemScanStatusGetData, ThrowOnError>) => (options?.client ?? client).get<GetScanStatusSystemScanStatusGetResponses, unknown, ThrowOnError>({ url: '/system/scan/status', ...options });
+export const getScanStatus = <ThrowOnError extends boolean = false>(options?: Options<GetScanStatusData, ThrowOnError>) => (options?.client ?? client).get<GetScanStatusResponses, unknown, ThrowOnError>({ url: '/system/scan/status', ...options });
 
 /**
  * Browse System Path
@@ -124,11 +124,11 @@ export const filesystemBrowse = <ThrowOnError extends boolean = false>(options?:
 export const filesystemSearch = <ThrowOnError extends boolean = false>(options: Options<FilesystemSearchData, ThrowOnError>) => (options.client ?? client).get<FilesystemSearchResponses, FilesystemSearchErrors, ThrowOnError>({ url: '/system/search', ...options });
 
 /**
- * Batch Update Tracking
+ * Batch Track
  *
  * Applies bulk inclusion and exclusion rules and synchronizes is_ignored flags.
  */
-export const batchUpdateTrackingSystemTrackBatchPost = <ThrowOnError extends boolean = false>(options: Options<BatchUpdateTrackingSystemTrackBatchPostData, ThrowOnError>) => (options.client ?? client).post<BatchUpdateTrackingSystemTrackBatchPostResponses, BatchUpdateTrackingSystemTrackBatchPostErrors, ThrowOnError>({
+export const batchTrack = <ThrowOnError extends boolean = false>(options: Options<BatchTrackData, ThrowOnError>) => (options.client ?? client).post<BatchTrackResponses, BatchTrackErrors, ThrowOnError>({
     url: '/system/track/batch',
     ...options,
     headers: {
@@ -138,18 +138,18 @@ export const batchUpdateTrackingSystemTrackBatchPost = <ThrowOnError extends boo
 });
 
 /**
- * Get System Settings
+ * Get Settings
  *
  * Retrieves all global system configuration key-value pairs.
  */
-export const getSystemSettingsSystemSettingsGet = <ThrowOnError extends boolean = false>(options?: Options<GetSystemSettingsSystemSettingsGetData, ThrowOnError>) => (options?.client ?? client).get<GetSystemSettingsSystemSettingsGetResponses, unknown, ThrowOnError>({ url: '/system/settings', ...options });
+export const getSettings = <ThrowOnError extends boolean = false>(options?: Options<GetSettingsData, ThrowOnError>) => (options?.client ?? client).get<GetSettingsResponses, unknown, ThrowOnError>({ url: '/system/settings', ...options });
 
 /**
- * Update System Setting
+ * Update Settings
  *
  * Updates or creates a global system configuration setting.
  */
-export const updateSystemSettingSystemSettingsPost = <ThrowOnError extends boolean = false>(options: Options<UpdateSystemSettingSystemSettingsPostData, ThrowOnError>) => (options.client ?? client).post<UpdateSystemSettingSystemSettingsPostResponses, UpdateSystemSettingSystemSettingsPostErrors, ThrowOnError>({
+export const updateSettings = <ThrowOnError extends boolean = false>(options: Options<UpdateSettingsData, ThrowOnError>) => (options.client ?? client).post<UpdateSettingsResponses, UpdateSettingsErrors, ThrowOnError>({
     url: '/system/settings',
     ...options,
     headers: {
@@ -159,11 +159,11 @@ export const updateSystemSettingSystemSettingsPost = <ThrowOnError extends boole
 });
 
 /**
- * Test Notification Dispatch
+ * Test Notification
  *
  * Dispatches a test alert to the provided Apprise URL.
  */
-export const testNotificationDispatchSystemNotificationsTestPost = <ThrowOnError extends boolean = false>(options: Options<TestNotificationDispatchSystemNotificationsTestPostData, ThrowOnError>) => (options.client ?? client).post<TestNotificationDispatchSystemNotificationsTestPostResponses, TestNotificationDispatchSystemNotificationsTestPostErrors, ThrowOnError>({
+export const testNotification = <ThrowOnError extends boolean = false>(options: Options<TestNotificationData, ThrowOnError>) => (options.client ?? client).post<TestNotificationResponses, TestNotificationErrors, ThrowOnError>({
     url: '/system/notifications/test',
     ...options,
     headers: {
@@ -173,25 +173,25 @@ export const testNotificationDispatchSystemNotificationsTestPost = <ThrowOnError
 });
 
 /**
- * List Host Directories
+ * List Directories
  *
  * Lists subdirectories on the host system for UI path selection.
  */
-export const listHostDirectoriesSystemLsGet = <ThrowOnError extends boolean = false>(options?: Options<ListHostDirectoriesSystemLsGetData, ThrowOnError>) => (options?.client ?? client).get<ListHostDirectoriesSystemLsGetResponses, ListHostDirectoriesSystemLsGetErrors, ThrowOnError>({ url: '/system/ls', ...options });
+export const listDirectories = <ThrowOnError extends boolean = false>(options?: Options<ListDirectoriesData, ThrowOnError>) => (options?.client ?? client).get<ListDirectoriesResponses, ListDirectoriesErrors, ThrowOnError>({ url: '/system/ls', ...options });
 
 /**
- * Discover Hardware Nodes
+ * Discover Hardware
  *
  * Polls host hardware and mount points to discover unregistered storage media.
  */
-export const discoverHardwareNodesSystemHardwareDiscoverGet = <ThrowOnError extends boolean = false>(options?: Options<DiscoverHardwareNodesSystemHardwareDiscoverGetData, ThrowOnError>) => (options?.client ?? client).get<DiscoverHardwareNodesSystemHardwareDiscoverGetResponses, unknown, ThrowOnError>({ url: '/system/hardware/discover', ...options });
+export const discoverHardware = <ThrowOnError extends boolean = false>(options?: Options<DiscoverHardwareData, ThrowOnError>) => (options?.client ?? client).get<DiscoverHardwareResponses, unknown, ThrowOnError>({ url: '/system/hardware/discover', ...options });
 
 /**
- * Ignore Hardware Node
+ * Ignore Hardware
  *
  * Appends a hardware identifier to the global ignore list.
  */
-export const ignoreHardwareNodeSystemHardwareIgnorePost = <ThrowOnError extends boolean = false>(options: Options<IgnoreHardwareNodeSystemHardwareIgnorePostData, ThrowOnError>) => (options.client ?? client).post<IgnoreHardwareNodeSystemHardwareIgnorePostResponses, IgnoreHardwareNodeSystemHardwareIgnorePostErrors, ThrowOnError>({
+export const ignoreHardware = <ThrowOnError extends boolean = false>(options: Options<IgnoreHardwareData, ThrowOnError>) => (options.client ?? client).post<IgnoreHardwareResponses, IgnoreHardwareErrors, ThrowOnError>({
     url: '/system/hardware/ignore',
     ...options,
     headers: {
@@ -201,18 +201,18 @@ export const ignoreHardwareNodeSystemHardwareIgnorePost = <ThrowOnError extends 
 });
 
 /**
- * Export Database Index
+ * Export Database
  *
  * Generates a clean backup of the active SQLite database.
  */
-export const exportDatabaseIndexSystemDatabaseExportGet = <ThrowOnError extends boolean = false>(options?: Options<ExportDatabaseIndexSystemDatabaseExportGetData, ThrowOnError>) => (options?.client ?? client).get<ExportDatabaseIndexSystemDatabaseExportGetResponses, unknown, ThrowOnError>({ url: '/system/database/export', ...options });
+export const exportDatabase = <ThrowOnError extends boolean = false>(options?: Options<ExportDatabaseData, ThrowOnError>) => (options?.client ?? client).get<ExportDatabaseResponses, unknown, ThrowOnError>({ url: '/system/database/export', ...options });
 
 /**
- * Import Database Index
+ * Import Database
  *
  * Overwrites the current system state with an imported index file.
  */
-export const importDatabaseIndexSystemDatabaseImportPost = <ThrowOnError extends boolean = false>(options: Options<ImportDatabaseIndexSystemDatabaseImportPostData, ThrowOnError>) => (options.client ?? client).post<ImportDatabaseIndexSystemDatabaseImportPostResponses, ImportDatabaseIndexSystemDatabaseImportPostErrors, ThrowOnError>({ url: '/system/database/import', ...options });
+export const importDatabase = <ThrowOnError extends boolean = false>(options: Options<ImportDatabaseData, ThrowOnError>) => (options.client ?? client).post<ImportDatabaseResponses, ImportDatabaseErrors, ThrowOnError>({ url: '/system/database/import', ...options });
 
 /**
  * Get System Tree
@@ -226,12 +226,12 @@ export const filesystemTree = <ThrowOnError extends boolean = false>(options?: O
  *
  * Lists files with discrepancies: confirmed deleted or unhashed and missing from disk.
  */
-export const listDiscrepanciesSystemDiscrepanciesGet = <ThrowOnError extends boolean = false>(options?: Options<ListDiscrepanciesSystemDiscrepanciesGetData, ThrowOnError>) => (options?.client ?? client).get<ListDiscrepanciesSystemDiscrepanciesGetResponses, unknown, ThrowOnError>({ url: '/system/discrepancies', ...options });
+export const listDiscrepancies = <ThrowOnError extends boolean = false>(options?: Options<ListDiscrepanciesData, ThrowOnError>) => (options?.client ?? client).get<ListDiscrepanciesResponses, unknown, ThrowOnError>({ url: '/system/discrepancies', ...options });
 
 /**
- * Batch Confirm Deleted
+ * Batch Confirm Discrepancies
  */
-export const batchConfirmDeletedSystemDiscrepanciesBatchConfirmPost = <ThrowOnError extends boolean = false>(options: Options<BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostData, ThrowOnError>) => (options.client ?? client).post<BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostResponses, BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostErrors, ThrowOnError>({
+export const batchConfirmDiscrepancies = <ThrowOnError extends boolean = false>(options: Options<BatchConfirmDiscrepanciesData, ThrowOnError>) => (options.client ?? client).post<BatchConfirmDiscrepanciesResponses, BatchConfirmDiscrepanciesErrors, ThrowOnError>({
     url: '/system/discrepancies/batch/confirm',
     ...options,
     headers: {
@@ -241,9 +241,9 @@ export const batchConfirmDeletedSystemDiscrepanciesBatchConfirmPost = <ThrowOnEr
 });
 
 /**
- * Batch Dismiss
+ * Batch Dismiss Discrepancies
  */
-export const batchDismissSystemDiscrepanciesBatchDismissPost = <ThrowOnError extends boolean = false>(options: Options<BatchDismissSystemDiscrepanciesBatchDismissPostData, ThrowOnError>) => (options.client ?? client).post<BatchDismissSystemDiscrepanciesBatchDismissPostResponses, BatchDismissSystemDiscrepanciesBatchDismissPostErrors, ThrowOnError>({
+export const batchDismissDiscrepancies = <ThrowOnError extends boolean = false>(options: Options<BatchDismissDiscrepanciesData, ThrowOnError>) => (options.client ?? client).post<BatchDismissDiscrepanciesResponses, BatchDismissDiscrepanciesErrors, ThrowOnError>({
     url: '/system/discrepancies/batch/dismiss',
     ...options,
     headers: {
@@ -253,9 +253,9 @@ export const batchDismissSystemDiscrepanciesBatchDismissPost = <ThrowOnError ext
 });
 
 /**
- * Batch Hard Delete
+ * Batch Delete Discrepancies
  */
-export const batchHardDeleteSystemDiscrepanciesBatchDeletePost = <ThrowOnError extends boolean = false>(options: Options<BatchHardDeleteSystemDiscrepanciesBatchDeletePostData, ThrowOnError>) => (options.client ?? client).post<BatchHardDeleteSystemDiscrepanciesBatchDeletePostResponses, BatchHardDeleteSystemDiscrepanciesBatchDeletePostErrors, ThrowOnError>({
+export const batchDeleteDiscrepancies = <ThrowOnError extends boolean = false>(options: Options<BatchDeleteDiscrepanciesData, ThrowOnError>) => (options.client ?? client).post<BatchDeleteDiscrepanciesResponses, BatchDeleteDiscrepanciesErrors, ThrowOnError>({
     url: '/system/discrepancies/batch/delete',
     ...options,
     headers: {
@@ -265,67 +265,67 @@ export const batchHardDeleteSystemDiscrepanciesBatchDeletePost = <ThrowOnError e
 });
 
 /**
- * Confirm File Deleted
+ * Confirm Discrepancy
  *
  * Marks a file as confirmed deleted (soft delete).
  */
-export const confirmFileDeletedSystemDiscrepanciesFileIdConfirmPost = <ThrowOnError extends boolean = false>(options: Options<ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostData, ThrowOnError>) => (options.client ?? client).post<ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostResponses, ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}/confirm', ...options });
+export const confirmDiscrepancy = <ThrowOnError extends boolean = false>(options: Options<ConfirmDiscrepancyData, ThrowOnError>) => (options.client ?? client).post<ConfirmDiscrepancyResponses, ConfirmDiscrepancyErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}/confirm', ...options });
 
 /**
  * Dismiss Discrepancy
  *
  * Acknowledges a missing file — hides it from discrepancies.
  */
-export const dismissDiscrepancySystemDiscrepanciesFileIdDismissPost = <ThrowOnError extends boolean = false>(options: Options<DismissDiscrepancySystemDiscrepanciesFileIdDismissPostData, ThrowOnError>) => (options.client ?? client).post<DismissDiscrepancySystemDiscrepanciesFileIdDismissPostResponses, DismissDiscrepancySystemDiscrepanciesFileIdDismissPostErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}/dismiss', ...options });
+export const dismissDiscrepancy = <ThrowOnError extends boolean = false>(options: Options<DismissDiscrepancyData, ThrowOnError>) => (options.client ?? client).post<DismissDiscrepancyResponses, DismissDiscrepancyErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}/dismiss', ...options });
 
 /**
  * Undo Dismiss Discrepancy
  *
  * Clears the acknowledged state so the file reappears in discrepancies (MEDIUM #22).
  */
-export const undoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPost = <ThrowOnError extends boolean = false>(options: Options<UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostData, ThrowOnError>) => (options.client ?? client).post<UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostResponses, UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}/undo-dismiss', ...options });
+export const undoDismissDiscrepancy = <ThrowOnError extends boolean = false>(options: Options<UndoDismissDiscrepancyData, ThrowOnError>) => (options.client ?? client).post<UndoDismissDiscrepancyResponses, UndoDismissDiscrepancyErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}/undo-dismiss', ...options });
 
 /**
- * Delete File Record
+ * Delete Discrepancy
  *
  * Hard-deletes a file record and all associated versions/cart entries.
  */
-export const deleteFileRecordSystemDiscrepanciesFileIdDelete = <ThrowOnError extends boolean = false>(options: Options<DeleteFileRecordSystemDiscrepanciesFileIdDeleteData, ThrowOnError>) => (options.client ?? client).delete<DeleteFileRecordSystemDiscrepanciesFileIdDeleteResponses, DeleteFileRecordSystemDiscrepanciesFileIdDeleteErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}', ...options });
+export const deleteDiscrepancy = <ThrowOnError extends boolean = false>(options: Options<DeleteDiscrepancyData, ThrowOnError>) => (options.client ?? client).delete<DeleteDiscrepancyResponses, DeleteDiscrepancyErrors, ThrowOnError>({ url: '/system/discrepancies/{file_id}', ...options });
 
 /**
- * Get Discrepancies Tree
+ * Get Discrepancy Tree
  *
  * Returns tree of directories that contain discrepancy files, grouped by source root.
  */
-export const getDiscrepanciesTreeSystemDiscrepanciesTreeGet = <ThrowOnError extends boolean = false>(options?: Options<GetDiscrepanciesTreeSystemDiscrepanciesTreeGetData, ThrowOnError>) => (options?.client ?? client).get<GetDiscrepanciesTreeSystemDiscrepanciesTreeGetResponses, GetDiscrepanciesTreeSystemDiscrepanciesTreeGetErrors, ThrowOnError>({ url: '/system/discrepancies/tree', ...options });
+export const getDiscrepancyTree = <ThrowOnError extends boolean = false>(options?: Options<GetDiscrepancyTreeData, ThrowOnError>) => (options?.client ?? client).get<GetDiscrepancyTreeResponses, GetDiscrepancyTreeErrors, ThrowOnError>({ url: '/system/discrepancies/tree', ...options });
 
 /**
  * Browse Discrepancies
  *
  * Returns discrepancy files and directories under a given directory path.
  */
-export const browseDiscrepanciesSystemDiscrepanciesBrowseGet = <ThrowOnError extends boolean = false>(options?: Options<BrowseDiscrepanciesSystemDiscrepanciesBrowseGetData, ThrowOnError>) => (options?.client ?? client).get<BrowseDiscrepanciesSystemDiscrepanciesBrowseGetResponses, BrowseDiscrepanciesSystemDiscrepanciesBrowseGetErrors, ThrowOnError>({ url: '/system/discrepancies/browse', ...options });
+export const browseDiscrepancies = <ThrowOnError extends boolean = false>(options?: Options<BrowseDiscrepanciesData, ThrowOnError>) => (options?.client ?? client).get<BrowseDiscrepanciesResponses, BrowseDiscrepanciesErrors, ThrowOnError>({ url: '/system/discrepancies/browse', ...options });
 
 /**
- * List Storage Providers
+ * List Providers
  *
  * Returns a registry of all available storage providers and their configurations.
  */
-export const listStorageProvidersInventoryProvidersGet = <ThrowOnError extends boolean = false>(options?: Options<ListStorageProvidersInventoryProvidersGetData, ThrowOnError>) => (options?.client ?? client).get<ListStorageProvidersInventoryProvidersGetResponses, unknown, ThrowOnError>({ url: '/inventory/providers', ...options });
+export const listProviders = <ThrowOnError extends boolean = false>(options?: Options<ListProvidersData, ThrowOnError>) => (options?.client ?? client).get<ListProvidersResponses, unknown, ThrowOnError>({ url: '/inventory/providers', ...options });
 
 /**
- * List Storage Fleet
+ * List Media
  *
  * Returns all registered media assets with real-time hardware status.
  */
-export const listStorageFleetInventoryMediaGet = <ThrowOnError extends boolean = false>(options?: Options<ListStorageFleetInventoryMediaGetData, ThrowOnError>) => (options?.client ?? client).get<ListStorageFleetInventoryMediaGetResponses, ListStorageFleetInventoryMediaGetErrors, ThrowOnError>({ url: '/inventory/media', ...options });
+export const listMedia = <ThrowOnError extends boolean = false>(options?: Options<ListMediaData, ThrowOnError>) => (options?.client ?? client).get<ListMediaResponses, ListMediaErrors, ThrowOnError>({ url: '/inventory/media', ...options });
 
 /**
- * Register New Media
+ * Create Media
  *
  * Adds a new physical storage medium to the inventory.
  */
-export const registerNewMediaInventoryMediaPost = <ThrowOnError extends boolean = false>(options: Options<RegisterNewMediaInventoryMediaPostData, ThrowOnError>) => (options.client ?? client).post<RegisterNewMediaInventoryMediaPostResponses, RegisterNewMediaInventoryMediaPostErrors, ThrowOnError>({
+export const createMedia = <ThrowOnError extends boolean = false>(options: Options<CreateMediaData, ThrowOnError>) => (options.client ?? client).post<CreateMediaResponses, CreateMediaErrors, ThrowOnError>({
     url: '/inventory/media',
     ...options,
     headers: {
@@ -335,11 +335,11 @@ export const registerNewMediaInventoryMediaPost = <ThrowOnError extends boolean 
 });
 
 /**
- * Reorder Archival Priority
+ * Reorder Media
  *
  * Updates the global archival priority order for the media fleet.
  */
-export const reorderArchivalPriorityInventoryMediaReorderPost = <ThrowOnError extends boolean = false>(options: Options<ReorderArchivalPriorityInventoryMediaReorderPostData, ThrowOnError>) => (options.client ?? client).post<ReorderArchivalPriorityInventoryMediaReorderPostResponses, ReorderArchivalPriorityInventoryMediaReorderPostErrors, ThrowOnError>({
+export const reorderMedia = <ThrowOnError extends boolean = false>(options: Options<ReorderMediaData, ThrowOnError>) => (options.client ?? client).post<ReorderMediaResponses, ReorderMediaErrors, ThrowOnError>({
     url: '/inventory/media/reorder',
     ...options,
     headers: {
@@ -349,18 +349,18 @@ export const reorderArchivalPriorityInventoryMediaReorderPost = <ThrowOnError ex
 });
 
 /**
- * Delete Media Asset
+ * Delete Media
  *
  * Removes a media asset and all associated version history from the index.
  */
-export const deleteMediaAssetInventoryMediaMediaIdDelete = <ThrowOnError extends boolean = false>(options: Options<DeleteMediaAssetInventoryMediaMediaIdDeleteData, ThrowOnError>) => (options.client ?? client).delete<DeleteMediaAssetInventoryMediaMediaIdDeleteResponses, DeleteMediaAssetInventoryMediaMediaIdDeleteErrors, ThrowOnError>({ url: '/inventory/media/{media_id}', ...options });
+export const deleteMedia = <ThrowOnError extends boolean = false>(options: Options<DeleteMediaData, ThrowOnError>) => (options.client ?? client).delete<DeleteMediaResponses, DeleteMediaErrors, ThrowOnError>({ url: '/inventory/media/{media_id}', ...options });
 
 /**
- * Update Media Asset
+ * Update Media
  *
  * Updates specific attributes of a media record (e.g. status, location, capacity).
  */
-export const updateMediaAssetInventoryMediaMediaIdPatch = <ThrowOnError extends boolean = false>(options: Options<UpdateMediaAssetInventoryMediaMediaIdPatchData, ThrowOnError>) => (options.client ?? client).patch<UpdateMediaAssetInventoryMediaMediaIdPatchResponses, UpdateMediaAssetInventoryMediaMediaIdPatchErrors, ThrowOnError>({
+export const updateMedia = <ThrowOnError extends boolean = false>(options: Options<UpdateMediaData, ThrowOnError>) => (options.client ?? client).patch<UpdateMediaResponses, UpdateMediaErrors, ThrowOnError>({
     url: '/inventory/media/{media_id}',
     ...options,
     headers: {
@@ -370,32 +370,32 @@ export const updateMediaAssetInventoryMediaMediaIdPatch = <ThrowOnError extends 
 });
 
 /**
- * Initialize Storage Hardware
+ * Initialize Media
  *
  * Prepares hardware for use by the system (wipes and labels media).
  */
-export const initializeStorageHardwareInventoryMediaMediaIdInitializePost = <ThrowOnError extends boolean = false>(options: Options<InitializeStorageHardwareInventoryMediaMediaIdInitializePostData, ThrowOnError>) => (options.client ?? client).post<InitializeStorageHardwareInventoryMediaMediaIdInitializePostResponses, InitializeStorageHardwareInventoryMediaMediaIdInitializePostErrors, ThrowOnError>({ url: '/inventory/media/{media_id}/initialize', ...options });
+export const initializeMedia = <ThrowOnError extends boolean = false>(options: Options<InitializeMediaData, ThrowOnError>) => (options.client ?? client).post<InitializeMediaResponses, InitializeMediaErrors, ThrowOnError>({ url: '/inventory/media/{media_id}/initialize', ...options });
 
 /**
- * Get System Analytics
+ * Get Analytics
  *
  * Computes high-signal system metrics with optimized single-pass queries.
  */
-export const getSystemAnalyticsInventoryInsightsGet = <ThrowOnError extends boolean = false>(options?: Options<GetSystemAnalyticsInventoryInsightsGetData, ThrowOnError>) => (options?.client ?? client).get<GetSystemAnalyticsInventoryInsightsGetResponses, unknown, ThrowOnError>({ url: '/inventory/insights', ...options });
+export const getAnalytics = <ThrowOnError extends boolean = false>(options?: Options<GetAnalyticsData, ThrowOnError>) => (options?.client ?? client).get<GetAnalyticsResponses, unknown, ThrowOnError>({ url: '/inventory/insights', ...options });
 
 /**
- * Get Directory Treemap
+ * Get Treemap
  *
  * Returns directory tree data for treemap visualization.
  */
-export const getDirectoryTreemapInventoryDirectoriesGet = <ThrowOnError extends boolean = false>(options?: Options<GetDirectoryTreemapInventoryDirectoriesGetData, ThrowOnError>) => (options?.client ?? client).get<GetDirectoryTreemapInventoryDirectoriesGetResponses, unknown, ThrowOnError>({ url: '/inventory/directories', ...options });
+export const getTreemap = <ThrowOnError extends boolean = false>(options?: Options<GetTreemapData, ThrowOnError>) => (options?.client ?? client).get<GetTreemapResponses, unknown, ThrowOnError>({ url: '/inventory/directories', ...options });
 
 /**
- * Detect Unregistered Media
+ * Detect Media
  *
  * Scans all configured hardware providers for newly inserted, unregistered media.
  */
-export const detectUnregisteredMediaInventoryDetectGet = <ThrowOnError extends boolean = false>(options?: Options<DetectUnregisteredMediaInventoryDetectGetData, ThrowOnError>) => (options?.client ?? client).get<DetectUnregisteredMediaInventoryDetectGetResponses, unknown, ThrowOnError>({ url: '/inventory/detect', ...options });
+export const detectMedia = <ThrowOnError extends boolean = false>(options?: Options<DetectMediaData, ThrowOnError>) => (options?.client ?? client).get<DetectMediaResponses, unknown, ThrowOnError>({ url: '/inventory/detect', ...options });
 
 /**
  * Browse
@@ -430,42 +430,42 @@ export const archiveMetadata = <ThrowOnError extends boolean = false>(options: O
  *
  * Initiates a background archival job that utilizes all active media to backup as much as possible.
  */
-export const triggerAutoBackupBackupsTriggerAutoPost = <ThrowOnError extends boolean = false>(options?: Options<TriggerAutoBackupBackupsTriggerAutoPostData, ThrowOnError>) => (options?.client ?? client).post<TriggerAutoBackupBackupsTriggerAutoPostResponses, unknown, ThrowOnError>({ url: '/backups/trigger/auto', ...options });
+export const triggerAutoBackup = <ThrowOnError extends boolean = false>(options?: Options<TriggerAutoBackupData, ThrowOnError>) => (options?.client ?? client).post<TriggerAutoBackupResponses, unknown, ThrowOnError>({ url: '/backups/trigger/auto', ...options });
 
 /**
- * Trigger Backup Job
+ * Trigger Backup
  *
  * Initiates a background archival job for a specific storage medium.
  */
-export const triggerBackupJobBackupsTriggerMediaIdPost = <ThrowOnError extends boolean = false>(options: Options<TriggerBackupJobBackupsTriggerMediaIdPostData, ThrowOnError>) => (options.client ?? client).post<TriggerBackupJobBackupsTriggerMediaIdPostResponses, TriggerBackupJobBackupsTriggerMediaIdPostErrors, ThrowOnError>({ url: '/backups/trigger/{media_id}', ...options });
+export const triggerBackup = <ThrowOnError extends boolean = false>(options: Options<TriggerBackupData, ThrowOnError>) => (options.client ?? client).post<TriggerBackupResponses, TriggerBackupErrors, ThrowOnError>({ url: '/backups/trigger/{media_id}', ...options });
 
 /**
- * List Archival History
+ * List Backups
  *
  * Retrieves a history of archival jobs, sorted by most recent.
  */
-export const listArchivalHistoryBackupsGet = <ThrowOnError extends boolean = false>(options?: Options<ListArchivalHistoryBackupsGetData, ThrowOnError>) => (options?.client ?? client).get<ListArchivalHistoryBackupsGetResponses, unknown, ThrowOnError>({ url: '/backups/', ...options });
+export const listBackups = <ThrowOnError extends boolean = false>(options?: Options<ListBackupsData, ThrowOnError>) => (options?.client ?? client).get<ListBackupsResponses, unknown, ThrowOnError>({ url: '/backups/', ...options });
 
 /**
- * List Recovery Queue
+ * Get Restore Queue
  *
  * Returns all items currently queued for data recovery.
  */
-export const listRecoveryQueueRestoresQueueGet = <ThrowOnError extends boolean = false>(options?: Options<ListRecoveryQueueRestoresQueueGetData, ThrowOnError>) => (options?.client ?? client).get<ListRecoveryQueueRestoresQueueGetResponses, unknown, ThrowOnError>({ url: '/restores/queue', ...options });
+export const getRestoreQueue = <ThrowOnError extends boolean = false>(options?: Options<GetRestoreQueueData, ThrowOnError>) => (options?.client ?? client).get<GetRestoreQueueResponses, unknown, ThrowOnError>({ url: '/restores/queue', ...options });
 
 /**
- * Clear Recovery Queue
+ * Clear Restore Queue
  *
  * Removes all items from the data recovery queue.
  */
-export const clearRecoveryQueueRestoresQueueClearPost = <ThrowOnError extends boolean = false>(options?: Options<ClearRecoveryQueueRestoresQueueClearPostData, ThrowOnError>) => (options?.client ?? client).post<ClearRecoveryQueueRestoresQueueClearPostResponses, unknown, ThrowOnError>({ url: '/restores/queue/clear', ...options });
+export const clearRestoreQueue = <ThrowOnError extends boolean = false>(options?: Options<ClearRestoreQueueData, ThrowOnError>) => (options?.client ?? client).post<ClearRestoreQueueResponses, unknown, ThrowOnError>({ url: '/restores/queue/clear', ...options });
 
 /**
- * Add Directory To Recovery Queue
+ * Add Directory To Restore Queue
  *
  * Recursively adds all restorable files within a directory to the recovery queue.
  */
-export const addDirectoryToRecoveryQueueRestoresQueueDirectoryPost = <ThrowOnError extends boolean = false>(options: Options<AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostData, ThrowOnError>) => (options.client ?? client).post<AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostResponses, AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostErrors, ThrowOnError>({
+export const addDirectoryToRestoreQueue = <ThrowOnError extends boolean = false>(options: Options<AddDirectoryToRestoreQueueData, ThrowOnError>) => (options.client ?? client).post<AddDirectoryToRestoreQueueResponses, AddDirectoryToRestoreQueueErrors, ThrowOnError>({
     url: '/restores/queue/directory',
     ...options,
     headers: {
@@ -475,18 +475,18 @@ export const addDirectoryToRecoveryQueueRestoresQueueDirectoryPost = <ThrowOnErr
 });
 
 /**
- * Add File To Recovery Queue
+ * Add File To Restore Queue
  *
  * Adds a specific file to the recovery queue if it has valid backups.
  */
-export const addFileToRecoveryQueueRestoresQueueFileFileIdPost = <ThrowOnError extends boolean = false>(options: Options<AddFileToRecoveryQueueRestoresQueueFileFileIdPostData, ThrowOnError>) => (options.client ?? client).post<AddFileToRecoveryQueueRestoresQueueFileFileIdPostResponses, AddFileToRecoveryQueueRestoresQueueFileFileIdPostErrors, ThrowOnError>({ url: '/restores/queue/file/{file_id}', ...options });
+export const addFileToRestoreQueue = <ThrowOnError extends boolean = false>(options: Options<AddFileToRestoreQueueData, ThrowOnError>) => (options.client ?? client).post<AddFileToRestoreQueueResponses, AddFileToRestoreQueueErrors, ThrowOnError>({ url: '/restores/queue/file/{file_id}', ...options });
 
 /**
- * Batch Add To Recovery Queue
+ * Batch Add To Restore Queue
  *
  * Adds multiple files to the recovery queue if they have valid backups.
  */
-export const batchAddToRecoveryQueueRestoresQueueBatchPost = <ThrowOnError extends boolean = false>(options: Options<BatchAddToRecoveryQueueRestoresQueueBatchPostData, ThrowOnError>) => (options.client ?? client).post<BatchAddToRecoveryQueueRestoresQueueBatchPostResponses, BatchAddToRecoveryQueueRestoresQueueBatchPostErrors, ThrowOnError>({
+export const batchAddToRestoreQueue = <ThrowOnError extends boolean = false>(options: Options<BatchAddToRestoreQueueData, ThrowOnError>) => (options.client ?? client).post<BatchAddToRestoreQueueResponses, BatchAddToRestoreQueueErrors, ThrowOnError>({
     url: '/restores/queue/batch',
     ...options,
     headers: {
@@ -496,25 +496,25 @@ export const batchAddToRecoveryQueueRestoresQueueBatchPost = <ThrowOnError exten
 });
 
 /**
- * Remove From Recovery Queue
+ * Remove From Restore Queue
  *
  * Removes a specific item from the data recovery queue.
  */
-export const removeFromRecoveryQueueRestoresQueueItemItemIdDelete = <ThrowOnError extends boolean = false>(options: Options<RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteData, ThrowOnError>) => (options.client ?? client).delete<RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteResponses, RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteErrors, ThrowOnError>({ url: '/restores/queue/item/{item_id}', ...options });
+export const removeFromRestoreQueue = <ThrowOnError extends boolean = false>(options: Options<RemoveFromRestoreQueueData, ThrowOnError>) => (options.client ?? client).delete<RemoveFromRestoreQueueResponses, RemoveFromRestoreQueueErrors, ThrowOnError>({ url: '/restores/queue/item/{item_id}', ...options });
 
 /**
- * Calculate Recovery Manifest
+ * Get Restore Manifest
  *
  * Generates an optimized physical media manifest for the current recovery queue.
  */
-export const calculateRecoveryManifestRestoresManifestGet = <ThrowOnError extends boolean = false>(options?: Options<CalculateRecoveryManifestRestoresManifestGetData, ThrowOnError>) => (options?.client ?? client).get<CalculateRecoveryManifestRestoresManifestGetResponses, unknown, ThrowOnError>({ url: '/restores/manifest', ...options });
+export const getRestoreManifest = <ThrowOnError extends boolean = false>(options?: Options<GetRestoreManifestData, ThrowOnError>) => (options?.client ?? client).get<GetRestoreManifestResponses, unknown, ThrowOnError>({ url: '/restores/manifest', ...options });
 
 /**
- * Trigger Recovery Job
+ * Trigger Restore
  *
  * Initiates the background physical recovery process to the specified destination.
  */
-export const triggerRecoveryJobRestoresTriggerPost = <ThrowOnError extends boolean = false>(options: Options<TriggerRecoveryJobRestoresTriggerPostData, ThrowOnError>) => (options.client ?? client).post<TriggerRecoveryJobRestoresTriggerPostResponses, TriggerRecoveryJobRestoresTriggerPostErrors, ThrowOnError>({
+export const triggerRestore = <ThrowOnError extends boolean = false>(options: Options<TriggerRestoreData, ThrowOnError>) => (options.client ?? client).post<TriggerRestoreResponses, TriggerRestoreErrors, ThrowOnError>({
     url: '/restores/trigger',
     ...options,
     headers: {
@@ -524,22 +524,22 @@ export const triggerRecoveryJobRestoresTriggerPost = <ThrowOnError extends boole
 });
 
 /**
- * Browse Recovery Queue Virtual Fs
+ * Browse Restore Queue
  *
  * Provides a virtual browsable view of the recovery queue.
  */
-export const browseRecoveryQueueVirtualFsRestoresQueueBrowseGet = <ThrowOnError extends boolean = false>(options?: Options<BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetData, ThrowOnError>) => (options?.client ?? client).get<BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetResponses, BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetErrors, ThrowOnError>({ url: '/restores/queue/browse', ...options });
+export const browseRestoreQueue = <ThrowOnError extends boolean = false>(options?: Options<BrowseRestoreQueueData, ThrowOnError>) => (options?.client ?? client).get<BrowseRestoreQueueResponses, BrowseRestoreQueueErrors, ThrowOnError>({ url: '/restores/queue/browse', ...options });
 
 /**
- * Get Recovery Queue Tree
+ * Get Restore Queue Tree
  *
  * Returns a recursive tree view of the recovery queue's virtual filesystem.
  */
-export const getRecoveryQueueTreeRestoresQueueTreeGet = <ThrowOnError extends boolean = false>(options?: Options<GetRecoveryQueueTreeRestoresQueueTreeGetData, ThrowOnError>) => (options?.client ?? client).get<GetRecoveryQueueTreeRestoresQueueTreeGetResponses, GetRecoveryQueueTreeRestoresQueueTreeGetErrors, ThrowOnError>({ url: '/restores/queue/tree', ...options });
+export const getRestoreQueueTree = <ThrowOnError extends boolean = false>(options?: Options<GetRestoreQueueTreeData, ThrowOnError>) => (options?.client ?? client).get<GetRestoreQueueTreeResponses, GetRestoreQueueTreeErrors, ThrowOnError>({ url: '/restores/queue/tree', ...options });
 
 /**
- * Health Heartbeat
+ * Check Health
  *
  * Simple health check endpoint for monitoring.
  */
-export const healthHeartbeatHealthGet = <ThrowOnError extends boolean = false>(options?: Options<HealthHeartbeatHealthGetData, ThrowOnError>) => (options?.client ?? client).get<HealthHeartbeatHealthGetResponses, unknown, ThrowOnError>({ url: '/health', ...options });
+export const checkHealth = <ThrowOnError extends boolean = false>(options?: Options<CheckHealthData, ThrowOnError>) => (options?.client ?? client).get<CheckHealthResponses, unknown, ThrowOnError>({ url: '/health', ...options });

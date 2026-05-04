@@ -24,11 +24,11 @@
     import EmptyState from '$lib/components/ui/EmptyState.svelte';
     import JobDetailModal from '$lib/components/JobDetailModal.svelte';
     import {
-        listJobsSystemJobsGet,
-        getJobsCountSystemJobsCountGet,
-        getJobsStatsSystemJobsStatsGet,
-        cancelJobSystemJobsJobIdCancelPost,
-        retryJobSystemJobsJobIdRetryPost,
+        listJobs,
+        getJobCount,
+        getJobStats,
+        cancelJob as cancelJobApi,
+        retryJob as retryJobApi,
         type AppApiSystemJobSchema
     } from '$lib/api';
     import { cn, formatLocalTime, parseUTCDate } from '$lib/utils';
@@ -65,7 +65,7 @@
     async function loadStats() {
         statsLoading = true;
         try {
-            const res = await getJobsStatsSystemJobsStatsGet();
+            const res = await getJobStats();
             if (res.data) stats = res.data as typeof stats;
         } catch (error) {
             console.error("Failed to load stats:", error);
@@ -78,8 +78,8 @@
         loading = true;
         try {
             const [jobsRes, countRes] = await Promise.all([
-                listJobsSystemJobsGet({ query: { limit: LIMIT, offset: 0 } }),
-                getJobsCountSystemJobsCountGet()
+                listJobs({ query: { limit: LIMIT, offset: 0 } }),
+                getJobCount()
             ]);
 
             if (jobsRes.data) jobs = jobsRes.data;
@@ -97,7 +97,7 @@
         loadingMore = true;
         const newOffset = offset + LIMIT;
         try {
-            const response = await listJobsSystemJobsGet({
+            const response = await listJobs({
                 query: { limit: LIMIT, offset: newOffset }
             });
             if (response.data) {
@@ -113,7 +113,7 @@
 
     async function pollActiveJobs() {
         try {
-            const response = await listJobsSystemJobsGet({
+            const response = await listJobs({
                 query: { limit: LIMIT, offset: 0 }
             });
             if (response.data) {
@@ -122,7 +122,7 @@
                 jobs = [...updated, ...rest];
             }
 
-            const countRes = await getJobsCountSystemJobsCountGet();
+            const countRes = await getJobCount();
             if (countRes.data) totalJobs = (countRes.data as any).count;
         } catch (error) {
             // Silently fail polling
@@ -131,7 +131,7 @@
 
     async function cancelJob(jobId: number) {
         try {
-            await cancelJobSystemJobsJobIdCancelPost({
+            await cancelJobApi({
                 path: { job_id: jobId },
                 throwOnError: true
             });
@@ -144,7 +144,7 @@
 
     async function retryJob(jobId: number) {
         try {
-            const res = await retryJobSystemJobsJobIdRetryPost({
+            const res = await retryJobApi({
                 path: { job_id: jobId },
                 throwOnError: true
             });

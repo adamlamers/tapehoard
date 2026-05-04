@@ -24,8 +24,8 @@
             archiveTree,
             filesystemBrowse,
             archiveBrowse,
-            getDiscrepanciesTreeSystemDiscrepanciesTreeGet,
-            browseDiscrepanciesSystemDiscrepanciesBrowseGet,
+            getDiscrepancyTree,
+            browseDiscrepancies,
         } from "$lib/api";
 
         let {
@@ -199,7 +199,7 @@
         onMount(async () => {
                 if (mode === "discrepancies") {
                         try {
-                                const response = await getDiscrepanciesTreeSystemDiscrepanciesTreeGet({ query: { path: "ROOT" } });
+                                const response = await getDiscrepancyTree({ query: { path: "ROOT" } });
                                 if (response.data && Array.isArray(response.data)) {
                                         discrepancyRoot.children = response.data.map((d: any) => ({
                                                 name: d.name,

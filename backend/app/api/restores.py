@@ -85,8 +85,10 @@ class BatchCartRequest(BaseModel):
 # --- Endpoints ---
 
 
-@router.get("/queue", response_model=List[CartItemSchema])
-def list_recovery_queue(db_session: Session = Depends(get_db)):
+@router.get(
+    "/queue", response_model=List[CartItemSchema], operation_id="get_restore_queue"
+)
+def get_restore_queue(db_session: Session = Depends(get_db)):
     """Returns all items currently queued for data recovery."""
     queue_items = (
         db_session.query(models.RestoreCart)
@@ -104,16 +106,16 @@ def list_recovery_queue(db_session: Session = Depends(get_db)):
     ]
 
 
-@router.post("/queue/clear")
-def clear_recovery_queue(db_session: Session = Depends(get_db)):
+@router.post("/queue/clear", operation_id="clear_restore_queue")
+def clear_restore_queue(db_session: Session = Depends(get_db)):
     """Removes all items from the data recovery queue."""
     db_session.query(models.RestoreCart).delete()
     db_session.commit()
     return {"message": "Recovery queue cleared."}
 
 
-@router.post("/queue/directory")
-def add_directory_to_recovery_queue(
+@router.post("/queue/directory", operation_id="add_directory_to_restore_queue")
+def add_directory_to_restore_queue(
     request_data: DirectoryCartRequest, db_session: Session = Depends(get_db)
 ):
     """Recursively adds all restorable files within a directory to the recovery queue."""
@@ -144,8 +146,8 @@ def add_directory_to_recovery_queue(
     return {"message": f"Added restorable items from {target_directory} to queue."}
 
 
-@router.post("/queue/file/{file_id}")
-def add_file_to_recovery_queue(file_id: int, db_session: Session = Depends(get_db)):
+@router.post("/queue/file/{file_id}", operation_id="add_file_to_restore_queue")
+def add_file_to_restore_queue(file_id: int, db_session: Session = Depends(get_db)):
     """Adds a specific file to the recovery queue if it has valid backups."""
     existing_item = (
         db_session.query(models.RestoreCart)
@@ -178,8 +180,8 @@ def add_file_to_recovery_queue(file_id: int, db_session: Session = Depends(get_d
     return {"message": "Added to recovery queue."}
 
 
-@router.post("/queue/batch")
-def batch_add_to_recovery_queue(
+@router.post("/queue/batch", operation_id="batch_add_to_restore_queue")
+def batch_add_to_restore_queue(
     request: BatchCartRequest, db_session: Session = Depends(get_db)
 ):
     """Adds multiple files to the recovery queue if they have valid backups."""
@@ -214,8 +216,8 @@ def batch_add_to_recovery_queue(
     }
 
 
-@router.delete("/queue/item/{item_id}")
-def remove_from_recovery_queue(item_id: int, db_session: Session = Depends(get_db)):
+@router.delete("/queue/item/{item_id}", operation_id="remove_from_restore_queue")
+def remove_from_restore_queue(item_id: int, db_session: Session = Depends(get_db)):
     """Removes a specific item from the data recovery queue."""
     queue_item = db_session.get(models.RestoreCart, item_id)
     if queue_item:
@@ -224,8 +226,12 @@ def remove_from_recovery_queue(item_id: int, db_session: Session = Depends(get_d
     return {"message": "Removed from recovery queue."}
 
 
-@router.get("/manifest", response_model=RestoreManifestSchema)
-def calculate_recovery_manifest(db_session: Session = Depends(get_db)):
+@router.get(
+    "/manifest",
+    response_model=RestoreManifestSchema,
+    operation_id="get_restore_manifest",
+)
+def get_restore_manifest(db_session: Session = Depends(get_db)):
     """Generates an optimized physical media manifest for the current recovery queue."""
     manifest_sql = text("""
         SELECT
@@ -264,8 +270,8 @@ def calculate_recovery_manifest(db_session: Session = Depends(get_db)):
     )
 
 
-@router.post("/trigger")
-def trigger_recovery_job(
+@router.post("/trigger", operation_id="trigger_restore")
+def trigger_restore(
     request_data: RestoreTriggerRequest,
     background_tasks: BackgroundTasks,
     db_session: Session = Depends(get_db),
@@ -315,8 +321,12 @@ def trigger_recovery_job(
     return {"message": "Recovery job initiated.", "job_id": job_record.id}
 
 
-@router.get("/queue/browse", response_model=List[CartFileItemSchema])
-def browse_recovery_queue_virtual_fs(
+@router.get(
+    "/queue/browse",
+    response_model=List[CartFileItemSchema],
+    operation_id="browse_restore_queue",
+)
+def browse_restore_queue(
     path: Optional[str] = None, db_session: Session = Depends(get_db)
 ):
     """Provides a virtual browsable view of the recovery queue."""
@@ -395,8 +405,12 @@ def browse_recovery_queue_virtual_fs(
     return results
 
 
-@router.get("/queue/tree", response_model=List[CartTreeNodeSchema])
-def get_recovery_queue_tree(
+@router.get(
+    "/queue/tree",
+    response_model=List[CartTreeNodeSchema],
+    operation_id="get_restore_queue_tree",
+)
+def get_restore_queue_tree(
     path: Optional[str] = None, db_session: Session = Depends(get_db)
 ):
     """Returns a recursive tree view of the recovery queue's virtual filesystem."""

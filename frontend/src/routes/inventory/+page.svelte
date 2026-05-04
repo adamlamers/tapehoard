@@ -39,17 +39,17 @@
     import { cn, formatSize } from '$lib/utils';
     import { POLL_SLOW } from '$lib/config';
     import {
-        listStorageFleetInventoryMediaGet,
-        registerNewMediaInventoryMediaPost,
-        deleteMediaAssetInventoryMediaMediaIdDelete,
-        triggerBackupJobBackupsTriggerMediaIdPost,
-        triggerAutoBackupBackupsTriggerAutoPost,
-        initializeStorageHardwareInventoryMediaMediaIdInitializePost,
-        reorderArchivalPriorityInventoryMediaReorderPost,
-        updateMediaAssetInventoryMediaMediaIdPatch,
-        discoverHardwareNodesSystemHardwareDiscoverGet,
-        ignoreHardwareNodeSystemHardwareIgnorePost,
-        listStorageProvidersInventoryProvidersGet,
+        listMedia,
+        createMedia,
+        deleteMedia,
+        triggerBackup,
+        triggerAutoBackup,
+        initializeMedia,
+        reorderMedia,
+        updateMedia,
+        discoverHardware,
+        ignoreHardware,
+        listProviders,
         type MediaSchema,
         type StorageProviderSchema
     } from '$lib/api';
@@ -149,8 +149,8 @@
         if (!silent) loading = true;
         try {
             const [mediaRes, hardwareRes] = await Promise.all([
-                listStorageFleetInventoryMediaGet({ query: { refresh } }),
-                discoverHardwareNodesSystemHardwareDiscoverGet()
+                listMedia({ query: { refresh } }),
+                discoverHardware()
             ]);
             if (mediaRes.data) {
                 // Implement client-side Last Known Good (LKG) caching for hardware status
@@ -207,7 +207,7 @@
         loadMedia(false, true);
 
         try {
-            const res = await listStorageProvidersInventoryProvidersGet();
+            const res = await listProviders();
             if (res.data) providersList = res.data;
         } catch (error) {
             console.error("Failed to load storage providers:", error);
@@ -248,7 +248,7 @@
         mediaList = [...activeItems, ...inactiveItems];
 
         try {
-            await reorderArchivalPriorityInventoryMediaReorderPost({
+            await reorderMedia({
                 body: { media_ids: mediaList.map(m => m.id) },
                 throwOnError: true
             });
@@ -264,7 +264,7 @@
 
         try {
             toast.info(`Initializing ${identifier}...`);
-            await initializeStorageHardwareInventoryMediaMediaIdInitializePost({
+            await initializeMedia({
                 path: { media_id: mediaId },
                 query: { force },
                 throwOnError: true
@@ -284,7 +284,7 @@
 
     async function handleStartBackup(mediaId: number, identifier: string) {
         try {
-            await triggerBackupJobBackupsTriggerMediaIdPost({
+            await triggerBackup({
                 path: { media_id: mediaId },
                 throwOnError: true
             });
@@ -296,7 +296,7 @@
 
     async function handleAutoArchive() {
         try {
-            await triggerAutoBackupBackupsTriggerAutoPost({
+            await triggerAutoBackup({
                 throwOnError: true
             });
             toast.success("Auto-archival job initiated for all active media");
@@ -312,7 +312,7 @@
         }
 
         try {
-            await registerNewMediaInventoryMediaPost({
+            await createMedia({
                 body: {
                     media_type: newMedia.media_type,
                     identifier: newMedia.identifier,
@@ -338,7 +338,7 @@
     async function handleUpdate() {
         if (!editingMedia) return;
         try {
-            await updateMediaAssetInventoryMediaMediaIdPatch({
+            await updateMedia({
                 path: { media_id: editingMedia.id },
                 body: {
                     location: editingMedia.location,
@@ -357,7 +357,7 @@
 
     async function handleIgnoreAsset(identifier: string) {
         try {
-            await ignoreHardwareNodeSystemHardwareIgnorePost({
+            await ignoreHardware({
                 body: { identifier }
             });
             loadMedia();
@@ -369,7 +369,7 @@
     async function handleDelete(mediaId: number) {
         if (!confirm("Remove this media from inventory? Data on the physical media will remain, but TapeHoard will lose its index association.")) return;
         try {
-            await deleteMediaAssetInventoryMediaMediaIdDelete({
+            await deleteMedia({
                 path: { media_id: mediaId }
             });
             toast.success("Media removed from inventory");

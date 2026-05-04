@@ -794,37 +794,37 @@ export type AppApiSystemJobSchema = {
     latest_log?: string | null;
 };
 
-export type ResetTestEnvironmentSystemTestResetPostData = {
+export type ResetTestEnvironmentData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/system/test/reset';
 };
 
-export type ResetTestEnvironmentSystemTestResetPostResponses = {
+export type ResetTestEnvironmentResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetDashboardStatsSystemDashboardStatsGetData = {
+export type GetDashboardStatsData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/system/dashboard/stats';
 };
 
-export type GetDashboardStatsSystemDashboardStatsGetResponses = {
+export type GetDashboardStatsResponses = {
     /**
      * Successful Response
      */
     200: DashboardStatsSchema;
 };
 
-export type GetDashboardStatsSystemDashboardStatsGetResponse = GetDashboardStatsSystemDashboardStatsGetResponses[keyof GetDashboardStatsSystemDashboardStatsGetResponses];
+export type GetDashboardStatsResponse = GetDashboardStatsResponses[keyof GetDashboardStatsResponses];
 
-export type ListJobsSystemJobsGetData = {
+export type ListJobsData = {
     body?: never;
     path?: never;
     query?: {
@@ -840,55 +840,55 @@ export type ListJobsSystemJobsGetData = {
     url: '/system/jobs';
 };
 
-export type ListJobsSystemJobsGetErrors = {
+export type ListJobsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ListJobsSystemJobsGetError = ListJobsSystemJobsGetErrors[keyof ListJobsSystemJobsGetErrors];
+export type ListJobsError = ListJobsErrors[keyof ListJobsErrors];
 
-export type ListJobsSystemJobsGetResponses = {
+export type ListJobsResponses = {
     /**
-     * Response List Jobs System Jobs Get
+     * Response List Jobs
      *
      * Successful Response
      */
     200: Array<AppApiSystemJobSchema>;
 };
 
-export type ListJobsSystemJobsGetResponse = ListJobsSystemJobsGetResponses[keyof ListJobsSystemJobsGetResponses];
+export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
 
-export type GetJobsCountSystemJobsCountGetData = {
+export type GetJobCountData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/system/jobs/count';
 };
 
-export type GetJobsCountSystemJobsCountGetResponses = {
+export type GetJobCountResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetJobsStatsSystemJobsStatsGetData = {
+export type GetJobStatsData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/system/jobs/stats';
 };
 
-export type GetJobsStatsSystemJobsStatsGetResponses = {
+export type GetJobStatsResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetJobDetailSystemJobsJobIdGetData = {
+export type GetJobData = {
     body?: never;
     path: {
         /**
@@ -900,25 +900,25 @@ export type GetJobDetailSystemJobsJobIdGetData = {
     url: '/system/jobs/{job_id}';
 };
 
-export type GetJobDetailSystemJobsJobIdGetErrors = {
+export type GetJobErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetJobDetailSystemJobsJobIdGetError = GetJobDetailSystemJobsJobIdGetErrors[keyof GetJobDetailSystemJobsJobIdGetErrors];
+export type GetJobError = GetJobErrors[keyof GetJobErrors];
 
-export type GetJobDetailSystemJobsJobIdGetResponses = {
+export type GetJobResponses = {
     /**
      * Successful Response
      */
     200: AppApiSystemJobSchema;
 };
 
-export type GetJobDetailSystemJobsJobIdGetResponse = GetJobDetailSystemJobsJobIdGetResponses[keyof GetJobDetailSystemJobsJobIdGetResponses];
+export type GetJobResponse = GetJobResponses[keyof GetJobResponses];
 
-export type GetJobLogsSystemJobsJobIdLogsGetData = {
+export type GetJobLogsData = {
     body?: never;
     path: {
         /**
@@ -930,27 +930,27 @@ export type GetJobLogsSystemJobsJobIdLogsGetData = {
     url: '/system/jobs/{job_id}/logs';
 };
 
-export type GetJobLogsSystemJobsJobIdLogsGetErrors = {
+export type GetJobLogsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetJobLogsSystemJobsJobIdLogsGetError = GetJobLogsSystemJobsJobIdLogsGetErrors[keyof GetJobLogsSystemJobsJobIdLogsGetErrors];
+export type GetJobLogsError = GetJobLogsErrors[keyof GetJobLogsErrors];
 
-export type GetJobLogsSystemJobsJobIdLogsGetResponses = {
+export type GetJobLogsResponses = {
     /**
-     * Response Get Job Logs System Jobs  Job Id  Logs Get
+     * Response Get Job Logs
      *
      * Successful Response
      */
     200: Array<JobLogSchema>;
 };
 
-export type GetJobLogsSystemJobsJobIdLogsGetResponse = GetJobLogsSystemJobsJobIdLogsGetResponses[keyof GetJobLogsSystemJobsJobIdLogsGetResponses];
+export type GetJobLogsResponse = GetJobLogsResponses[keyof GetJobLogsResponses];
 
-export type CancelJobSystemJobsJobIdCancelPostData = {
+export type CancelJobData = {
     body?: never;
     path: {
         /**
@@ -962,23 +962,23 @@ export type CancelJobSystemJobsJobIdCancelPostData = {
     url: '/system/jobs/{job_id}/cancel';
 };
 
-export type CancelJobSystemJobsJobIdCancelPostErrors = {
+export type CancelJobErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CancelJobSystemJobsJobIdCancelPostError = CancelJobSystemJobsJobIdCancelPostErrors[keyof CancelJobSystemJobsJobIdCancelPostErrors];
+export type CancelJobError = CancelJobErrors[keyof CancelJobErrors];
 
-export type CancelJobSystemJobsJobIdCancelPostResponses = {
+export type CancelJobResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type RetryJobSystemJobsJobIdRetryPostData = {
+export type RetryJobData = {
     body?: never;
     path: {
         /**
@@ -990,79 +990,79 @@ export type RetryJobSystemJobsJobIdRetryPostData = {
     url: '/system/jobs/{job_id}/retry';
 };
 
-export type RetryJobSystemJobsJobIdRetryPostErrors = {
+export type RetryJobErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RetryJobSystemJobsJobIdRetryPostError = RetryJobSystemJobsJobIdRetryPostErrors[keyof RetryJobSystemJobsJobIdRetryPostErrors];
+export type RetryJobError = RetryJobErrors[keyof RetryJobErrors];
 
-export type RetryJobSystemJobsJobIdRetryPostResponses = {
+export type RetryJobResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type StreamJobsSystemJobsStreamGetData = {
+export type StreamJobsData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/system/jobs/stream';
 };
 
-export type StreamJobsSystemJobsStreamGetResponses = {
+export type StreamJobsResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type TriggerScanSystemScanPostData = {
+export type TriggerScanData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/system/scan';
 };
 
-export type TriggerScanSystemScanPostResponses = {
+export type TriggerScanResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type TriggerIndexingSystemIndexHashPostData = {
+export type TriggerIndexingData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/system/index/hash';
 };
 
-export type TriggerIndexingSystemIndexHashPostResponses = {
+export type TriggerIndexingResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetScanStatusSystemScanStatusGetData = {
+export type GetScanStatusData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/system/scan/status';
 };
 
-export type GetScanStatusSystemScanStatusGetResponses = {
+export type GetScanStatusResponses = {
     /**
      * Successful Response
      */
     200: ScanStatusSchema;
 };
 
-export type GetScanStatusSystemScanStatusGetResponse = GetScanStatusSystemScanStatusGetResponses[keyof GetScanStatusSystemScanStatusGetResponses];
+export type GetScanStatusResponse = GetScanStatusResponses[keyof GetScanStatusResponses];
 
 export type FilesystemBrowseData = {
     body?: never;
@@ -1134,39 +1134,39 @@ export type FilesystemSearchResponses = {
 
 export type FilesystemSearchResponse = FilesystemSearchResponses[keyof FilesystemSearchResponses];
 
-export type BatchUpdateTrackingSystemTrackBatchPostData = {
+export type BatchTrackData = {
     body: BatchTrackRequest;
     path?: never;
     query?: never;
     url: '/system/track/batch';
 };
 
-export type BatchUpdateTrackingSystemTrackBatchPostErrors = {
+export type BatchTrackErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type BatchUpdateTrackingSystemTrackBatchPostError = BatchUpdateTrackingSystemTrackBatchPostErrors[keyof BatchUpdateTrackingSystemTrackBatchPostErrors];
+export type BatchTrackError = BatchTrackErrors[keyof BatchTrackErrors];
 
-export type BatchUpdateTrackingSystemTrackBatchPostResponses = {
+export type BatchTrackResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetSystemSettingsSystemSettingsGetData = {
+export type GetSettingsData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/system/settings';
 };
 
-export type GetSystemSettingsSystemSettingsGetResponses = {
+export type GetSettingsResponses = {
     /**
-     * Response Get System Settings System Settings Get
+     * Response Get Settings
      *
      * Successful Response
      */
@@ -1175,55 +1175,55 @@ export type GetSystemSettingsSystemSettingsGetResponses = {
     };
 };
 
-export type GetSystemSettingsSystemSettingsGetResponse = GetSystemSettingsSystemSettingsGetResponses[keyof GetSystemSettingsSystemSettingsGetResponses];
+export type GetSettingsResponse = GetSettingsResponses[keyof GetSettingsResponses];
 
-export type UpdateSystemSettingSystemSettingsPostData = {
+export type UpdateSettingsData = {
     body: SettingSchema;
     path?: never;
     query?: never;
     url: '/system/settings';
 };
 
-export type UpdateSystemSettingSystemSettingsPostErrors = {
+export type UpdateSettingsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UpdateSystemSettingSystemSettingsPostError = UpdateSystemSettingSystemSettingsPostErrors[keyof UpdateSystemSettingSystemSettingsPostErrors];
+export type UpdateSettingsError = UpdateSettingsErrors[keyof UpdateSettingsErrors];
 
-export type UpdateSystemSettingSystemSettingsPostResponses = {
+export type UpdateSettingsResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type TestNotificationDispatchSystemNotificationsTestPostData = {
+export type TestNotificationData = {
     body: TestNotificationRequest;
     path?: never;
     query?: never;
     url: '/system/notifications/test';
 };
 
-export type TestNotificationDispatchSystemNotificationsTestPostErrors = {
+export type TestNotificationErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type TestNotificationDispatchSystemNotificationsTestPostError = TestNotificationDispatchSystemNotificationsTestPostErrors[keyof TestNotificationDispatchSystemNotificationsTestPostErrors];
+export type TestNotificationError = TestNotificationErrors[keyof TestNotificationErrors];
 
-export type TestNotificationDispatchSystemNotificationsTestPostResponses = {
+export type TestNotificationResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ListHostDirectoriesSystemLsGetData = {
+export type ListDirectoriesData = {
     body?: never;
     path?: never;
     query?: {
@@ -1235,74 +1235,74 @@ export type ListHostDirectoriesSystemLsGetData = {
     url: '/system/ls';
 };
 
-export type ListHostDirectoriesSystemLsGetErrors = {
+export type ListDirectoriesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ListHostDirectoriesSystemLsGetError = ListHostDirectoriesSystemLsGetErrors[keyof ListHostDirectoriesSystemLsGetErrors];
+export type ListDirectoriesError = ListDirectoriesErrors[keyof ListDirectoriesErrors];
 
-export type ListHostDirectoriesSystemLsGetResponses = {
+export type ListDirectoriesResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type DiscoverHardwareNodesSystemHardwareDiscoverGetData = {
+export type DiscoverHardwareData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/system/hardware/discover';
 };
 
-export type DiscoverHardwareNodesSystemHardwareDiscoverGetResponses = {
+export type DiscoverHardwareResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type IgnoreHardwareNodeSystemHardwareIgnorePostData = {
+export type IgnoreHardwareData = {
     body: IgnoreHardwareRequest;
     path?: never;
     query?: never;
     url: '/system/hardware/ignore';
 };
 
-export type IgnoreHardwareNodeSystemHardwareIgnorePostErrors = {
+export type IgnoreHardwareErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type IgnoreHardwareNodeSystemHardwareIgnorePostError = IgnoreHardwareNodeSystemHardwareIgnorePostErrors[keyof IgnoreHardwareNodeSystemHardwareIgnorePostErrors];
+export type IgnoreHardwareError = IgnoreHardwareErrors[keyof IgnoreHardwareErrors];
 
-export type IgnoreHardwareNodeSystemHardwareIgnorePostResponses = {
+export type IgnoreHardwareResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ExportDatabaseIndexSystemDatabaseExportGetData = {
+export type ExportDatabaseData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/system/database/export';
 };
 
-export type ExportDatabaseIndexSystemDatabaseExportGetResponses = {
+export type ExportDatabaseResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ImportDatabaseIndexSystemDatabaseImportPostData = {
+export type ImportDatabaseData = {
     body?: never;
     path?: never;
     query: {
@@ -1314,16 +1314,16 @@ export type ImportDatabaseIndexSystemDatabaseImportPostData = {
     url: '/system/database/import';
 };
 
-export type ImportDatabaseIndexSystemDatabaseImportPostErrors = {
+export type ImportDatabaseErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ImportDatabaseIndexSystemDatabaseImportPostError = ImportDatabaseIndexSystemDatabaseImportPostErrors[keyof ImportDatabaseIndexSystemDatabaseImportPostErrors];
+export type ImportDatabaseError = ImportDatabaseErrors[keyof ImportDatabaseErrors];
 
-export type ImportDatabaseIndexSystemDatabaseImportPostResponses = {
+export type ImportDatabaseResponses = {
     /**
      * Successful Response
      */
@@ -1362,94 +1362,94 @@ export type FilesystemTreeResponses = {
 
 export type FilesystemTreeResponse = FilesystemTreeResponses[keyof FilesystemTreeResponses];
 
-export type ListDiscrepanciesSystemDiscrepanciesGetData = {
+export type ListDiscrepanciesData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/system/discrepancies';
 };
 
-export type ListDiscrepanciesSystemDiscrepanciesGetResponses = {
+export type ListDiscrepanciesResponses = {
     /**
-     * Response List Discrepancies System Discrepancies Get
+     * Response List Discrepancies
      *
      * Successful Response
      */
     200: Array<DiscrepancySchema>;
 };
 
-export type ListDiscrepanciesSystemDiscrepanciesGetResponse = ListDiscrepanciesSystemDiscrepanciesGetResponses[keyof ListDiscrepanciesSystemDiscrepanciesGetResponses];
+export type ListDiscrepanciesResponse = ListDiscrepanciesResponses[keyof ListDiscrepanciesResponses];
 
-export type BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostData = {
+export type BatchConfirmDiscrepanciesData = {
     body: BatchDiscrepancyAction;
     path?: never;
     query?: never;
     url: '/system/discrepancies/batch/confirm';
 };
 
-export type BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostErrors = {
+export type BatchConfirmDiscrepanciesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostError = BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostErrors[keyof BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostErrors];
+export type BatchConfirmDiscrepanciesError = BatchConfirmDiscrepanciesErrors[keyof BatchConfirmDiscrepanciesErrors];
 
-export type BatchConfirmDeletedSystemDiscrepanciesBatchConfirmPostResponses = {
+export type BatchConfirmDiscrepanciesResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type BatchDismissSystemDiscrepanciesBatchDismissPostData = {
+export type BatchDismissDiscrepanciesData = {
     body: BatchDiscrepancyAction;
     path?: never;
     query?: never;
     url: '/system/discrepancies/batch/dismiss';
 };
 
-export type BatchDismissSystemDiscrepanciesBatchDismissPostErrors = {
+export type BatchDismissDiscrepanciesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type BatchDismissSystemDiscrepanciesBatchDismissPostError = BatchDismissSystemDiscrepanciesBatchDismissPostErrors[keyof BatchDismissSystemDiscrepanciesBatchDismissPostErrors];
+export type BatchDismissDiscrepanciesError = BatchDismissDiscrepanciesErrors[keyof BatchDismissDiscrepanciesErrors];
 
-export type BatchDismissSystemDiscrepanciesBatchDismissPostResponses = {
+export type BatchDismissDiscrepanciesResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type BatchHardDeleteSystemDiscrepanciesBatchDeletePostData = {
+export type BatchDeleteDiscrepanciesData = {
     body: BatchDiscrepancyAction;
     path?: never;
     query?: never;
     url: '/system/discrepancies/batch/delete';
 };
 
-export type BatchHardDeleteSystemDiscrepanciesBatchDeletePostErrors = {
+export type BatchDeleteDiscrepanciesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type BatchHardDeleteSystemDiscrepanciesBatchDeletePostError = BatchHardDeleteSystemDiscrepanciesBatchDeletePostErrors[keyof BatchHardDeleteSystemDiscrepanciesBatchDeletePostErrors];
+export type BatchDeleteDiscrepanciesError = BatchDeleteDiscrepanciesErrors[keyof BatchDeleteDiscrepanciesErrors];
 
-export type BatchHardDeleteSystemDiscrepanciesBatchDeletePostResponses = {
+export type BatchDeleteDiscrepanciesResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostData = {
+export type ConfirmDiscrepancyData = {
     body?: never;
     path: {
         /**
@@ -1461,23 +1461,23 @@ export type ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostData = {
     url: '/system/discrepancies/{file_id}/confirm';
 };
 
-export type ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostErrors = {
+export type ConfirmDiscrepancyErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostError = ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostErrors[keyof ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostErrors];
+export type ConfirmDiscrepancyError = ConfirmDiscrepancyErrors[keyof ConfirmDiscrepancyErrors];
 
-export type ConfirmFileDeletedSystemDiscrepanciesFileIdConfirmPostResponses = {
+export type ConfirmDiscrepancyResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type DismissDiscrepancySystemDiscrepanciesFileIdDismissPostData = {
+export type DismissDiscrepancyData = {
     body?: never;
     path: {
         /**
@@ -1489,23 +1489,23 @@ export type DismissDiscrepancySystemDiscrepanciesFileIdDismissPostData = {
     url: '/system/discrepancies/{file_id}/dismiss';
 };
 
-export type DismissDiscrepancySystemDiscrepanciesFileIdDismissPostErrors = {
+export type DismissDiscrepancyErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DismissDiscrepancySystemDiscrepanciesFileIdDismissPostError = DismissDiscrepancySystemDiscrepanciesFileIdDismissPostErrors[keyof DismissDiscrepancySystemDiscrepanciesFileIdDismissPostErrors];
+export type DismissDiscrepancyError = DismissDiscrepancyErrors[keyof DismissDiscrepancyErrors];
 
-export type DismissDiscrepancySystemDiscrepanciesFileIdDismissPostResponses = {
+export type DismissDiscrepancyResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostData = {
+export type UndoDismissDiscrepancyData = {
     body?: never;
     path: {
         /**
@@ -1517,23 +1517,23 @@ export type UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostData =
     url: '/system/discrepancies/{file_id}/undo-dismiss';
 };
 
-export type UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostErrors = {
+export type UndoDismissDiscrepancyErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostError = UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostErrors[keyof UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostErrors];
+export type UndoDismissDiscrepancyError = UndoDismissDiscrepancyErrors[keyof UndoDismissDiscrepancyErrors];
 
-export type UndoDismissDiscrepancySystemDiscrepanciesFileIdUndoDismissPostResponses = {
+export type UndoDismissDiscrepancyResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type DeleteFileRecordSystemDiscrepanciesFileIdDeleteData = {
+export type DeleteDiscrepancyData = {
     body?: never;
     path: {
         /**
@@ -1545,23 +1545,23 @@ export type DeleteFileRecordSystemDiscrepanciesFileIdDeleteData = {
     url: '/system/discrepancies/{file_id}';
 };
 
-export type DeleteFileRecordSystemDiscrepanciesFileIdDeleteErrors = {
+export type DeleteDiscrepancyErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DeleteFileRecordSystemDiscrepanciesFileIdDeleteError = DeleteFileRecordSystemDiscrepanciesFileIdDeleteErrors[keyof DeleteFileRecordSystemDiscrepanciesFileIdDeleteErrors];
+export type DeleteDiscrepancyError = DeleteDiscrepancyErrors[keyof DeleteDiscrepancyErrors];
 
-export type DeleteFileRecordSystemDiscrepanciesFileIdDeleteResponses = {
+export type DeleteDiscrepancyResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetDiscrepanciesTreeSystemDiscrepanciesTreeGetData = {
+export type GetDiscrepancyTreeData = {
     body?: never;
     path?: never;
     query?: {
@@ -1575,27 +1575,27 @@ export type GetDiscrepanciesTreeSystemDiscrepanciesTreeGetData = {
     url: '/system/discrepancies/tree';
 };
 
-export type GetDiscrepanciesTreeSystemDiscrepanciesTreeGetErrors = {
+export type GetDiscrepancyTreeErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetDiscrepanciesTreeSystemDiscrepanciesTreeGetError = GetDiscrepanciesTreeSystemDiscrepanciesTreeGetErrors[keyof GetDiscrepanciesTreeSystemDiscrepanciesTreeGetErrors];
+export type GetDiscrepancyTreeError = GetDiscrepancyTreeErrors[keyof GetDiscrepancyTreeErrors];
 
-export type GetDiscrepanciesTreeSystemDiscrepanciesTreeGetResponses = {
+export type GetDiscrepancyTreeResponses = {
     /**
-     * Response Get Discrepancies Tree System Discrepancies Tree Get
+     * Response Get Discrepancy Tree
      *
      * Successful Response
      */
     200: Array<TreeNodeSchema>;
 };
 
-export type GetDiscrepanciesTreeSystemDiscrepanciesTreeGetResponse = GetDiscrepanciesTreeSystemDiscrepanciesTreeGetResponses[keyof GetDiscrepanciesTreeSystemDiscrepanciesTreeGetResponses];
+export type GetDiscrepancyTreeResponse = GetDiscrepancyTreeResponses[keyof GetDiscrepancyTreeResponses];
 
-export type BrowseDiscrepanciesSystemDiscrepanciesBrowseGetData = {
+export type BrowseDiscrepanciesData = {
     body?: never;
     path?: never;
     query?: {
@@ -1609,18 +1609,18 @@ export type BrowseDiscrepanciesSystemDiscrepanciesBrowseGetData = {
     url: '/system/discrepancies/browse';
 };
 
-export type BrowseDiscrepanciesSystemDiscrepanciesBrowseGetErrors = {
+export type BrowseDiscrepanciesErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type BrowseDiscrepanciesSystemDiscrepanciesBrowseGetError = BrowseDiscrepanciesSystemDiscrepanciesBrowseGetErrors[keyof BrowseDiscrepanciesSystemDiscrepanciesBrowseGetErrors];
+export type BrowseDiscrepanciesError = BrowseDiscrepanciesErrors[keyof BrowseDiscrepanciesErrors];
 
-export type BrowseDiscrepanciesSystemDiscrepanciesBrowseGetResponses = {
+export type BrowseDiscrepanciesResponses = {
     /**
-     * Response Browse Discrepancies System Discrepancies Browse Get
+     * Response Browse Discrepancies
      *
      * Successful Response
      */
@@ -1629,27 +1629,27 @@ export type BrowseDiscrepanciesSystemDiscrepanciesBrowseGetResponses = {
     };
 };
 
-export type BrowseDiscrepanciesSystemDiscrepanciesBrowseGetResponse = BrowseDiscrepanciesSystemDiscrepanciesBrowseGetResponses[keyof BrowseDiscrepanciesSystemDiscrepanciesBrowseGetResponses];
+export type BrowseDiscrepanciesResponse = BrowseDiscrepanciesResponses[keyof BrowseDiscrepanciesResponses];
 
-export type ListStorageProvidersInventoryProvidersGetData = {
+export type ListProvidersData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/inventory/providers';
 };
 
-export type ListStorageProvidersInventoryProvidersGetResponses = {
+export type ListProvidersResponses = {
     /**
-     * Response List Storage Providers Inventory Providers Get
+     * Response List Providers
      *
      * Successful Response
      */
     200: Array<StorageProviderSchema>;
 };
 
-export type ListStorageProvidersInventoryProvidersGetResponse = ListStorageProvidersInventoryProvidersGetResponses[keyof ListStorageProvidersInventoryProvidersGetResponses];
+export type ListProvidersResponse = ListProvidersResponses[keyof ListProvidersResponses];
 
-export type ListStorageFleetInventoryMediaGetData = {
+export type ListMediaData = {
     body?: never;
     path?: never;
     query?: {
@@ -1661,75 +1661,75 @@ export type ListStorageFleetInventoryMediaGetData = {
     url: '/inventory/media';
 };
 
-export type ListStorageFleetInventoryMediaGetErrors = {
+export type ListMediaErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ListStorageFleetInventoryMediaGetError = ListStorageFleetInventoryMediaGetErrors[keyof ListStorageFleetInventoryMediaGetErrors];
+export type ListMediaError = ListMediaErrors[keyof ListMediaErrors];
 
-export type ListStorageFleetInventoryMediaGetResponses = {
+export type ListMediaResponses = {
     /**
-     * Response List Storage Fleet Inventory Media Get
+     * Response List Media
      *
      * Successful Response
      */
     200: Array<MediaSchema>;
 };
 
-export type ListStorageFleetInventoryMediaGetResponse = ListStorageFleetInventoryMediaGetResponses[keyof ListStorageFleetInventoryMediaGetResponses];
+export type ListMediaResponse = ListMediaResponses[keyof ListMediaResponses];
 
-export type RegisterNewMediaInventoryMediaPostData = {
+export type CreateMediaData = {
     body: MediaCreateSchema;
     path?: never;
     query?: never;
     url: '/inventory/media';
 };
 
-export type RegisterNewMediaInventoryMediaPostErrors = {
+export type CreateMediaErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RegisterNewMediaInventoryMediaPostError = RegisterNewMediaInventoryMediaPostErrors[keyof RegisterNewMediaInventoryMediaPostErrors];
+export type CreateMediaError = CreateMediaErrors[keyof CreateMediaErrors];
 
-export type RegisterNewMediaInventoryMediaPostResponses = {
+export type CreateMediaResponses = {
     /**
      * Successful Response
      */
     200: MediaSchema;
 };
 
-export type RegisterNewMediaInventoryMediaPostResponse = RegisterNewMediaInventoryMediaPostResponses[keyof RegisterNewMediaInventoryMediaPostResponses];
+export type CreateMediaResponse = CreateMediaResponses[keyof CreateMediaResponses];
 
-export type ReorderArchivalPriorityInventoryMediaReorderPostData = {
+export type ReorderMediaData = {
     body: ReorderMediaRequest;
     path?: never;
     query?: never;
     url: '/inventory/media/reorder';
 };
 
-export type ReorderArchivalPriorityInventoryMediaReorderPostErrors = {
+export type ReorderMediaErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ReorderArchivalPriorityInventoryMediaReorderPostError = ReorderArchivalPriorityInventoryMediaReorderPostErrors[keyof ReorderArchivalPriorityInventoryMediaReorderPostErrors];
+export type ReorderMediaError = ReorderMediaErrors[keyof ReorderMediaErrors];
 
-export type ReorderArchivalPriorityInventoryMediaReorderPostResponses = {
+export type ReorderMediaResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type DeleteMediaAssetInventoryMediaMediaIdDeleteData = {
+export type DeleteMediaData = {
     body?: never;
     path: {
         /**
@@ -1741,23 +1741,23 @@ export type DeleteMediaAssetInventoryMediaMediaIdDeleteData = {
     url: '/inventory/media/{media_id}';
 };
 
-export type DeleteMediaAssetInventoryMediaMediaIdDeleteErrors = {
+export type DeleteMediaErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DeleteMediaAssetInventoryMediaMediaIdDeleteError = DeleteMediaAssetInventoryMediaMediaIdDeleteErrors[keyof DeleteMediaAssetInventoryMediaMediaIdDeleteErrors];
+export type DeleteMediaError = DeleteMediaErrors[keyof DeleteMediaErrors];
 
-export type DeleteMediaAssetInventoryMediaMediaIdDeleteResponses = {
+export type DeleteMediaResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type UpdateMediaAssetInventoryMediaMediaIdPatchData = {
+export type UpdateMediaData = {
     body: MediaUpdateSchema;
     path: {
         /**
@@ -1769,25 +1769,25 @@ export type UpdateMediaAssetInventoryMediaMediaIdPatchData = {
     url: '/inventory/media/{media_id}';
 };
 
-export type UpdateMediaAssetInventoryMediaMediaIdPatchErrors = {
+export type UpdateMediaErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type UpdateMediaAssetInventoryMediaMediaIdPatchError = UpdateMediaAssetInventoryMediaMediaIdPatchErrors[keyof UpdateMediaAssetInventoryMediaMediaIdPatchErrors];
+export type UpdateMediaError = UpdateMediaErrors[keyof UpdateMediaErrors];
 
-export type UpdateMediaAssetInventoryMediaMediaIdPatchResponses = {
+export type UpdateMediaResponses = {
     /**
      * Successful Response
      */
     200: MediaSchema;
 };
 
-export type UpdateMediaAssetInventoryMediaMediaIdPatchResponse = UpdateMediaAssetInventoryMediaMediaIdPatchResponses[keyof UpdateMediaAssetInventoryMediaMediaIdPatchResponses];
+export type UpdateMediaResponse = UpdateMediaResponses[keyof UpdateMediaResponses];
 
-export type InitializeStorageHardwareInventoryMediaMediaIdInitializePostData = {
+export type InitializeMediaData = {
     body?: never;
     path: {
         /**
@@ -1804,58 +1804,58 @@ export type InitializeStorageHardwareInventoryMediaMediaIdInitializePostData = {
     url: '/inventory/media/{media_id}/initialize';
 };
 
-export type InitializeStorageHardwareInventoryMediaMediaIdInitializePostErrors = {
+export type InitializeMediaErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type InitializeStorageHardwareInventoryMediaMediaIdInitializePostError = InitializeStorageHardwareInventoryMediaMediaIdInitializePostErrors[keyof InitializeStorageHardwareInventoryMediaMediaIdInitializePostErrors];
+export type InitializeMediaError = InitializeMediaErrors[keyof InitializeMediaErrors];
 
-export type InitializeStorageHardwareInventoryMediaMediaIdInitializePostResponses = {
+export type InitializeMediaResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetSystemAnalyticsInventoryInsightsGetData = {
+export type GetAnalyticsData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/inventory/insights';
 };
 
-export type GetSystemAnalyticsInventoryInsightsGetResponses = {
+export type GetAnalyticsResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type GetDirectoryTreemapInventoryDirectoriesGetData = {
+export type GetTreemapData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/inventory/directories';
 };
 
-export type GetDirectoryTreemapInventoryDirectoriesGetResponses = {
+export type GetTreemapResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type DetectUnregisteredMediaInventoryDetectGetData = {
+export type DetectMediaData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/inventory/detect';
 };
 
-export type DetectUnregisteredMediaInventoryDetectGetResponses = {
+export type DetectMediaResponses = {
     /**
      * Successful Response
      */
@@ -1984,21 +1984,21 @@ export type ArchiveMetadataResponses = {
 
 export type ArchiveMetadataResponse = ArchiveMetadataResponses[keyof ArchiveMetadataResponses];
 
-export type TriggerAutoBackupBackupsTriggerAutoPostData = {
+export type TriggerAutoBackupData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/backups/trigger/auto';
 };
 
-export type TriggerAutoBackupBackupsTriggerAutoPostResponses = {
+export type TriggerAutoBackupResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type TriggerBackupJobBackupsTriggerMediaIdPostData = {
+export type TriggerBackupData = {
     body?: never;
     path: {
         /**
@@ -2010,96 +2010,96 @@ export type TriggerBackupJobBackupsTriggerMediaIdPostData = {
     url: '/backups/trigger/{media_id}';
 };
 
-export type TriggerBackupJobBackupsTriggerMediaIdPostErrors = {
+export type TriggerBackupErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type TriggerBackupJobBackupsTriggerMediaIdPostError = TriggerBackupJobBackupsTriggerMediaIdPostErrors[keyof TriggerBackupJobBackupsTriggerMediaIdPostErrors];
+export type TriggerBackupError = TriggerBackupErrors[keyof TriggerBackupErrors];
 
-export type TriggerBackupJobBackupsTriggerMediaIdPostResponses = {
+export type TriggerBackupResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type ListArchivalHistoryBackupsGetData = {
+export type ListBackupsData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/backups/';
 };
 
-export type ListArchivalHistoryBackupsGetResponses = {
+export type ListBackupsResponses = {
     /**
-     * Response List Archival History Backups  Get
+     * Response List Backups
      *
      * Successful Response
      */
     200: Array<AppApiBackupsJobSchema>;
 };
 
-export type ListArchivalHistoryBackupsGetResponse = ListArchivalHistoryBackupsGetResponses[keyof ListArchivalHistoryBackupsGetResponses];
+export type ListBackupsResponse = ListBackupsResponses[keyof ListBackupsResponses];
 
-export type ListRecoveryQueueRestoresQueueGetData = {
+export type GetRestoreQueueData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/restores/queue';
 };
 
-export type ListRecoveryQueueRestoresQueueGetResponses = {
+export type GetRestoreQueueResponses = {
     /**
-     * Response List Recovery Queue Restores Queue Get
+     * Response Get Restore Queue
      *
      * Successful Response
      */
     200: Array<CartItemSchema>;
 };
 
-export type ListRecoveryQueueRestoresQueueGetResponse = ListRecoveryQueueRestoresQueueGetResponses[keyof ListRecoveryQueueRestoresQueueGetResponses];
+export type GetRestoreQueueResponse = GetRestoreQueueResponses[keyof GetRestoreQueueResponses];
 
-export type ClearRecoveryQueueRestoresQueueClearPostData = {
+export type ClearRestoreQueueData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/restores/queue/clear';
 };
 
-export type ClearRecoveryQueueRestoresQueueClearPostResponses = {
+export type ClearRestoreQueueResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostData = {
+export type AddDirectoryToRestoreQueueData = {
     body: DirectoryCartRequest;
     path?: never;
     query?: never;
     url: '/restores/queue/directory';
 };
 
-export type AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostErrors = {
+export type AddDirectoryToRestoreQueueErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostError = AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostErrors[keyof AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostErrors];
+export type AddDirectoryToRestoreQueueError = AddDirectoryToRestoreQueueErrors[keyof AddDirectoryToRestoreQueueErrors];
 
-export type AddDirectoryToRecoveryQueueRestoresQueueDirectoryPostResponses = {
+export type AddDirectoryToRestoreQueueResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type AddFileToRecoveryQueueRestoresQueueFileFileIdPostData = {
+export type AddFileToRestoreQueueData = {
     body?: never;
     path: {
         /**
@@ -2111,46 +2111,46 @@ export type AddFileToRecoveryQueueRestoresQueueFileFileIdPostData = {
     url: '/restores/queue/file/{file_id}';
 };
 
-export type AddFileToRecoveryQueueRestoresQueueFileFileIdPostErrors = {
+export type AddFileToRestoreQueueErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AddFileToRecoveryQueueRestoresQueueFileFileIdPostError = AddFileToRecoveryQueueRestoresQueueFileFileIdPostErrors[keyof AddFileToRecoveryQueueRestoresQueueFileFileIdPostErrors];
+export type AddFileToRestoreQueueError = AddFileToRestoreQueueErrors[keyof AddFileToRestoreQueueErrors];
 
-export type AddFileToRecoveryQueueRestoresQueueFileFileIdPostResponses = {
+export type AddFileToRestoreQueueResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type BatchAddToRecoveryQueueRestoresQueueBatchPostData = {
+export type BatchAddToRestoreQueueData = {
     body: BatchCartRequest;
     path?: never;
     query?: never;
     url: '/restores/queue/batch';
 };
 
-export type BatchAddToRecoveryQueueRestoresQueueBatchPostErrors = {
+export type BatchAddToRestoreQueueErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type BatchAddToRecoveryQueueRestoresQueueBatchPostError = BatchAddToRecoveryQueueRestoresQueueBatchPostErrors[keyof BatchAddToRecoveryQueueRestoresQueueBatchPostErrors];
+export type BatchAddToRestoreQueueError = BatchAddToRestoreQueueErrors[keyof BatchAddToRestoreQueueErrors];
 
-export type BatchAddToRecoveryQueueRestoresQueueBatchPostResponses = {
+export type BatchAddToRestoreQueueResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteData = {
+export type RemoveFromRestoreQueueData = {
     body?: never;
     path: {
         /**
@@ -2162,62 +2162,62 @@ export type RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteData = {
     url: '/restores/queue/item/{item_id}';
 };
 
-export type RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteErrors = {
+export type RemoveFromRestoreQueueErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteError = RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteErrors[keyof RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteErrors];
+export type RemoveFromRestoreQueueError = RemoveFromRestoreQueueErrors[keyof RemoveFromRestoreQueueErrors];
 
-export type RemoveFromRecoveryQueueRestoresQueueItemItemIdDeleteResponses = {
+export type RemoveFromRestoreQueueResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type CalculateRecoveryManifestRestoresManifestGetData = {
+export type GetRestoreManifestData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/restores/manifest';
 };
 
-export type CalculateRecoveryManifestRestoresManifestGetResponses = {
+export type GetRestoreManifestResponses = {
     /**
      * Successful Response
      */
     200: RestoreManifestSchema;
 };
 
-export type CalculateRecoveryManifestRestoresManifestGetResponse = CalculateRecoveryManifestRestoresManifestGetResponses[keyof CalculateRecoveryManifestRestoresManifestGetResponses];
+export type GetRestoreManifestResponse = GetRestoreManifestResponses[keyof GetRestoreManifestResponses];
 
-export type TriggerRecoveryJobRestoresTriggerPostData = {
+export type TriggerRestoreData = {
     body: RestoreTriggerRequest;
     path?: never;
     query?: never;
     url: '/restores/trigger';
 };
 
-export type TriggerRecoveryJobRestoresTriggerPostErrors = {
+export type TriggerRestoreErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type TriggerRecoveryJobRestoresTriggerPostError = TriggerRecoveryJobRestoresTriggerPostErrors[keyof TriggerRecoveryJobRestoresTriggerPostErrors];
+export type TriggerRestoreError = TriggerRestoreErrors[keyof TriggerRestoreErrors];
 
-export type TriggerRecoveryJobRestoresTriggerPostResponses = {
+export type TriggerRestoreResponses = {
     /**
      * Successful Response
      */
     200: unknown;
 };
 
-export type BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetData = {
+export type BrowseRestoreQueueData = {
     body?: never;
     path?: never;
     query?: {
@@ -2229,27 +2229,27 @@ export type BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetData = {
     url: '/restores/queue/browse';
 };
 
-export type BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetErrors = {
+export type BrowseRestoreQueueErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetError = BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetErrors[keyof BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetErrors];
+export type BrowseRestoreQueueError = BrowseRestoreQueueErrors[keyof BrowseRestoreQueueErrors];
 
-export type BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetResponses = {
+export type BrowseRestoreQueueResponses = {
     /**
-     * Response Browse Recovery Queue Virtual Fs Restores Queue Browse Get
+     * Response Browse Restore Queue
      *
      * Successful Response
      */
     200: Array<CartFileItemSchema>;
 };
 
-export type BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetResponse = BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetResponses[keyof BrowseRecoveryQueueVirtualFsRestoresQueueBrowseGetResponses];
+export type BrowseRestoreQueueResponse = BrowseRestoreQueueResponses[keyof BrowseRestoreQueueResponses];
 
-export type GetRecoveryQueueTreeRestoresQueueTreeGetData = {
+export type GetRestoreQueueTreeData = {
     body?: never;
     path?: never;
     query?: {
@@ -2261,34 +2261,34 @@ export type GetRecoveryQueueTreeRestoresQueueTreeGetData = {
     url: '/restores/queue/tree';
 };
 
-export type GetRecoveryQueueTreeRestoresQueueTreeGetErrors = {
+export type GetRestoreQueueTreeErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type GetRecoveryQueueTreeRestoresQueueTreeGetError = GetRecoveryQueueTreeRestoresQueueTreeGetErrors[keyof GetRecoveryQueueTreeRestoresQueueTreeGetErrors];
+export type GetRestoreQueueTreeError = GetRestoreQueueTreeErrors[keyof GetRestoreQueueTreeErrors];
 
-export type GetRecoveryQueueTreeRestoresQueueTreeGetResponses = {
+export type GetRestoreQueueTreeResponses = {
     /**
-     * Response Get Recovery Queue Tree Restores Queue Tree Get
+     * Response Get Restore Queue Tree
      *
      * Successful Response
      */
     200: Array<CartTreeNodeSchema>;
 };
 
-export type GetRecoveryQueueTreeRestoresQueueTreeGetResponse = GetRecoveryQueueTreeRestoresQueueTreeGetResponses[keyof GetRecoveryQueueTreeRestoresQueueTreeGetResponses];
+export type GetRestoreQueueTreeResponse = GetRestoreQueueTreeResponses[keyof GetRestoreQueueTreeResponses];
 
-export type HealthHeartbeatHealthGetData = {
+export type CheckHealthData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/health';
 };
 
-export type HealthHeartbeatHealthGetResponses = {
+export type CheckHealthResponses = {
     /**
      * Successful Response
      */

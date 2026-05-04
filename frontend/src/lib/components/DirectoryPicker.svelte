@@ -1,7 +1,7 @@
 <script lang="ts">
     import { Folder, ChevronRight, Home, ArrowLeft, Check, X, RotateCw } from 'lucide-svelte';
     import { Button } from './ui/button';
-    import { listHostDirectoriesSystemLsGet } from '$lib/api';
+    import { listDirectories } from '$lib/api';
     import { cn } from '$lib/utils';
     import { toast } from 'svelte-sonner';
 
@@ -17,7 +17,7 @@
     async function loadDirectories(path: string) {
         loading = true;
         try {
-            const response = await listHostDirectoriesSystemLsGet({
+            const response = await listDirectories({
                 query: { path }
             });
             if (response.data) {

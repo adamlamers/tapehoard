@@ -71,7 +71,7 @@ if os.path.exists(static_assets_path):
         return FileResponse(os.path.join(static_assets_path, "index.html"))
 
 
-@app.get("/health")
-def health_heartbeat():
+@app.get("/health", operation_id="check_health")
+def check_health():
     """Simple health check endpoint for monitoring."""
     return {"status": "healthy", "service": "tapehoard-backend"}

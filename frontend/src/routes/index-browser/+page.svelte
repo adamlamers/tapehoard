@@ -23,10 +23,10 @@
     import {
         archiveBrowse,
         archiveMetadata,
-        listRecoveryQueueRestoresQueueGet,
-        addFileToRecoveryQueueRestoresQueueFileFileIdPost,
-        removeFromRecoveryQueueRestoresQueueItemItemIdDelete,
-        addDirectoryToRecoveryQueueRestoresQueueDirectoryPost,
+        getRestoreQueue,
+        addFileToRestoreQueue,
+        removeFromRestoreQueue,
+        addDirectoryToRestoreQueue,
         archiveSearch,
         type ItemMetadataSchema,
         type CartItemSchema
@@ -51,7 +51,7 @@
 
     async function loadCart() {
         try {
-            const response = await listRecoveryQueueRestoresQueueGet();
+            const response = await getRestoreQueue();
             if (response.data) {
                 restoreCartItems = response.data;
             }
@@ -177,7 +177,7 @@
                 if (item.type === 'file') {
                     const cartItem = restoreCartItems.find(i => i.file_path === item.path);
                     if (cartItem) {
-                        await removeFromRecoveryQueueRestoresQueueItemItemIdDelete({
+                        await removeFromRestoreQueue({
                             path: { item_id: cartItem.id }
                         });
                     }
@@ -193,13 +193,13 @@
                     });
 
                     if (metaResponse.data?.id) {
-                        await addFileToRecoveryQueueRestoresQueueFileFileIdPost({
+                        await addFileToRestoreQueue({
                             path: { file_id: metaResponse.data.id }
                         });
                     }
                 } else {
                     // It's a directory
-                    await addDirectoryToRecoveryQueueRestoresQueueDirectoryPost({
+                    await addDirectoryToRestoreQueue({
                         body: { path: item.path }
                     });
                 }
@@ -222,7 +222,7 @@
 
     async function handleToggleDirectoryCart(itemPath: string) {
         try {
-            await addDirectoryToRecoveryQueueRestoresQueueDirectoryPost({
+            await addDirectoryToRestoreQueue({
                 body: { path: itemPath }
             });
 

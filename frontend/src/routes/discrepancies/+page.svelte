@@ -8,14 +8,14 @@
     import FileBrowser from '$lib/components/file-browser/FileBrowser.svelte';
     import { toast } from 'svelte-sonner';
     import {
-        listDiscrepanciesSystemDiscrepanciesGet,
-        dismissDiscrepancySystemDiscrepanciesFileIdDismissPost,
-        batchDismissSystemDiscrepanciesBatchDismissPost,
-        batchHardDeleteSystemDiscrepanciesBatchDeletePost,
-        addFileToRecoveryQueueRestoresQueueFileFileIdPost,
-        batchAddToRecoveryQueueRestoresQueueBatchPost,
-        browseDiscrepanciesSystemDiscrepanciesBrowseGet,
-        getDiscrepanciesTreeSystemDiscrepanciesTreeGet,
+        listDiscrepancies,
+        dismissDiscrepancy,
+        batchDismissDiscrepancies,
+        batchDeleteDiscrepancies,
+        addFileToRestoreQueue,
+        batchAddToRestoreQueue,
+        browseDiscrepancies,
+        getDiscrepancyTree,
         type DiscrepancySchema,
     } from '$lib/api';
     import { type FileItem } from '$lib/types';
@@ -31,7 +31,7 @@
     async function loadDiscrepancies() {
         loading = true;
         try {
-            const response = await listDiscrepanciesSystemDiscrepanciesGet();
+            const response = await listDiscrepancies();
             if (response.data) {
                 discrepancies = response.data;
             }
@@ -46,7 +46,7 @@
 
     async function loadFiles(path: string) {
         try {
-            const response = await browseDiscrepanciesSystemDiscrepanciesBrowseGet({ query: { path } });
+            const response = await browseDiscrepancies({ query: { path } });
             if (response.data && (response.data as any).files) {
                 files = (response.data as any).files.map((d: any) => {
                     // Check if it's a directory (has "type" property) or a file (has "id")
@@ -82,7 +82,7 @@
     async function addToCart(item: FileItem) {
         if (!item.discrepancy_id) return;
         try {
-            await addFileToRecoveryQueueRestoresQueueFileFileIdPost({
+            await addFileToRestoreQueue({
                 path: { file_id: item.discrepancy_id }
             });
             toast.success("Added to restore cart");
@@ -94,7 +94,7 @@
     async function deletePermanently(item: FileItem) {
         if (!item.discrepancy_id) return;
         try {
-            await batchHardDeleteSystemDiscrepanciesBatchDeletePost({
+            await batchDeleteDiscrepancies({
                 body: { ids: [item.discrepancy_id] }
             });
             toast.success("File record deleted permanently");
@@ -112,7 +112,7 @@
         }
         batchLoading = true;
         try {
-            await batchDismissSystemDiscrepanciesBatchDismissPost({
+            await batchDismissDiscrepancies({
                 body: { ids }
             });
             toast.success(`Dismissed ${ids.length} files`);
@@ -133,7 +133,7 @@
         }
         batchLoading = true;
         try {
-            await batchHardDeleteSystemDiscrepanciesBatchDeletePost({
+            await batchDeleteDiscrepancies({
                 body: { ids }
             });
             toast.success(`Deleted ${ids.length} file records`);
@@ -154,7 +154,7 @@
         }
         batchLoading = true;
         try {
-            await batchAddToRecoveryQueueRestoresQueueBatchPost({
+            await batchAddToRestoreQueue({
                 body: { ids }
             });
             toast.success(`Added ${ids.length} files to restore cart`);

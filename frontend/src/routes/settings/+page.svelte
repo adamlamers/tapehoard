@@ -26,11 +26,11 @@
     import { Card } from "$lib/components/ui/card";
     import { Input } from "$lib/components/ui/input";
     import {
-        getSystemSettingsSystemSettingsGet,
-        updateSystemSettingSystemSettingsPost,
-        testNotificationDispatchSystemNotificationsTestPost,
-        exportDatabaseIndexSystemDatabaseExportGet,
-        importDatabaseIndexSystemDatabaseImportPost
+        getSettings,
+        updateSettings,
+        testNotification,
+        exportDatabase,
+        importDatabase
     } from "$lib/api";
     import { toast } from "svelte-sonner";
     import { cn } from "$lib/utils";
@@ -115,7 +115,7 @@
     async function loadSettings() {
         loading = true;
         try {
-            const response = await getSystemSettingsSystemSettingsGet();
+            const response = await getSettings();
             if (response.data) {
                 const data = response.data;
                 if (data.source_roots) sourceRoots = JSON.parse(data.source_roots);
@@ -148,13 +148,13 @@
         saving = true;
         try {
             await Promise.all([
-                updateSystemSettingSystemSettingsPost({ body: { key: "source_roots", value: JSON.stringify(sourceRoots) } }),
-                updateSystemSettingSystemSettingsPost({ body: { key: "restore_destinations", value: JSON.stringify(restoreDestinations) } }),
-                updateSystemSettingSystemSettingsPost({ body: { key: "tape_drives", value: JSON.stringify(tapeDrives) } }),
-                updateSystemSettingSystemSettingsPost({ body: { key: "global_exclusions", value: globalExclusions } }),
-                updateSystemSettingSystemSettingsPost({ body: { key: "schedule_scan", value: scanSchedule } }),
-                updateSystemSettingSystemSettingsPost({ body: { key: "schedule_archival", value: archivalSchedule } }),
-                updateSystemSettingSystemSettingsPost({ body: { key: "notification_urls", value: JSON.stringify(notificationUrls) } })
+                updateSettings({ body: { key: "source_roots", value: JSON.stringify(sourceRoots) } }),
+                updateSettings({ body: { key: "restore_destinations", value: JSON.stringify(restoreDestinations) } }),
+                updateSettings({ body: { key: "tape_drives", value: JSON.stringify(tapeDrives) } }),
+                updateSettings({ body: { key: "global_exclusions", value: globalExclusions } }),
+                updateSettings({ body: { key: "schedule_scan", value: scanSchedule } }),
+                updateSettings({ body: { key: "schedule_archival", value: archivalSchedule } }),
+                updateSettings({ body: { key: "notification_urls", value: JSON.stringify(notificationUrls) } })
             ]);
 
             // Snapshot saved state
@@ -179,7 +179,7 @@
     async function handleExport() {
         exporting = true;
         try {
-            const response = await exportDatabaseIndexSystemDatabaseExportGet();
+            const response = await exportDatabase();
             if (response.data) {
                 const blob = await (response.data as any).blob();
                 const url = window.URL.createObjectURL(blob);
@@ -200,7 +200,7 @@
 
     async function testNotify(url: string) {
         try {
-            await testNotificationDispatchSystemNotificationsTestPost({ body: { url } });
+            await testNotification({ body: { url } });
             toast.success("Test notification dispatched");
         } catch (error) {
             toast.error("Notification test failed");

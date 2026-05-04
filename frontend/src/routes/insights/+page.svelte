@@ -18,7 +18,7 @@
     import StatCard from '$lib/components/ui/StatCard.svelte';
     import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
     import Treemap from '$lib/components/Treemap.svelte';
-    import { getSystemAnalyticsInventoryInsightsGet, getDirectoryTreemapInventoryDirectoriesGet } from '$lib/api';
+    import { getAnalytics, getTreemap } from '$lib/api';
     import { cn, formatSize } from '$lib/utils';
     import { toast } from 'svelte-sonner';
     import { goto } from '$app/navigation';
@@ -32,7 +32,7 @@
     async function loadInsights() {
         loading = true;
         try {
-            const response = await getSystemAnalyticsInventoryInsightsGet();
+            const response = await getAnalytics();
             if (response.data) insights = response.data;
         } catch (error) {
             toast.error("Failed to generate analytics");
@@ -45,7 +45,7 @@
         if (dirTreemapLoaded) return;
         dirTreemapLoading = true;
         try {
-            const response = await getDirectoryTreemapInventoryDirectoriesGet();
+            const response = await getTreemap();
             if (response.data) {
                 dirTreemapData = mapDirectoryTree(response.data as any[]);
                 dirTreemapLoaded = true;

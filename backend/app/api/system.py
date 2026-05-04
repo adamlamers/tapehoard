@@ -203,7 +203,7 @@ def _validate_path_within_roots(path: str, roots: List[str]) -> bool:
 # --- Endpoints ---
 
 
-@router.post("/test/reset")
+@router.post("/test/reset", operation_id="reset_test_environment")
 def reset_test_environment(db_session: Session = Depends(get_db)):
     """Wipes the database and resets state for E2E testing."""
     import os
@@ -229,7 +229,11 @@ def reset_test_environment(db_session: Session = Depends(get_db)):
     return {"message": "Test environment reset"}
 
 
-@router.get("/dashboard/stats", response_model=DashboardStatsSchema)
+@router.get(
+    "/dashboard/stats",
+    response_model=DashboardStatsSchema,
+    operation_id="get_dashboard_stats",
+)
 def get_dashboard_stats(db_session: Session = Depends(get_db)):
     """Computes high-level system statistics for the overview dashboard."""
     aggregation_sql = text("""
@@ -324,7 +328,7 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
     )
 
 
-@router.get("/jobs", response_model=List[JobSchema])
+@router.get("/jobs", response_model=List[JobSchema], operation_id="list_jobs")
 def list_jobs(limit: int = 10, offset: int = 0, db_session: Session = Depends(get_db)):
     """Returns a paginated list of background archival and discovery jobs."""
     jobs = (
@@ -373,14 +377,14 @@ def list_jobs(limit: int = 10, offset: int = 0, db_session: Session = Depends(ge
     return result
 
 
-@router.get("/jobs/count")
-def get_jobs_count(db_session: Session = Depends(get_db)):
+@router.get("/jobs/count", operation_id="get_job_count")
+def get_job_count(db_session: Session = Depends(get_db)):
     """Returns the total number of jobs recorded in the system."""
     return {"count": db_session.query(models.Job).count()}
 
 
-@router.get("/jobs/stats")
-def get_jobs_stats(db_session: Session = Depends(get_db)):
+@router.get("/jobs/stats", operation_id="get_job_stats")
+def get_job_stats(db_session: Session = Depends(get_db)):
     """Returns summary statistics for all jobs."""
     total = db_session.query(models.Job).count()
     completed = (
@@ -429,8 +433,8 @@ def get_jobs_stats(db_session: Session = Depends(get_db)):
     }
 
 
-@router.get("/jobs/{job_id}", response_model=JobSchema)
-def get_job_detail(job_id: int, db_session: Session = Depends(get_db)):
+@router.get("/jobs/{job_id}", response_model=JobSchema, operation_id="get_job")
+def get_job(job_id: int, db_session: Session = Depends(get_db)):
     """Retrieves detailed metadata for a specific job."""
     job_record = db_session.get(models.Job, job_id)
     if not job_record:
@@ -457,7 +461,11 @@ def get_job_detail(job_id: int, db_session: Session = Depends(get_db)):
     )
 
 
-@router.get("/jobs/{job_id}/logs", response_model=List[JobLogSchema])
+@router.get(
+    "/jobs/{job_id}/logs",
+    response_model=List[JobLogSchema],
+    operation_id="get_job_logs",
+)
 def get_job_logs(job_id: int, db_session: Session = Depends(get_db)):
     """Retrieves the full execution log for a specific job."""
     job_record = db_session.get(models.Job, job_id)
@@ -476,14 +484,14 @@ def get_job_logs(job_id: int, db_session: Session = Depends(get_db)):
     ]
 
 
-@router.post("/jobs/{job_id}/cancel")
+@router.post("/jobs/{job_id}/cancel", operation_id="cancel_job")
 def cancel_job(job_id: int):
     """Submits a cancellation request for an active job."""
     JobManager.cancel_job(job_id)
     return {"message": "Cancellation request submitted"}
 
 
-@router.post("/jobs/{job_id}/retry")
+@router.post("/jobs/{job_id}/retry", operation_id="retry_job")
 def retry_job(
     job_id: int,
     background_tasks: BackgroundTasks,
@@ -520,7 +528,7 @@ def retry_job(
     }
 
 
-@router.get("/jobs/stream")
+@router.get("/jobs/stream", operation_id="stream_jobs")
 async def stream_jobs():
     """Server-Sent Events (SSE) endpoint for real-time job status updates."""
 
@@ -582,7 +590,7 @@ async def stream_jobs():
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-@router.post("/scan")
+@router.post("/scan", operation_id="trigger_scan")
 def trigger_scan(
     background_tasks: BackgroundTasks, db_session: Session = Depends(get_db)
 ):
@@ -599,7 +607,7 @@ def trigger_scan(
     return {"message": "Scan started", "job_id": job_record.id}
 
 
-@router.post("/index/hash")
+@router.post("/index/hash", operation_id="trigger_indexing")
 def trigger_indexing(
     background_tasks: BackgroundTasks, db_session: Session = Depends(get_db)
 ):
@@ -611,7 +619,9 @@ def trigger_indexing(
     return {"message": "Background hashing task initiated"}
 
 
-@router.get("/scan/status", response_model=ScanStatusSchema)
+@router.get(
+    "/scan/status", response_model=ScanStatusSchema, operation_id="get_scan_status"
+)
 def get_scan_status():
     """Returns the real-time operational status of the scanner and hashing engines."""
     return ScanStatusSchema(
@@ -837,10 +847,8 @@ def search_system_index(
     return results
 
 
-@router.post("/track/batch")
-def batch_update_tracking(
-    request_data: BatchTrackRequest, db_session: Session = Depends(get_db)
-):
+@router.post("/track/batch", operation_id="batch_track")
+def batch_track(request_data: BatchTrackRequest, db_session: Session = Depends(get_db)):
     """Applies bulk inclusion and exclusion rules and synchronizes is_ignored flags."""
     all_paths = list(request_data.tracks) + list(request_data.untracks)
     # Batch-fetch existing TrackedSource records (MEDIUM #15)
@@ -887,17 +895,15 @@ def batch_update_tracking(
     return {"message": "Tracking policy synchronized with filesystem index."}
 
 
-@router.get("/settings", response_model=Dict[str, str])
-def get_system_settings(db_session: Session = Depends(get_db)):
+@router.get("/settings", response_model=Dict[str, str], operation_id="get_settings")
+def get_settings(db_session: Session = Depends(get_db)):
     """Retrieves all global system configuration key-value pairs."""
     settings_records = db_session.query(models.SystemSetting).all()
     return {record.key: record.value for record in settings_records}
 
 
-@router.post("/settings")
-def update_system_setting(
-    setting_data: SettingSchema, db_session: Session = Depends(get_db)
-):
+@router.post("/settings", operation_id="update_settings")
+def update_settings(setting_data: SettingSchema, db_session: Session = Depends(get_db)):
     """Updates or creates a global system configuration setting."""
     existing_record = (
         db_session.query(models.SystemSetting)
@@ -921,8 +927,8 @@ def update_system_setting(
     return {"message": "Setting committed."}
 
 
-@router.post("/notifications/test")
-def test_notification_dispatch(request_data: TestNotificationRequest):
+@router.post("/notifications/test", operation_id="test_notification")
+def test_notification(request_data: TestNotificationRequest):
     """Dispatches a test alert to the provided Apprise URL."""
     from app.services.notifications import notification_manager
 
@@ -932,8 +938,8 @@ def test_notification_dispatch(request_data: TestNotificationRequest):
     raise HTTPException(status_code=500, detail="Failed to dispatch test alert.")
 
 
-@router.get("/ls")
-def list_host_directories(path: str = "/"):
+@router.get("/ls", operation_id="list_directories")
+def list_directories(path: str = "/"):
     """Lists subdirectories on the host system for UI path selection."""
     if ".." in path:
         raise HTTPException(status_code=403, detail="Path traversal not allowed")
@@ -956,8 +962,8 @@ def list_host_directories(path: str = "/"):
         raise HTTPException(status_code=500, detail=str(directory_error))
 
 
-@router.get("/hardware/discover")
-def discover_hardware_nodes(db_session: Session = Depends(get_db)):
+@router.get("/hardware/discover", operation_id="discover_hardware")
+def discover_hardware(db_session: Session = Depends(get_db)):
     """Polls host hardware and mount points to discover unregistered storage media."""
     discovered_nodes = []
 
@@ -1112,8 +1118,8 @@ def discover_hardware_nodes(db_session: Session = Depends(get_db)):
     return discovered_nodes
 
 
-@router.post("/hardware/ignore")
-def ignore_hardware_node(
+@router.post("/hardware/ignore", operation_id="ignore_hardware")
+def ignore_hardware(
     request_data: IgnoreHardwareRequest, db_session: Session = Depends(get_db)
 ):
     """Appends a hardware identifier to the global ignore list."""
@@ -1135,8 +1141,8 @@ def ignore_hardware_node(
     return {"message": "Hardware node ignored."}
 
 
-@router.get("/database/export")
-def export_database_index():
+@router.get("/database/export", operation_id="export_database")
+def export_database():
     """Generates a clean backup of the active SQLite database."""
     database_url = os.getenv("DATABASE_URL", "sqlite:///tapehoard.db")
     database_path = database_url.replace("sqlite:///", "")
@@ -1174,8 +1180,8 @@ def export_database_index():
         )
 
 
-@router.post("/database/import")
-async def import_database_index(file: Any, db_session: Session = Depends(get_db)):
+@router.post("/database/import", operation_id="import_database")
+async def import_database(file: Any, db_session: Session = Depends(get_db)):
     """Overwrites the current system state with an imported index file."""
     # Implementation pending - requires careful session termination
     return {"message": "Import logic restricted for safety."}
@@ -1218,7 +1224,11 @@ def get_system_tree(path: Optional[str] = None, db_session: Session = Depends(ge
 # --- Discrepancy Endpoints ---
 
 
-@router.get("/discrepancies", response_model=List[DiscrepancySchema])
+@router.get(
+    "/discrepancies",
+    response_model=List[DiscrepancySchema],
+    operation_id="list_discrepancies",
+)
 def list_discrepancies(db_session: Session = Depends(get_db)):
     """Lists files with discrepancies: confirmed deleted or unhashed and missing from disk."""
     deleted_records = (
@@ -1327,8 +1337,8 @@ def _resolve_ids_from_action(
     return []
 
 
-@router.post("/discrepancies/batch/confirm")
-def batch_confirm_deleted(
+@router.post("/discrepancies/batch/confirm", operation_id="batch_confirm_discrepancies")
+def batch_confirm_discrepancies(
     action: BatchDiscrepancyAction, db_session: Session = Depends(get_db)
 ):
     ids = _resolve_ids_from_action(action, db_session)
@@ -1344,8 +1354,8 @@ def batch_confirm_deleted(
     }
 
 
-@router.post("/discrepancies/batch/dismiss")
-def batch_dismiss(
+@router.post("/discrepancies/batch/dismiss", operation_id="batch_dismiss_discrepancies")
+def batch_dismiss_discrepancies(
     action: BatchDiscrepancyAction, db_session: Session = Depends(get_db)
 ):
     ids = _resolve_ids_from_action(action, db_session)
@@ -1363,8 +1373,8 @@ def batch_dismiss(
     return {"message": f"{len(ids)} discrepancy(ies) dismissed", "count": len(ids)}
 
 
-@router.post("/discrepancies/batch/delete")
-def batch_hard_delete(
+@router.post("/discrepancies/batch/delete", operation_id="batch_delete_discrepancies")
+def batch_delete_discrepancies(
     action: BatchDiscrepancyAction, db_session: Session = Depends(get_db)
 ):
     ids = _resolve_ids_from_action(action, db_session)
@@ -1383,8 +1393,8 @@ def batch_hard_delete(
     return {"message": f"{len(ids)} record(s) permanently deleted", "count": len(ids)}
 
 
-@router.post("/discrepancies/{file_id}/confirm")
-def confirm_file_deleted(file_id: int, db_session: Session = Depends(get_db)):
+@router.post("/discrepancies/{file_id}/confirm", operation_id="confirm_discrepancy")
+def confirm_discrepancy(file_id: int, db_session: Session = Depends(get_db)):
     """Marks a file as confirmed deleted (soft delete)."""
     record = db_session.get(models.FilesystemState, file_id)
     if not record:
@@ -1394,7 +1404,7 @@ def confirm_file_deleted(file_id: int, db_session: Session = Depends(get_db)):
     return {"message": f"File '{record.file_path}' marked as deleted"}
 
 
-@router.post("/discrepancies/{file_id}/dismiss")
+@router.post("/discrepancies/{file_id}/dismiss", operation_id="dismiss_discrepancy")
 def dismiss_discrepancy(file_id: int, db_session: Session = Depends(get_db)):
     """Acknowledges a missing file — hides it from discrepancies."""
     record = db_session.get(models.FilesystemState, file_id)
@@ -1405,7 +1415,9 @@ def dismiss_discrepancy(file_id: int, db_session: Session = Depends(get_db)):
     return {"message": f"File '{record.file_path}' discrepancy dismissed"}
 
 
-@router.post("/discrepancies/{file_id}/undo-dismiss")
+@router.post(
+    "/discrepancies/{file_id}/undo-dismiss", operation_id="undo_dismiss_discrepancy"
+)
 def undo_dismiss_discrepancy(file_id: int, db_session: Session = Depends(get_db)):
     """Clears the acknowledged state so the file reappears in discrepancies (MEDIUM #22)."""
     record = db_session.get(models.FilesystemState, file_id)
@@ -1418,8 +1430,8 @@ def undo_dismiss_discrepancy(file_id: int, db_session: Session = Depends(get_db)
     }
 
 
-@router.delete("/discrepancies/{file_id}")
-def delete_file_record(file_id: int, db_session: Session = Depends(get_db)):
+@router.delete("/discrepancies/{file_id}", operation_id="delete_discrepancy")
+def delete_discrepancy(file_id: int, db_session: Session = Depends(get_db)):
     """Hard-deletes a file record and all associated versions/cart entries."""
     record = db_session.get(models.FilesystemState, file_id)
     if not record:
@@ -1439,8 +1451,12 @@ def delete_file_record(file_id: int, db_session: Session = Depends(get_db)):
 # --- Discrepancy Tree & Browse Endpoints ---
 
 
-@router.get("/discrepancies/tree", response_model=List[TreeNodeSchema])
-def get_discrepancies_tree(
+@router.get(
+    "/discrepancies/tree",
+    response_model=List[TreeNodeSchema],
+    operation_id="get_discrepancy_tree",
+)
+def get_discrepancy_tree(
     path: Optional[str] = Query(
         default="ROOT", description="Root path to get tree for"
     ),
@@ -1557,7 +1573,9 @@ def get_discrepancies_tree(
     return result
 
 
-@router.get("/discrepancies/browse", response_model=dict)
+@router.get(
+    "/discrepancies/browse", response_model=dict, operation_id="browse_discrepancies"
+)
 def browse_discrepancies(
     path: Optional[str] = Query(default="ROOT", description="Directory path to browse"),
     db_session: Session = Depends(get_db),

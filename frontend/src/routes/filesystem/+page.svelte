@@ -8,9 +8,9 @@
     import type { FileItem } from '$lib/types';
     import {
         filesystemBrowse,
-        batchUpdateTrackingSystemTrackBatchPost,
-        triggerScanSystemScanPost,
-        getScanStatusSystemScanStatusGet,
+        batchTrack,
+        triggerScan,
+        getScanStatus,
         filesystemSearch,
         type ScanStatusSchema
     } from '$lib/api';
@@ -108,7 +108,7 @@
 
     async function updateScanStatus() {
         try {
-            const response = await getScanStatusSystemScanStatusGet();
+            const response = await getScanStatus();
             if (response.data) {
                 const wasRunning = scanRunning;
                 scanRunning = response.data.is_running;
@@ -124,7 +124,7 @@
 
     async function startScan() {
         try {
-            await triggerScanSystemScanPost();
+            await triggerScan();
             updateScanStatus();
         } catch (error: any) {
             toast.error(error.body?.detail || "Failed to start scan");
@@ -181,7 +181,7 @@
                 .filter(([_, ignoredState]) => ignoredState)
                 .map(([path, _]) => path);
 
-            await batchUpdateTrackingSystemTrackBatchPost({
+            await batchTrack({
                 body: { tracks, untracks }
             });
             pendingChanges.clear();

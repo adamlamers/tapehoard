@@ -43,7 +43,7 @@ class JobSchema(BaseModel):
 # --- Endpoints ---
 
 
-@router.post("/trigger/auto")
+@router.post("/trigger/auto", operation_id="trigger_auto_backup")
 def trigger_auto_backup(
     background_tasks: BackgroundTasks,
     db_session: Session = Depends(get_db),
@@ -95,8 +95,8 @@ def trigger_auto_backup(
     }
 
 
-@router.post("/trigger/{media_id}")
-def trigger_backup_job(
+@router.post("/trigger/{media_id}", operation_id="trigger_backup")
+def trigger_backup(
     media_id: int,
     background_tasks: BackgroundTasks,
     db_session: Session = Depends(get_db),
@@ -132,8 +132,8 @@ def trigger_backup_job(
     }
 
 
-@router.get("/", response_model=List[JobSchema])
-def list_archival_history(db_session: Session = Depends(get_db)):
+@router.get("/", response_model=List[JobSchema], operation_id="list_backups")
+def list_backups(db_session: Session = Depends(get_db)):
     """Retrieves a history of archival jobs, sorted by most recent."""
     # Note: Using the generic Job model for consistency across the UI
     return (
