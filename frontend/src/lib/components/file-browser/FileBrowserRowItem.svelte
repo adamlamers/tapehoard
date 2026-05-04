@@ -255,7 +255,7 @@
                 class="shrink-0 px-4 h-full flex items-center justify-end text-xs text-text-secondary mono text-right tabular-nums font-medium border-r border-border-color/10"
                 style="width: {colWidths.size}px"
         >
-                {item.type === "directory" ? "" : formatSize(item.size)}
+			{formatSize(item.size)}
         </div>
 
         <!-- QUICK ACTIONS -->

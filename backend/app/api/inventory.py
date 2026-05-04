@@ -715,7 +715,8 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
                      JOIN storage_media sm ON sm.id = fv.media_id
                      JOIN filesystem_state fs2 ON fs2.id = fv.filesystem_state_id
                      WHERE (fs2.file_path = :r OR fs2.file_path LIKE :prefix)) as media_list,
-                    SUM(CASE WHEN EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = fs.id) THEN 1 ELSE 0 END) as selected_count
+                    SUM(CASE WHEN EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = fs.id) THEN 1 ELSE 0 END) as selected_count,
+                    SUM(fs.size) as total_size
                 FROM filesystem_state fs
                 WHERE (fs.file_path = :r OR fs.file_path LIKE :prefix)
             """)
@@ -727,11 +728,13 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
             protected = 0
             media_list = []
             selected_count = 0
+            total_size = 0
             if stats:
                 total = stats[0] or 0
                 protected = stats[1] or 0
                 media_list = stats[2].split(",") if stats[2] else []
                 selected_count = stats[3] or 0
+                total_size = stats[4] or 0
 
             if protected > 0:
                 results.append(
@@ -739,6 +742,7 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
                         "name": root,
                         "path": root,
                         "type": "directory",
+                        "size": total_size,
                         "vulnerable": (protected < total),
                         "selected": (
                             selected_count > 0 and selected_count == protected
@@ -764,7 +768,8 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
              JOIN storage_media sm ON sm.id = fv.media_id
              JOIN filesystem_state fs2 ON fs2.id = fv.filesystem_state_id
              WHERE fs2.file_path LIKE :prefix || SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) || '/%') as media_list,
-            SUM(CASE WHEN EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = filesystem_state.id) THEN 1 ELSE 0 END) as selected_count
+            SUM(CASE WHEN EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = filesystem_state.id) THEN 1 ELSE 0 END) as selected_count,
+            SUM(size) as total_size
         FROM filesystem_state
         WHERE file_path LIKE :prefix_wildcard
         AND file_path != :prefix
@@ -804,6 +809,7 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
         protected = d[2] or 0
         media_list = d[3].split(",") if d[3] else []
         selected_count = d[4] or 0
+        total_size = d[5] or 0
 
         # Only show directories that have at least one protected file
         if protected == 0:
@@ -815,6 +821,7 @@ def browse_archive_index(path: str = "ROOT", db_session: Session = Depends(get_d
                 "name": d[0],
                 "path": full_dir_path,
                 "type": "directory",
+                "size": total_size,
                 "vulnerable": (protected < total),
                 "selected": (selected_count > 0 and selected_count == protected),
                 "indeterminate": (selected_count > 0 and selected_count < protected),
