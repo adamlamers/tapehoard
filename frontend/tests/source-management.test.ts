@@ -38,6 +38,14 @@ test.describe('Source Management', () => {
     expect(status.is_running).toBe(false);
     expect(status.total_files_found).toBeGreaterThan(0);
 
+    console.log('Step 4: Verify browse endpoint reflects source roots');
+    const browseResp = await requestContext.get(`${API_URL}/system/browse?path=ROOT`);
+    expect(browseResp.ok()).toBe(true);
+    const browseData = await browseResp.json();
+    const roots = (browseData as any).files;
+    const sourceRoot = (roots as Array<any>).find((r: any) => r.path === SOURCE_ROOT);
+    expect(sourceRoot).toBeDefined();
+
     await requestContext.dispose();
   });
 

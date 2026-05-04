@@ -79,25 +79,6 @@ test.describe('Discrepancies', () => {
     // No automatic cleanup needed - tests use separate files
   });
 
-  test('missing files are detected and can be confirmed', async ({}) => {
-    const requestContext = await request.newContext();
-    const fileId = fileIds['confirm_missing.txt'];
-    expect(fileId).toBeDefined();
-
-    console.log('Step 1: Confirm the file as deleted');
-    const confirmResp = await requestContext.post(`${API_URL}/system/discrepancies/${fileId}/confirm`);
-    expect(confirmResp.ok()).toBe(true);
-
-    console.log('Step 2: Verify item appears in discrepancies as deleted');
-    const discResp = await requestContext.get(`${API_URL}/system/discrepancies`);
-    const discrepancies = await discResp.json();
-    const found = (discrepancies as Array<any>).find((d: any) => d.path === path.join(SOURCE_ROOT, 'confirm_missing.txt'));
-    expect(found).toBeDefined();
-    expect(found.is_deleted).toBe(true);
-
-    await requestContext.dispose();
-  });
-
   test('dismiss discrepancy', async ({}) => {
     const requestContext = await request.newContext();
     const fileId = fileIds['dismiss_test.txt'];

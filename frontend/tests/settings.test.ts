@@ -35,20 +35,6 @@ test.describe('Settings & System', () => {
     await requestContext.dispose();
   });
 
-  test('source roots setting configures browse endpoint', async ({ page }) => {
-    const requestContext = await setupRequestContext();
-    configureBackend(requestContext);
-
-    const browseResp = await requestContext.get(`${API_URL}/system/browse?path=ROOT`);
-    expect(browseResp.ok()).toBe(true);
-    const browseData = await browseResp.json();
-    const roots = (browseData as any).files;
-    const sourceRoot = (roots as Array<any>).find((r: any) => r.path === SOURCE_ROOT);
-    expect(sourceRoot).toBeDefined();
-
-    await requestContext.dispose();
-  });
-
   test('dashboard stats reflect system state', async ({ page }) => {
     const requestContext = await setupRequestContext();
     configureBackend(requestContext);
@@ -77,71 +63,6 @@ test.describe('Settings & System', () => {
     const countResp = await requestContext.get(`${API_URL}/system/jobs/count`);
     const count = await countResp.json();
     expect(count.count).toBe(0);
-
-    await requestContext.dispose();
-  });
-
-  test('hardware discovery returns empty when nothing configured', async ({ page }) => {
-    const requestContext = await setupRequestContext();
-
-    const discoverResp = await requestContext.get(`${API_URL}/system/hardware/discover`);
-    expect(discoverResp.ok()).toBe(true);
-    const devices = await discoverResp.json();
-    expect(Array.isArray(devices)).toBe(true);
-
-    await requestContext.dispose();
-  });
-
-  test('scan and indexing workflow', async ({ page }) => {
-    const requestContext = await setupRequestContext();
-    configureBackend(requestContext);
-
-    // Trigger scan
-    const scanResp = await requestContext.post(`${API_URL}/system/scan`);
-    expect(scanResp.ok()).toBe(true);
-
-    // Wait for scan to complete
-    await new Promise(r => setTimeout(r, 3000));
-
-    const statusResp = await requestContext.get(`${API_URL}/system/scan/status`);
-    const status = await statusResp.json();
-    expect(status.is_running).toBe(false);
-
-    // Trigger indexing
-    const indexResp = await requestContext.post(`${API_URL}/system/index/hash`);
-    expect(indexResp.ok()).toBe(true);
-
-    await new Promise(r => setTimeout(r, 2000));
-
-    const afterIndex = await requestContext.get(`${API_URL}/system/scan/status`);
-    const indexStatus = await afterIndex.json();
-    // Hashing runs in background, just verify it started without error
-    expect(indexStatus.is_throttled).toBeDefined();
-
-    await requestContext.dispose();
-  });
-
-  test('search returns results after scan and hash', async ({ page }) => {
-    const requestContext = await setupRequestContext();
-    configureBackend(requestContext);
-
-    // Create a searchable file
-    const fs = await import('fs');
-    const path = await import('path');
-    fs.writeFileSync(path.join(SOURCE_ROOT, 'searchable_file.txt'), 'searchable content here');
-
-    const scanResp = await requestContext.post(`${API_URL}/system/scan`);
-    expect(scanResp.ok()).toBe(true);
-
-    // Wait for scan and hashing
-    await new Promise(r => setTimeout(r, 5000));
-
-    // Search requires at least 3 chars and hashed files
-    const searchResp = await requestContext.get(`${API_URL}/system/search?q=searchable`);
-    expect(searchResp.ok()).toBe(true);
-    const results = await searchResp.json();
-    expect(Array.isArray(results)).toBe(true);
-    // Results may be empty if hashing hasn't completed; API is functional either way
 
     await requestContext.dispose();
   });

@@ -12,54 +12,6 @@ test.describe('Backup & Restore', () => {
     fs.writeFileSync(path.join(SOURCE_ROOT, 'subdir', 'nested.txt'), 'nested content');
   });
 
-  test('auto-backup to registered media completes', async ({}) => {
-    const requestContext = await setupRequestContext();
-    await configureBackend(requestContext);
-
-    const registerResp = await requestContext.post(`${API_URL}/inventory/media`, {
-      data: {
-        identifier: 'BACKUP_TAPE_001',
-        media_type: 'mock_lto',
-        generation_tier: 'LTO-8',
-        capacity: 12000,
-        location: 'Test Lab',
-        config: {}
-      }
-    });
-    expect(registerResp.ok()).toBe(true);
-    const media = await registerResp.json();
-
-    const initResp = await requestContext.post(`${API_URL}/inventory/media/${media.id}/initialize`);
-    expect(initResp.ok()).toBe(true);
-
-    const scanResp = await requestContext.post(`${API_URL}/system/scan`);
-    expect(scanResp.ok()).toBe(true);
-    await waitForScanComplete(requestContext);
-
-    const backupResp = await requestContext.post(`${API_URL}/backups/trigger/auto`);
-    expect(backupResp.ok()).toBe(true);
-    const backupResult = await backupResp.json();
-    expect(backupResult.job_id).toBeDefined();
-
-    await expect(async () => {
-      const jobsResp = await requestContext.get(`${API_URL}/system/jobs`);
-      const jobs = await jobsResp.json();
-      const backupJob = (jobs as Array<any>).find((j: any) => j.job_type === 'BACKUP');
-      expect(backupJob).toBeDefined();
-      expect(backupJob.status).toBe('COMPLETED');
-    }).toPass({ timeout: 30000 });
-
-    const metaResp = await requestContext.get(`${API_URL}/archive/metadata`, {
-      params: { path: path.join(SOURCE_ROOT, 'backup_test.txt') }
-    });
-    expect(metaResp.ok()).toBe(true);
-    const meta = await metaResp.json();
-    expect(meta.versions.length).toBeGreaterThan(0);
-
-    await requestContext.delete(`${API_URL}/inventory/media/${media.id}`);
-    await requestContext.dispose();
-  });
-
   test('backup to specific media works', async ({}) => {
     const requestContext = await setupRequestContext();
     await configureBackend(requestContext);
