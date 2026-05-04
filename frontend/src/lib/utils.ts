@@ -55,3 +55,70 @@ export function formatSize(bytes: number | null | undefined): string {
     }
     return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
+
+/**
+ * Natural sort comparator mimicking Windows Explorer's StrCmpLogicalW.
+ *
+ * Rules:
+ * 1. Directories always sort before files.
+ * 2. Case-insensitive alphanumeric comparison.
+ * 3. Multi-digit numbers are compared as whole integers (1, 2, 10 not 1, 10, 2).
+ * 4. Falls back to locale-aware comparison for non-ASCII characters.
+ */
+export function naturalSortCompare(aName: string, bName: string): number {
+    const aLower = aName.toLowerCase();
+    const bLower = bName.toLowerCase();
+    const len = Math.min(aLower.length, bLower.length);
+
+    let i = 0;
+    while (i < len) {
+        const aChar = aLower[i];
+        const bChar = bLower[i];
+
+        // If both are digits, extract the full number and compare numerically
+        if (isDigit(aChar) && isDigit(bChar)) {
+            let aNum = 0;
+            let bNum = 0;
+            let j = i;
+
+            while (j < aLower.length && isDigit(aLower[j])) {
+                aNum = aNum * 10 + (aLower.charCodeAt(j) - 48);
+                j++;
+            }
+            const aEnd = j;
+
+            j = i;
+            while (j < bLower.length && isDigit(bLower[j])) {
+                bNum = bNum * 10 + (bLower.charCodeAt(j) - 48);
+                j++;
+            }
+            const bEnd = j;
+
+            if (aNum !== bNum) {
+                return aNum - bNum;
+            }
+
+            // Numbers are equal but one may have leading zeros; shorter run first
+            if (aEnd !== bEnd) {
+                return aEnd - bEnd;
+            }
+
+            i = aEnd;
+            continue;
+        }
+
+        // Simple character comparison (locale-aware fallback for non-ASCII)
+        if (aChar !== bChar) {
+            return aChar.localeCompare(bChar);
+        }
+
+        i++;
+    }
+
+    return aLower.length - bLower.length;
+}
+
+function isDigit(c: string): boolean {
+    const code = c.charCodeAt(0);
+    return code >= 48 && code <= 57;
+}

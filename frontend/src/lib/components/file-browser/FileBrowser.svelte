@@ -18,7 +18,7 @@
         import FileBrowserTreeItem from "./FileBrowserTreeItem.svelte";
         import FileBrowserRowItem from "./FileBrowserRowItem.svelte";
         import type { FileItem, TreeNode, Breadcrumb } from "$lib/types";
-        import { cn } from "$lib/utils";
+        import { cn, naturalSortCompare } from "$lib/utils";
         import {
             getSystemTreeSystemTreeGet,
             getArchiveTreeInventoryTreeGet,
@@ -264,12 +264,24 @@
 		});
 
 		result.sort((a: FileItem, b: FileItem) => {
-			const valA = sortColumn === "type" ? a.type : a[sortColumn as keyof FileItem] || 0;
-			const valB = sortColumn === "type" ? b.type : b[sortColumn as keyof FileItem] || 0;
+			let cmp = 0;
 
-			if (valA < (valB as any)) return sortDirection === "asc" ? -1 : 1;
-			if (valA > (valB as any)) return sortDirection === "asc" ? 1 : -1;
-			return 0;
+			if (sortColumn === "name") {
+				// Directories always sort before files, then natural sort by name
+				if (a.type !== b.type) {
+					cmp = a.type === "directory" ? -1 : 1;
+				} else {
+					cmp = naturalSortCompare(a.name, b.name);
+				}
+			} else {
+				const valA = sortColumn === "type" ? a.type : a[sortColumn as keyof FileItem] || 0;
+				const valB = sortColumn === "type" ? b.type : b[sortColumn as keyof FileItem] || 0;
+
+				if (valA < (valB as any)) cmp = -1;
+				else if (valA > (valB as any)) cmp = 1;
+			}
+
+			return sortDirection === "asc" ? cmp : -cmp;
 		});
 
 		return result;
