@@ -6,7 +6,22 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from loguru import logger
 
-from app.api import archive, backups, inventory, restores, system
+from app.api import archive, backups, inventory, restores
+from app.api.system import (
+    dashboard,
+    database,
+    discrepancies,
+    filesystem,
+    hardware,
+    host,
+    jobs,
+    notifications,
+    scan,
+    settings,
+    test,
+    tracking,
+    tree,
+)
 
 
 @asynccontextmanager
@@ -42,7 +57,20 @@ app.add_middleware(
 )
 
 # Register API Routers
-app.include_router(system.router)
+system_prefix = "/system"
+app.include_router(test.router, prefix=system_prefix)
+app.include_router(dashboard.router, prefix=system_prefix)
+app.include_router(jobs.router, prefix=system_prefix)
+app.include_router(scan.router, prefix=system_prefix)
+app.include_router(filesystem.router, prefix=system_prefix)
+app.include_router(tracking.router, prefix=system_prefix)
+app.include_router(settings.router, prefix=system_prefix)
+app.include_router(notifications.router, prefix=system_prefix)
+app.include_router(host.router, prefix=system_prefix)
+app.include_router(hardware.router, prefix=system_prefix)
+app.include_router(database.router, prefix=system_prefix)
+app.include_router(tree.router, prefix=system_prefix)
+app.include_router(discrepancies.router, prefix=system_prefix)
 app.include_router(inventory.router)
 app.include_router(archive.router)
 app.include_router(backups.router)

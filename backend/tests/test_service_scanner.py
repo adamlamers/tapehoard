@@ -119,8 +119,8 @@ def test_scan_sources_mocked(db_session, mocker):
     mocker.patch("app.services.scanner._FAST_FIND_BINARY", None)
 
     # Mock settings
-    mocker.patch("app.api.system.get_source_roots", return_value=["/mock_source"])
-    mocker.patch("app.api.system.get_exclusion_spec", return_value=None)
+    mocker.patch("app.api.common.get_source_roots", return_value=["/mock_source"])
+    mocker.patch("app.api.common.get_exclusion_spec", return_value=None)
 
     # Mock os.walk and os.stat
     mocker.patch("os.path.exists", return_value=True)
@@ -189,8 +189,8 @@ def test_missing_file_marked_deleted_at_end_of_scan(db_session, mocker):
     scanner = ScannerService()
 
     mocker.patch("app.services.scanner._FAST_FIND_BINARY", None)
-    mocker.patch("app.api.system.get_source_roots", return_value=["/mock_source"])
-    mocker.patch("app.api.system.get_exclusion_spec", return_value=None)
+    mocker.patch("app.api.common.get_source_roots", return_value=["/mock_source"])
+    mocker.patch("app.api.common.get_exclusion_spec", return_value=None)
     mocker.patch("os.walk", return_value=[])
 
     # os.path.exists returns True for source roots, False for the missing file
@@ -226,8 +226,8 @@ def test_existing_file_not_marked_deleted(db_session, mocker):
     print(f"DEBUG test_existing: scanner.is_hashing = {scanner.is_hashing}")
 
     mocker.patch("app.services.scanner._FAST_FIND_BINARY", None)
-    mocker.patch("app.api.system.get_source_roots", return_value=["/mock_source"])
-    mocker.patch("app.api.system.get_exclusion_spec", return_value=None)
+    mocker.patch("app.api.common.get_source_roots", return_value=["/mock_source"])
+    mocker.patch("app.api.common.get_exclusion_spec", return_value=None)
     mocker.patch("os.path.exists", return_value=True)
     mocker.patch("os.walk", return_value=[("/mock_source", [], ["file.txt"])])
 

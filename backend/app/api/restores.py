@@ -330,7 +330,7 @@ def browse_restore_queue(
     path: Optional[str] = None, db_session: Session = Depends(get_db)
 ):
     """Provides a virtual browsable view of the recovery queue."""
-    from app.api.system import get_source_roots
+    from app.api.common import get_source_roots
 
     source_roots = get_source_roots(db_session)
 
@@ -414,7 +414,7 @@ def get_restore_queue_tree(
     path: Optional[str] = None, db_session: Session = Depends(get_db)
 ):
     """Returns a recursive tree view of the recovery queue's virtual filesystem."""
-    from app.api.system import get_source_roots
+    from app.api.common import get_source_roots
 
     source_roots = get_source_roots(db_session)
 

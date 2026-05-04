@@ -514,7 +514,7 @@ class ScannerService:
             self.total_files_found = 0
 
         try:
-            from app.api.system import get_exclusion_spec, get_source_roots
+            from app.api.common import get_exclusion_spec, get_source_roots
 
             exclusion_spec = get_exclusion_spec(db_session)
             source_roots = get_source_roots(db_session)
