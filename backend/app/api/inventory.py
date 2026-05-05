@@ -230,6 +230,7 @@ def create_media(
         new_media.compression = request_data.compression
         new_media.encryption_key_id = request_data.encryption_key_id
         new_media.cleaning_cartridge = request_data.cleaning_cartridge
+        new_media.encryption_secret_name = request_data.encryption_secret_name
     elif request_data.media_type == "local_hdd":
         assert isinstance(request_data, schemas.OfflineHddCreateSchema)
         new_media.drive_model = request_data.drive_model
@@ -240,6 +241,7 @@ def create_media(
         new_media.connection_interface = request_data.connection_interface
         new_media.encrypted = request_data.encrypted
         new_media.encryption_key_id = request_data.encryption_key_id
+        new_media.encryption_secret_name = request_data.encryption_secret_name
     elif request_data.media_type == "s3_compat":
         assert isinstance(request_data, schemas.CloudCreateSchema)
         new_media.provider_template = request_data.provider_template

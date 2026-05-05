@@ -392,6 +392,7 @@
             payload.compression = newMedia.compression;
             payload.encryption_key_id = newMedia.encryption_key_id || undefined;
             payload.cleaning_cartridge = newMedia.cleaning_cartridge;
+            payload.encryption_secret_name = newMedia.encryption_secret_name || undefined;
         } else if (newMedia.media_type === 'local_hdd') {
             payload.drive_model = newMedia.drive_model || undefined;
             payload.device_uuid = newMedia.device_uuid || undefined;
@@ -401,6 +402,7 @@
             payload.connection_interface = newMedia.connection_interface || undefined;
             payload.encrypted = newMedia.encrypted;
             payload.encryption_key_id = newMedia.hdd_encryption_key_id || undefined;
+            payload.encryption_secret_name = newMedia.encryption_secret_name || undefined;
         } else if (newMedia.media_type === 's3_compat') {
             payload.provider_template = newMedia.provider_template;
             payload.endpoint_url = newMedia.endpoint_url;
@@ -482,6 +484,7 @@
             payload.write_protected = editingMedia.write_protected;
             payload.cleaning_cartridge = editingMedia.cleaning_cartridge;
             payload.encryption_key_id = editingMedia.encryption_key_id || undefined;
+            payload.encryption_secret_name = editingMedia.encryption_secret_name || undefined;
         }
         // HDD fields
         else if (editingMedia.media_type === 'local_hdd') {
@@ -490,6 +493,7 @@
             payload.is_ssd = editingMedia.is_ssd;
             payload.encrypted = editingMedia.encrypted;
             payload.encryption_key_id = editingMedia.encryption_key_id || undefined;
+            payload.encryption_secret_name = editingMedia.encryption_secret_name || undefined;
         }
         // Cloud fields
         else if (editingMedia.media_type === 's3_compat') {
@@ -1250,6 +1254,19 @@
                             <label class="text-xs font-medium text-text-secondary ml-1" for="encryption_key_id">Encryption Key ID</label>
                             <Input id="encryption_key_id" bind:value={newMedia.encryption_key_id} placeholder="Key reference in system keystore" class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
                         </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-medium text-text-secondary ml-1" for="lto-encryption_secret_name">Encryption Secret</label>
+                            <div class="relative">
+                                <select id="lto-encryption_secret_name" bind:value={newMedia.encryption_secret_name} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
+                                    <option value="">None (no encryption)</option>
+                                    {#each secretsList as secret}
+                                        <option value={secret}>{secret}</option>
+                                    {/each}
+                                </select>
+                                <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+                            </div>
+                            <p class="text-[10px] text-text-secondary leading-tight opacity-60">Manage secrets in <a href="/settings" class="text-blue-500 hover:underline">Settings</a>.</p>
+                        </div>
                     {:else if newMedia.media_type === 'local_hdd'}
                         <div class="grid grid-cols-2 gap-4">
                             <div class="flex items-center gap-3 h-10 px-1">
@@ -1293,6 +1310,19 @@
                         <div class="space-y-2">
                             <label class="text-xs font-medium text-text-secondary ml-1" for="hdd_encryption_key_id">Encryption Key ID</label>
                             <Input id="hdd_encryption_key_id" bind:value={newMedia.hdd_encryption_key_id} placeholder="Key reference in system keystore" class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-medium text-text-secondary ml-1" for="hdd-encryption_secret_name">Encryption Secret</label>
+                            <div class="relative">
+                                <select id="hdd-encryption_secret_name" bind:value={newMedia.encryption_secret_name} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
+                                    <option value="">None (no encryption)</option>
+                                    {#each secretsList as secret}
+                                        <option value={secret}>{secret}</option>
+                                    {/each}
+                                </select>
+                                <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+                            </div>
+                            <p class="text-[10px] text-text-secondary leading-tight opacity-60">Manage secrets in <a href="/settings" class="text-blue-500 hover:underline">Settings</a>.</p>
                         </div>
                     {:else if newMedia.media_type === 's3_compat'}
                         <div class="grid grid-cols-2 gap-4">
@@ -1423,6 +1453,18 @@
                                     <label class="text-xs font-medium text-text-secondary cursor-pointer" for="edit-cleaning_cartridge">Cleaning Cartridge</label>
                                 </div>
                             </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-medium text-text-secondary ml-1" for="edit-lto-encryption_secret_name">Encryption Secret</label>
+                                <div class="relative">
+                                    <select id="edit-lto-encryption_secret_name" bind:value={editingMedia.encryption_secret_name} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
+                                        <option value="">None (no encryption)</option>
+                                        {#each secretsList as secret}
+                                            <option value={secret}>{secret}</option>
+                                        {/each}
+                                    </select>
+                                    <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+                                </div>
+                            </div>
                         </div>
                     {:else if editingMedia.media_type === 'local_hdd'}
                         <div class="space-y-4">
@@ -1443,6 +1485,18 @@
                                 <div class="flex items-center gap-3 h-10 px-1">
                                     <input id="edit-encrypted" type="checkbox" bind:checked={editingMedia.encrypted} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
                                     <label class="text-xs font-medium text-text-secondary cursor-pointer" for="edit-encrypted">Encrypted</label>
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-medium text-text-secondary ml-1" for="edit-hdd-encryption_secret_name">Encryption Secret</label>
+                                <div class="relative">
+                                    <select id="edit-hdd-encryption_secret_name" bind:value={editingMedia.encryption_secret_name} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
+                                        <option value="">None (no encryption)</option>
+                                        {#each secretsList as secret}
+                                            <option value={secret}>{secret}</option>
+                                        {/each}
+                                    </select>
+                                    <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
                                 </div>
                             </div>
                         </div>

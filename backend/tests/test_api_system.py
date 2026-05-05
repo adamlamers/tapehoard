@@ -298,6 +298,57 @@ def test_dashboard_stats_excludes_failed_media(client, db_session):
     assert data["archived_data_size"] == 2048
 
 
+def test_dashboard_stats_counts_only_archived_bytes(client, db_session):
+    """Tests that archived_data_size counts only written bytes, not full file size."""
+    active_media = models.StorageMedia(
+        media_type="hdd", identifier="M1", capacity=5000, status="active"
+    )
+    db_session.add(active_media)
+    db_session.flush()
+
+    # File 1: fully archived (2048 bytes)
+    file1 = models.FilesystemState(
+        file_path="/source/full.txt", size=2048, mtime=1000, is_ignored=False
+    )
+    # File 2: partially archived (only 500 of 3000 bytes)
+    file2 = models.FilesystemState(
+        file_path="/source/partial.bin", size=3000, mtime=1000, is_ignored=False
+    )
+    db_session.add_all([file1, file2])
+    db_session.flush()
+
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=file1.id,
+            media_id=active_media.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=2048,
+        )
+    )
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=file2.id,
+            media_id=active_media.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=500,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/system/dashboard/stats")
+    assert response.status_code == 200
+    data = response.json()
+
+    # Archived data = 2048 + 500 = 2548, NOT 2048 + 3000
+    assert data["archived_data_size"] == 2548
+    # Unprotected count = 1 (partial file is still vulnerable)
+    assert data["unprotected_files_count"] == 1
+    # Unprotected size = 3000 - 500 = 2500 (the remaining unarchived bytes)
+    assert data["unprotected_data_size"] == 2500
+
+
 def test_discrepancies_excludes_versions_on_unavailable_media(client, db_session):
     """Tests that discrepancy has_versions is False when only backed up on failed/retired media."""
     failed_media = models.StorageMedia(
@@ -379,3 +430,77 @@ def test_discrepancies_excludes_versions_on_unavailable_media(client, db_session
 
     good_backed = next(d for d in data if d["path"] == "/data/exists_on_good.txt")
     assert good_backed["has_versions"] is True
+
+
+# ── Secrets Keystore ──
+
+
+def test_list_secrets_empty(client):
+    """Tests listing secrets when keystore is empty."""
+    response = client.get("/system/secrets")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_create_and_list_secret(client):
+    """Tests creating a secret and verifying it appears in the list."""
+    response = client.post(
+        "/system/secrets", json={"name": "my-api-key", "value": "secret123"}
+    )
+    assert response.status_code == 200
+    assert "stored" in response.json()["message"]
+
+    response = client.get("/system/secrets")
+    assert response.status_code == 200
+    assert "my-api-key" in response.json()
+
+
+def test_get_secret_value(client):
+    """Tests retrieving a secret value by name."""
+    client.post(
+        "/system/secrets", json={"name": "encryption-key", "value": "super-secret"}
+    )
+
+    response = client.get("/system/secrets/encryption-key")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "encryption-key"
+    assert data["value"] == "super-secret"
+
+
+def test_get_secret_not_found(client):
+    """Tests retrieving a non-existent secret returns 404."""
+    response = client.get("/system/secrets/nonexistent")
+    assert response.status_code == 404
+
+
+def test_delete_secret(client):
+    """Tests deleting a secret from the keystore."""
+    client.post("/system/secrets", json={"name": "to-delete", "value": "val"})
+
+    response = client.request("DELETE", "/system/secrets", json={"name": "to-delete"})
+    assert response.status_code == 200
+    assert "removed" in response.json()["message"]
+
+    response = client.get("/system/secrets")
+    assert "to-delete" not in response.json()
+
+
+def test_delete_secret_not_found(client):
+    """Tests deleting a non-existent secret returns 404."""
+    response = client.request("DELETE", "/system/secrets", json={"name": "missing"})
+    assert response.status_code == 404
+
+
+def test_update_existing_secret(client):
+    """Tests overwriting an existing secret value."""
+    client.post(
+        "/system/secrets", json={"name": " rotating-key ", "value": "old-value"}
+    )
+    client.post(
+        "/system/secrets", json={"name": " rotating-key ", "value": "new-value"}
+    )
+
+    response = client.get("/system/secrets/ rotating-key ")
+    assert response.status_code == 200
+    assert response.json()["value"] == "new-value"

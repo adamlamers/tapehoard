@@ -21,23 +21,31 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
             SUM(size) as total_size,
             SUM(CASE WHEN is_ignored = 1 THEN 1 ELSE 0 END) as ignored_count,
             SUM(CASE WHEN is_ignored = 1 THEN size ELSE 0 END) as ignored_size,
-            SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 AND id NOT IN (
-                SELECT fv.filesystem_state_id FROM file_versions fv
-                JOIN storage_media sm ON sm.id = fv.media_id
-                WHERE sm.status IN ('active', 'full')
-            ) THEN 1 ELSE 0 END) as unprotected_count,
-            SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 AND id NOT IN (
-                SELECT fv.filesystem_state_id FROM file_versions fv
-                JOIN storage_media sm ON sm.id = fv.media_id
-                WHERE sm.status IN ('active', 'full')
-            ) THEN size ELSE 0 END) as unprotected_size,
+            SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 AND
+                COALESCE((SELECT SUM(fv.offset_end - fv.offset_start)
+                          FROM file_versions fv
+                          JOIN storage_media sm ON sm.id = fv.media_id
+                          WHERE fv.filesystem_state_id = filesystem_state.id
+                          AND sm.status IN ('active', 'full')), 0) < filesystem_state.size
+            THEN 1 ELSE 0 END) as unprotected_count,
+            SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 AND
+                COALESCE((SELECT SUM(fv.offset_end - fv.offset_start)
+                          FROM file_versions fv
+                          JOIN storage_media sm ON sm.id = fv.media_id
+                          WHERE fv.filesystem_state_id = filesystem_state.id
+                          AND sm.status IN ('active', 'full')), 0) < filesystem_state.size
+            THEN filesystem_state.size - COALESCE((SELECT SUM(fv.offset_end - fv.offset_start)
+                          FROM file_versions fv
+                          JOIN storage_media sm ON sm.id = fv.media_id
+                          WHERE fv.filesystem_state_id = filesystem_state.id
+                          AND sm.status IN ('active', 'full')), 0)
+            ELSE 0 END) as unprotected_size,
             SUM(CASE WHEN sha256_hash IS NOT NULL AND is_ignored = 0 AND is_deleted = 0 THEN 1 ELSE 0 END) as hashed_count,
             SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 THEN 1 ELSE 0 END) as eligible_count,
-            SUM(CASE WHEN is_deleted = 0 AND id IN (
-                SELECT fv.filesystem_state_id FROM file_versions fv
-                JOIN storage_media sm ON sm.id = fv.media_id
-                WHERE sm.status IN ('active', 'full')
-            ) THEN size ELSE 0 END) as archived_size,
+            COALESCE((SELECT SUM(fv.offset_end - fv.offset_start)
+                      FROM file_versions fv
+                      JOIN storage_media sm ON sm.id = fv.media_id
+                      WHERE sm.status IN ('active', 'full')), 0) as archived_size,
             SUM(CASE WHEN is_deleted = 1 THEN 1 ELSE 0 END) as missing_count,
             SUM(CASE WHEN is_deleted = 1 AND missing_acknowledged_at IS NULL AND is_ignored = 0 THEN 1 ELSE 0 END) as active_discrepancies_count
         FROM filesystem_state

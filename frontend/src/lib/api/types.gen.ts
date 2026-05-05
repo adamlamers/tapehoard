@@ -550,6 +550,10 @@ export type LtoTapeCreateSchema = {
      * Cleaning Cartridge
      */
     cleaning_cartridge?: boolean;
+    /**
+     * Encryption Secret Name
+     */
+    encryption_secret_name?: string | null;
 };
 
 /**
@@ -970,6 +974,10 @@ export type OfflineHddCreateSchema = {
      * Encryption Key Id
      */
     encryption_key_id?: string | null;
+    /**
+     * Encryption Secret Name
+     */
+    encryption_secret_name?: string | null;
 };
 
 /**

@@ -434,3 +434,58 @@ def test_run_restore_mocked(db_session, mocker, tmp_path):
     expected_file = restore_dest / "original/path/data.txt"
     assert expected_file.exists()
     assert expected_file.read_bytes() == b"hello"
+
+
+def test_cancelled_backup_job_status(db_session, mocker, tmp_path):
+    """Verifies that a cancelled backup job never calls complete_job."""
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    archiver = ArchiverService(staging_directory=str(staging))
+
+    media = models.StorageMedia(
+        media_type="hdd",
+        identifier="CANCEL_DISK",
+        capacity=10**9,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add(media)
+
+    source_file = tmp_path / "source.txt"
+    source_file.write_bytes(b"hello world")
+
+    f1 = models.FilesystemState(
+        file_path=str(source_file),
+        size=source_file.stat().st_size,
+        mtime=1,
+        sha256_hash="hash1",
+    )
+    db_session.add(f1)
+    db_session.commit()
+
+    mock_provider = mocker.MagicMock()
+    mock_provider.capabilities = {"supports_random_access": False}
+    mock_provider.identify_media.return_value = "CANCEL_DISK"
+    mock_provider.prepare_for_write.return_value = True
+    mock_provider.write_archive.return_value = "ARCH_1"
+
+    mocker.patch.object(archiver, "_get_storage_provider", return_value=mock_provider)
+
+    from app.services.scanner import JobManager
+
+    job = JobManager.create_job(db_session, "BACKUP")
+    job_id = job.id
+
+    # Simulate cancellation mid-flight by mocking is_cancelled to True
+    mocker.patch.object(JobManager, "is_cancelled", return_value=True)
+    complete_job_spy = mocker.spy(JobManager, "complete_job")
+
+    archiver.run_backup(db_session, media.id, job_id)
+
+    # complete_job should NEVER be called for a cancelled backup
+    complete_job_spy.assert_not_called()
+
+    # Job should not be COMPLETED
+    db_session.expire_all()
+    refreshed_job = db_session.get(models.Job, job_id)
+    assert refreshed_job.status != "COMPLETED"

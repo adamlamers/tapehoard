@@ -68,6 +68,8 @@ class LtoTapeCreateSchema(MediaBaseSchema):
     compression: bool = True
     encryption_key_id: Optional[str] = None
     cleaning_cartridge: bool = False
+    # Reference to encryption passphrase in the settings keystore
+    encryption_secret_name: Optional[str] = None
 
 
 class OfflineHddCreateSchema(MediaBaseSchema):
@@ -82,6 +84,8 @@ class OfflineHddCreateSchema(MediaBaseSchema):
     connection_interface: Optional[str] = None
     encrypted: bool = False
     encryption_key_id: Optional[str] = None
+    # Reference to encryption passphrase in the settings keystore
+    encryption_secret_name: Optional[str] = None
 
 
 class CloudCreateSchema(MediaBaseSchema):
