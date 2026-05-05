@@ -1,12 +1,9 @@
 import hashlib
 from datetime import datetime, timezone
 
-import pytest
 from app.services.scanner import (
     ScannerService,
     JobManager,
-    _hash_file_batch_fast,
-    _FAST_HASH_BINARY,
 )
 from app.db import models
 
@@ -145,46 +142,6 @@ def test_scan_sources_mocked(db_session, mocker):
     assert record.size == 500
 
 
-def test_hash_file_batch_fast(tmp_path):
-    """Tests native sha256sum/shasum batch hashing if available."""
-    if _FAST_HASH_BINARY is None:
-        pytest.skip("No native hash binary available")
-
-    # Create test files
-    files = {}
-    for i in range(5):
-        content = f"test content {i}".encode()
-        f = tmp_path / f"file_{i}.txt"
-        f.write_bytes(content)
-        files[str(f)] = hashlib.sha256(content).hexdigest()
-
-    # Hash via native binary
-    results = _hash_file_batch_fast(list(files.keys()), _FAST_HASH_BINARY)
-
-    assert len(results) == 5
-    for path, expected_hash in files.items():
-        assert results[path] == expected_hash
-
-
-def test_hash_file_batch_fast_empty():
-    """Tests that empty batch returns empty results."""
-    if _FAST_HASH_BINARY is None:
-        pytest.skip("No native hash binary available")
-
-    results = _hash_file_batch_fast([], _FAST_HASH_BINARY)
-    assert results == {}
-
-
-def test_hash_file_batch_fast_nonexistent():
-    """Tests that non-existent files are silently skipped."""
-    if _FAST_HASH_BINARY is None:
-        pytest.skip("No native hash binary available")
-
-    results = _hash_file_batch_fast(["/nonexistent/path"], _FAST_HASH_BINARY)
-    # Non-existent files should not produce hash entries
-    assert results == {}
-
-
 def test_missing_file_marked_deleted_at_end_of_scan(db_session, mocker):
     """Tests that files not seen during a scan are marked as deleted."""
     scanner = ScannerService()
@@ -258,8 +215,6 @@ def test_existing_file_not_marked_deleted(db_session, mocker):
 def test_missing_file_during_hashing_marked_deleted(db_session, mocker):
     """Tests that files missing during hashing are marked as deleted."""
     scanner = ScannerService()
-
-    mocker.patch("app.services.scanner._FAST_HASH_BINARY", None)
 
     f = models.FilesystemState(
         file_path="/data/vanished.bin", size=10, mtime=1, is_ignored=False
