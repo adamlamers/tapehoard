@@ -694,17 +694,24 @@ class ArchiverService:
                     f"Media record {media_id_for_log} was modified or deleted by another process; skipping final commit"
                 )
 
-            JobManager.add_job_log(
-                job_id, f"Backup complete. Utilization: {utilization_ratio*100:.1f}%"
-            )
-            JobManager.complete_job(job_id)
-            from app.services.notifications import notification_manager
+            if JobManager.is_cancelled(job_id):
+                JobManager.add_job_log(
+                    job_id,
+                    f"Backup cancelled. Utilization: {utilization_ratio*100:.1f}%",
+                )
+            else:
+                JobManager.add_job_log(
+                    job_id,
+                    f"Backup complete. Utilization: {utilization_ratio*100:.1f}%",
+                )
+                JobManager.complete_job(job_id)
+                from app.services.notifications import notification_manager
 
-            notification_manager.notify(
-                "Archival Complete",
-                f"{media_identifier_for_log} synchronized.",
-                "success",
-            )
+                notification_manager.notify(
+                    "Archival Complete",
+                    f"{media_identifier_for_log} synchronized.",
+                    "success",
+                )
 
         except Exception as e:
             logger.exception(f"Archival failed: {e}")
