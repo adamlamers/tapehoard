@@ -560,3 +560,137 @@ def test_update_status_to_retired_purges_versions(client, db_session):
         {"media_id": media.id},
     ).scalar()
     assert result == 0
+
+
+# ── Archive Tree ──
+
+
+def test_archive_tree_with_versions(client, db_session):
+    """Tests archive tree returns source roots with versions."""
+    db_session.add(models.SystemSetting(key="source_roots", value=json.dumps(["data"])))
+    db_session.flush()
+
+    media = models.StorageMedia(
+        media_type="hdd", identifier="M1", capacity=1000, status="active"
+    )
+    db_session.add(media)
+    db_session.flush()
+
+    file1 = models.FilesystemState(file_path="data/file1.txt", size=100, mtime=1000)
+    db_session.add(file1)
+    db_session.flush()
+
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=file1.id,
+            media_id=media.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=100,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/archive/tree")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["name"] == "data"
+    assert data[0]["has_children"] is True
+
+
+def test_archive_tree_nested_directories(client, db_session):
+    """Tests archive tree with nested directories."""
+    db_session.add(models.SystemSetting(key="source_roots", value=json.dumps(["data"])))
+    db_session.flush()
+
+    media = models.StorageMedia(
+        media_type="hdd", identifier="M1", capacity=1000, status="active"
+    )
+    db_session.add(media)
+    db_session.flush()
+
+    file1 = models.FilesystemState(
+        file_path="data/subdir/file1.txt", size=100, mtime=1000
+    )
+    db_session.add(file1)
+    db_session.flush()
+
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=file1.id,
+            media_id=media.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=100,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/archive/tree")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["name"] == "data"
+
+
+def test_archive_tree_empty_no_versions(client, db_session):
+    """Tests archive tree excludes roots with no versions."""
+    db_session.add(models.SystemSetting(key="source_roots", value=json.dumps(["data"])))
+    db_session.flush()
+
+    # Add file but no versions
+    file1 = models.FilesystemState(file_path="data/file1.txt", size=100, mtime=1000)
+    db_session.add(file1)
+    db_session.commit()
+
+    response = client.get("/archive/tree")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+# ── Metadata Directory ──
+
+
+def test_metadata_directory(client, db_session):
+    """Tests metadata endpoint for a directory returns aggregated stats."""
+    db_session.add(models.SystemSetting(key="source_roots", value=json.dumps(["data"])))
+    db_session.flush()
+
+    media = models.StorageMedia(
+        media_type="hdd", identifier="M1", capacity=1000, status="active"
+    )
+    db_session.add(media)
+    db_session.flush()
+
+    file1 = models.FilesystemState(file_path="data/sub/file1.txt", size=100, mtime=1000)
+    file2 = models.FilesystemState(file_path="data/sub/file2.txt", size=200, mtime=1000)
+    db_session.add_all([file1, file2])
+    db_session.flush()
+
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=file1.id,
+            media_id=media.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=100,
+        )
+    )
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=file2.id,
+            media_id=media.id,
+            file_number="2",
+            offset_start=0,
+            offset_end=200,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/archive/metadata?path=data/sub")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["type"] == "directory"
+    assert data["child_count"] == 2
+    assert data["size"] == 300

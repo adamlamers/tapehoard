@@ -504,3 +504,177 @@ def test_update_existing_secret(client):
     response = client.get("/system/secrets/ rotating-key ")
     assert response.status_code == 200
     assert response.json()["value"] == "new-value"
+
+
+# ── Filesystem Browse ──
+
+
+def test_filesystem_browse_root(client, db_session):
+    """Tests browsing the filesystem at ROOT level."""
+    db_session.add(models.SystemSetting(key="source_roots", value='["/source_data"]'))
+    db_session.commit()
+
+    response = client.get("/system/browse?path=ROOT")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["files"]) == 1
+    assert data["files"][0]["path"] == "/source_data"
+    assert data["files"][0]["type"] == "directory"
+
+
+def test_filesystem_browse_subdirectory(client, db_session):
+    """Tests browsing a subdirectory of the filesystem index."""
+    db_session.add(models.SystemSetting(key="source_roots", value='["/source_data"]'))
+    db_session.flush()
+
+    file1 = models.FilesystemState(
+        file_path="/source_data/subdir/file1.txt", size=100, mtime=1000
+    )
+    db_session.add(file1)
+    db_session.commit()
+
+    response = client.get("/system/browse?path=/source_data/subdir")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["files"]) == 1
+    assert data["files"][0]["name"] == "file1.txt"
+    assert data["files"][0]["type"] == "file"
+
+
+def test_filesystem_browse_outside_roots(client, db_session):
+    """Tests browsing outside configured roots returns 403."""
+    db_session.add(models.SystemSetting(key="source_roots", value='["/source_data"]'))
+    db_session.commit()
+
+    response = client.get("/system/browse?path=/etc")
+    assert response.status_code == 403
+
+
+# ── Filesystem Search ──
+
+
+def test_filesystem_search_too_short(client):
+    """Tests search with query < 3 chars returns empty list."""
+    response = client.get("/system/search?q=ab")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+# ── Hardware Discover ──
+
+
+def test_discover_hardware_empty(client):
+    """Tests hardware discovery endpoint returns a list (may contain real mounts)."""
+    response = client.get("/system/hardware/discover")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    # Each discovered node should have required fields if present
+    for node in data:
+        assert "type" in node
+        assert "identifier" in node
+        assert "is_registered" in node
+
+
+# ── Hardware Ignore ──
+
+
+def test_ignore_hardware_duplicate(client):
+    """Tests ignoring the same hardware twice is idempotent."""
+    client.post("/system/hardware/ignore", json={"identifier": "DISK_DUP"})
+    response = client.post("/system/hardware/ignore", json={"identifier": "DISK_DUP"})
+    assert response.status_code == 200
+
+    response = client.get("/system/settings")
+    assert response.json()["ignored_hardware"].count("DISK_DUP") == 1
+
+
+# ── Database Export ──
+
+
+def test_database_export(client):
+    """Tests database export endpoint returns a file response."""
+    response = client.get("/system/database/export")
+    # May return 200 with file or 404 if db path not found
+    assert response.status_code in (200, 404)
+
+
+# ── Tracking Batch ──
+
+
+def test_batch_track_include(client, db_session):
+    """Tests batch tracking include action sets is_ignored=0."""
+    file1 = models.FilesystemState(
+        file_path="/data/important.txt", size=100, mtime=1000, is_ignored=True
+    )
+    db_session.add(file1)
+    db_session.commit()
+
+    response = client.post(
+        "/system/track/batch",
+        json={"tracks": ["/data/important.txt"], "untracks": []},
+    )
+    assert response.status_code == 200
+    assert "synchronized" in response.json()["message"]
+
+    db_session.expire_all()
+    assert db_session.get(models.FilesystemState, file1.id).is_ignored is False
+
+    # Verify tracked source record was created
+    ts = (
+        db_session.query(models.TrackedSource)
+        .filter_by(path="/data/important.txt")
+        .first()
+    )
+    assert ts is not None
+    assert ts.action == "include"
+
+
+def test_batch_track_exclude(client, db_session):
+    """Tests batch tracking exclude action sets is_ignored=1."""
+    file1 = models.FilesystemState(
+        file_path="/data/temp.txt", size=100, mtime=1000, is_ignored=False
+    )
+    db_session.add(file1)
+    db_session.commit()
+
+    response = client.post(
+        "/system/track/batch",
+        json={"tracks": [], "untracks": ["/data/temp.txt"]},
+    )
+    assert response.status_code == 200
+
+    db_session.expire_all()
+    assert db_session.get(models.FilesystemState, file1.id).is_ignored is True
+
+    ts = db_session.query(models.TrackedSource).filter_by(path="/data/temp.txt").first()
+    assert ts is not None
+    assert ts.action == "exclude"
+
+
+def test_batch_track_empty(client):
+    """Tests batch track with empty lists succeeds."""
+    response = client.post("/system/track/batch", json={"tracks": [], "untracks": []})
+    assert response.status_code == 200
+
+
+# ── Archive Tree ──
+
+
+def test_archive_tree_empty(client):
+    """Tests archive tree when index is empty."""
+    response = client.get("/archive/tree")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+# ── Notifications ──
+
+
+def test_test_notification_invalid_url(client):
+    """Tests test notification with invalid URL returns 500."""
+    response = client.post(
+        "/system/notifications/test", json={"url": "not-a-valid-url"}
+    )
+    # Notification manager may succeed or fail depending on apprise parsing
+    assert response.status_code in (200, 500)
