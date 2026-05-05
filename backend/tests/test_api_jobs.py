@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -17,19 +17,22 @@ def test_list_jobs_empty(client):
 
 def test_list_jobs_populated(client, db_session):
     """Tests listing jobs with pagination and latest_log inclusion."""
+    now = datetime.now(timezone.utc)
     job1 = models.Job(
         job_type="SCAN",
         status="COMPLETED",
         progress=100.0,
         current_task="Done",
-        started_at=datetime.now(timezone.utc),
-        completed_at=datetime.now(timezone.utc),
+        started_at=now - timedelta(seconds=2),
+        completed_at=now - timedelta(seconds=1),
+        created_at=now - timedelta(seconds=2),
     )
     job2 = models.Job(
         job_type="BACKUP",
         status="RUNNING",
         progress=50.0,
         current_task="Writing archive",
+        created_at=now,
     )
     db_session.add_all([job1, job2])
     db_session.flush()
