@@ -51,6 +51,7 @@
         discoverHardware,
         ignoreHardware,
         listProviders,
+        listSecrets,
         type MediaSchema,
         type StorageProviderSchema
     } from '$lib/api';
@@ -62,6 +63,7 @@
     let mediaList = $state<MediaSchema[]>([]);
     let providersList = $state<StorageProviderSchema[]>([]);
     let discoveredAssets = $state<any[]>([]);
+    let secretsList = $state<string[]>([]);
     let loading = $state(true);
     let showRegisterDialog = $state(false);
     let editingMedia = $state<MediaSchema | null>(null);
@@ -102,12 +104,12 @@
         region: 'us-east-1',
         bucket_name: '',
         access_key_id: '',
-        secret_access_key: '',
+        secret_access_key_name: '',
         path_style_access: false,
         storage_class: '',
         max_part_size_mb: 5000,
         obfuscate_filenames: false,
-        client_side_encryption_passphrase: ''
+        encryption_secret_name: ''
     });
 
     // Provider template change handler
@@ -252,9 +254,19 @@
         prevOnlineCount = currentOnlineCount;
     });
 
+    async function loadSecrets() {
+        try {
+            const res = await listSecrets();
+            if (res.data) secretsList = res.data as string[];
+        } catch (error) {
+            console.error("Failed to load secrets:", error);
+        }
+    }
+
     onMount(async () => {
         // Initial load (non-silent and forced refresh to show live hardware status immediately)
         loadMedia(false, true);
+        loadSecrets();
 
         try {
             const res = await listProviders();
@@ -395,12 +407,12 @@
             payload.region = newMedia.region;
             payload.bucket_name = newMedia.bucket_name;
             payload.access_key_id = newMedia.access_key_id;
-            payload.secret_access_key = newMedia.secret_access_key;
+            payload.secret_access_key_name = newMedia.secret_access_key_name || undefined;
             payload.path_style_access = newMedia.path_style_access;
             payload.storage_class = newMedia.storage_class || undefined;
             payload.max_part_size_mb = newMedia.max_part_size_mb;
             payload.obfuscate_filenames = newMedia.obfuscate_filenames;
-            payload.client_side_encryption_passphrase = newMedia.client_side_encryption_passphrase || undefined;
+            payload.encryption_secret_name = newMedia.encryption_secret_name || undefined;
         }
 
         try {
@@ -438,6 +450,8 @@
             editingMedia.storage_class = editingMedia.storage_class || '';
             editingMedia.path_style_access = editingMedia.path_style_access ?? false;
             editingMedia.obfuscate_filenames = editingMedia.obfuscate_filenames ?? false;
+            editingMedia.secret_access_key_name = editingMedia.secret_access_key_name || '';
+            editingMedia.encryption_secret_name = editingMedia.encryption_secret_name || '';
         }
     }
 
@@ -483,9 +497,11 @@
             payload.region = editingMedia.region || undefined;
             payload.bucket_name = editingMedia.bucket_name || undefined;
             payload.access_key_id = editingMedia.access_key_id || undefined;
+            payload.secret_access_key_name = editingMedia.secret_access_key_name || undefined;
             payload.path_style_access = editingMedia.path_style_access;
             payload.obfuscate_filenames = editingMedia.obfuscate_filenames;
             payload.storage_class = editingMedia.storage_class || undefined;
+            payload.encryption_secret_name = editingMedia.encryption_secret_name || undefined;
         }
 
         // Remove undefined values
@@ -1150,8 +1166,17 @@
                             </div>
                         </div>
                         <div class="space-y-2">
-                            <label class="text-xs font-medium text-text-secondary ml-1" for="secret_access_key">Secret Access Key</label>
-                            <Input id="secret_access_key" bind:value={newMedia.secret_access_key} placeholder="Secret key" class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" type="password" />
+                            <label class="text-xs font-medium text-text-secondary ml-1" for="secret_access_key_name">Secret Access Key</label>
+                            <div class="relative">
+                                <select id="secret_access_key_name" bind:value={newMedia.secret_access_key_name} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
+                                    <option value="">None (unauthenticated)</option>
+                                    {#each secretsList as secret}
+                                        <option value={secret}>{secret}</option>
+                                    {/each}
+                                </select>
+                                <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+                            </div>
+                            <p class="text-[10px] text-text-secondary leading-tight opacity-60">Manage secrets in <a href="/settings" class="text-blue-500 hover:underline">Settings</a>.</p>
                         </div>
                     {/if}
                 </div>
@@ -1291,8 +1316,17 @@
                             </div>
                         </div>
                         <div class="space-y-2">
-                            <label class="text-xs font-medium text-text-secondary ml-1" for="client_side_encryption_passphrase">Client-Side Encryption Passphrase</label>
-                            <Input id="client_side_encryption_passphrase" bind:value={newMedia.client_side_encryption_passphrase} type="password" placeholder="Encrypts payloads before upload" class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                            <label class="text-xs font-medium text-text-secondary ml-1" for="encryption_secret_name">Encryption Secret</label>
+                            <div class="relative">
+                                <select id="encryption_secret_name" bind:value={newMedia.encryption_secret_name} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
+                                    <option value="">None (no encryption)</option>
+                                    {#each secretsList as secret}
+                                        <option value={secret}>{secret}</option>
+                                    {/each}
+                                </select>
+                                <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+                            </div>
+                            <p class="text-[10px] text-text-secondary leading-tight opacity-60">Manage secrets in <a href="/settings" class="text-blue-500 hover:underline">Settings</a>.</p>
                         </div>
                     {/if}
                 </div>
@@ -1435,6 +1469,30 @@
                                 <div class="space-y-2">
                                     <label class="text-xs font-medium text-text-secondary ml-1" for="edit-access_key_id">Access Key ID</label>
                                     <Input id="edit-access_key_id" bind:value={editingMedia.access_key_id} class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-xs font-medium text-text-secondary ml-1" for="edit-secret_access_key_name">Secret Access Key</label>
+                                    <div class="relative">
+                                        <select id="edit-secret_access_key_name" bind:value={editingMedia.secret_access_key_name} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
+                                            <option value="">None (unauthenticated)</option>
+                                            {#each secretsList as secret}
+                                                <option value={secret}>{secret}</option>
+                                            {/each}
+                                        </select>
+                                        <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+                                    </div>
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-xs font-medium text-text-secondary ml-1" for="edit-encryption_secret_name">Encryption Secret</label>
+                                    <div class="relative">
+                                        <select id="edit-encryption_secret_name" bind:value={editingMedia.encryption_secret_name} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
+                                            <option value="">None (no encryption)</option>
+                                            {#each secretsList as secret}
+                                                <option value={secret}>{secret}</option>
+                                            {/each}
+                                        </select>
+                                        <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+                                    </div>
                                 </div>
                                 <div class="flex items-center gap-3 h-10 px-1">
                                     <input id="edit-path_style_access" type="checkbox" bind:checked={editingMedia.path_style_access} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />

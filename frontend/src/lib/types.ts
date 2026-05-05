@@ -90,12 +90,12 @@ export interface CloudCreateData {
     region: string;
     bucket_name: string;
     access_key_id: string;
-    secret_access_key: string;
+    secret_access_key_name?: string;
     path_style_access?: boolean;
     storage_class?: string;
     max_part_size_mb?: number;
     obfuscate_filenames?: boolean;
-    client_side_encryption_passphrase?: string;
+    encryption_secret_name?: string;
 }
 
 export type MediaCreateData = LtoTapeCreateData | OfflineHddCreateData | CloudCreateData;

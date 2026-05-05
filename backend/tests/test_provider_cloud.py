@@ -41,28 +41,44 @@ def test_cloud_provider_obfuscation_logic():
     assert "secret_plan.pdf" not in key_hidden
 
 
-def test_cloud_secret_fallback(mocker):
-    """Verifies that the provider prioritizes local config over global settings for passphrases."""
-    from app.core.config import settings
+def test_cloud_secret_lookup(mocker, db_session):
+    """Verifies that the provider looks up secrets from the keystore by name."""
+    from app.db import models
 
     # Mock boto3.client to avoid slow initialization in unit tests
     mocker.patch("app.providers.cloud.boto3")
 
-    # Mock global settings
-    mocker.patch.object(settings, "encryption_passphrase", "global-fallback")
+    # Seed the secrets keystore
+    db_session.add(
+        models.SystemSetting(
+            key="secrets",
+            value='{"my-encryption-key": "local-override", "empty-secret": ""}',
+        )
+    )
+    db_session.commit()
 
-    # CASE1: Local config provides passphrase
-    config_local = {"bucket_name": "b", "encryption_passphrase": "local-override"}
+    # CASE 1: Secret name provided and exists in keystore
+    config_local = {
+        "bucket_name": "b",
+        "encryption_secret_name": "my-encryption-key",
+    }
     provider_local = CloudStorageProvider(config_local)
     assert provider_local.passphrase == "local-override"
 
-    # CASE 2: Local config is empty, should fallback to global
+    # CASE 2: No secret name provided, passphrase is None
     config_empty = {"bucket_name": "b"}
     provider_fallback = CloudStorageProvider(config_empty)
-    assert provider_fallback.passphrase == "global-fallback"
+    assert provider_fallback.passphrase is None
 
-    # CASE 3: No passphrase anywhere (ValueError on key derivation)
-    mocker.patch.object(settings, "encryption_passphrase", "")
+    # CASE 3: Secret name provided but value is empty string
+    config_empty_secret = {
+        "bucket_name": "b",
+        "encryption_secret_name": "empty-secret",
+    }
+    provider_empty = CloudStorageProvider(config_empty_secret)
+    assert provider_empty.passphrase == ""
+
+    # CASE 4: No passphrase anywhere (ValueError on key derivation)
     provider_none = CloudStorageProvider({"bucket_name": "b"})
     with pytest.raises(ValueError, match="No encryption passphrase configured"):
         provider_none._derive_key(b"salt")

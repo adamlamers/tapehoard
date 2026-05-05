@@ -219,9 +219,9 @@ export type CloudCreateSchema = {
      */
     access_key_id: string;
     /**
-     * Secret Access Key
+     * Secret Access Key Name
      */
-    secret_access_key: string;
+    secret_access_key_name?: string | null;
     /**
      * Path Style Access
      */
@@ -239,9 +239,9 @@ export type CloudCreateSchema = {
      */
     obfuscate_filenames?: boolean;
     /**
-     * Client Side Encryption Passphrase
+     * Encryption Secret Name
      */
-    client_side_encryption_passphrase?: string | null;
+    encryption_secret_name?: string | null;
 };
 
 /**
@@ -699,6 +699,10 @@ export type MediaSchema = {
      */
     access_key_id?: string | null;
     /**
+     * Secret Access Key Name
+     */
+    secret_access_key_name?: string | null;
+    /**
      * Path Style Access
      */
     path_style_access?: boolean;
@@ -714,6 +718,10 @@ export type MediaSchema = {
      * Obfuscate Filenames
      */
     obfuscate_filenames?: boolean;
+    /**
+     * Encryption Secret Name
+     */
+    encryption_secret_name?: string | null;
     /**
      * Config
      */
@@ -859,9 +867,9 @@ export type MediaUpdateSchema = {
      */
     access_key_id?: string | null;
     /**
-     * Secret Access Key
+     * Secret Access Key Name
      */
-    secret_access_key?: string | null;
+    secret_access_key_name?: string | null;
     /**
      * Path Style Access
      */
@@ -879,9 +887,9 @@ export type MediaUpdateSchema = {
      */
     obfuscate_filenames?: boolean | null;
     /**
-     * Client Side Encryption Passphrase
+     * Encryption Secret Name
      */
-    client_side_encryption_passphrase?: string | null;
+    encryption_secret_name?: string | null;
 };
 
 /**
@@ -1042,6 +1050,30 @@ export type ScanStatusSchema = {
      * Last Run Time
      */
     last_run_time?: string | null;
+};
+
+/**
+ * SecretCreateRequest
+ */
+export type SecretCreateRequest = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Value
+     */
+    value: string;
+};
+
+/**
+ * SecretDeleteRequest
+ */
+export type SecretDeleteRequest = {
+    /**
+     * Name
+     */
+    name: string;
 };
 
 /**
@@ -1708,6 +1740,98 @@ export type DownloadExclusionReportErrors = {
 export type DownloadExclusionReportError = DownloadExclusionReportErrors[keyof DownloadExclusionReportErrors];
 
 export type DownloadExclusionReportResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type DeleteSecretData = {
+    body: SecretDeleteRequest;
+    path?: never;
+    query?: never;
+    url: '/system/secrets';
+};
+
+export type DeleteSecretErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteSecretError = DeleteSecretErrors[keyof DeleteSecretErrors];
+
+export type DeleteSecretResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ListSecretsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/secrets';
+};
+
+export type ListSecretsResponses = {
+    /**
+     * Response List Secrets
+     *
+     * Successful Response
+     */
+    200: Array<string>;
+};
+
+export type ListSecretsResponse = ListSecretsResponses[keyof ListSecretsResponses];
+
+export type CreateSecretData = {
+    body: SecretCreateRequest;
+    path?: never;
+    query?: never;
+    url: '/system/secrets';
+};
+
+export type CreateSecretErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateSecretError = CreateSecretErrors[keyof CreateSecretErrors];
+
+export type CreateSecretResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type GetSecretData = {
+    body?: never;
+    path: {
+        /**
+         * Name
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/system/secrets/{name}';
+};
+
+export type GetSecretErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetSecretError = GetSecretErrors[keyof GetSecretErrors];
+
+export type GetSecretResponses = {
     /**
      * Successful Response
      */

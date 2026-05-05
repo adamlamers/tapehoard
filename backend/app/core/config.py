@@ -3,8 +3,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """
-    Standardized secret management and application configuration.
+    Application configuration.
     Values can be overridden via environment variables or a .env file.
+    NOTE: No default secrets or passphrases are set. Users must configure
+    secrets via the settings keystore before encryption can be used.
     """
 
     model_config = SettingsConfigDict(
@@ -13,10 +15,6 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "sqlite:///./tapehoard.db"
-
-    # Security / Encryption
-    # Standardized secret management pattern
-    encryption_passphrase: str = "tapehoard-default-insecure-passphrase"
 
     # Staging
     staging_directory: str = "/staging"

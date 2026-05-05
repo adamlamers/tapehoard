@@ -67,10 +67,12 @@ def _media_to_schema(media: models.StorageMedia, config: Dict[str, Any]) -> Medi
         region=media.region,
         bucket_name=media.bucket_name,
         access_key_id=media.access_key_id,
+        secret_access_key_name=media.secret_access_key_name,
         path_style_access=media.path_style_access,
         storage_class=media.storage_class,
         max_part_size_mb=media.max_part_size_mb,
         obfuscate_filenames=media.obfuscate_filenames,
+        encryption_secret_name=media.encryption_secret_name,
         config=config,
     )
 
@@ -245,14 +247,12 @@ def create_media(
         new_media.region = request_data.region
         new_media.bucket_name = request_data.bucket_name
         new_media.access_key_id = request_data.access_key_id
-        new_media.secret_access_key = request_data.secret_access_key
+        new_media.secret_access_key_name = request_data.secret_access_key_name
         new_media.path_style_access = request_data.path_style_access
         new_media.storage_class = request_data.storage_class
         new_media.max_part_size_mb = request_data.max_part_size_mb
         new_media.obfuscate_filenames = request_data.obfuscate_filenames
-        new_media.client_side_encryption_passphrase = (
-            request_data.client_side_encryption_passphrase
-        )
+        new_media.encryption_secret_name = request_data.encryption_secret_name
 
     db_session.add(new_media)
     db_session.commit()
@@ -349,8 +349,8 @@ def update_media(
         media_record.bucket_name = request_data.bucket_name
     if request_data.access_key_id is not None:
         media_record.access_key_id = request_data.access_key_id
-    if request_data.secret_access_key is not None:
-        media_record.secret_access_key = request_data.secret_access_key
+    if request_data.secret_access_key_name is not None:
+        media_record.secret_access_key_name = request_data.secret_access_key_name
     if request_data.path_style_access is not None:
         media_record.path_style_access = request_data.path_style_access
     if request_data.storage_class is not None:
@@ -359,10 +359,8 @@ def update_media(
         media_record.max_part_size_mb = request_data.max_part_size_mb
     if request_data.obfuscate_filenames is not None:
         media_record.obfuscate_filenames = request_data.obfuscate_filenames
-    if request_data.client_side_encryption_passphrase is not None:
-        media_record.client_side_encryption_passphrase = (
-            request_data.client_side_encryption_passphrase
-        )
+    if request_data.encryption_secret_name is not None:
+        media_record.encryption_secret_name = request_data.encryption_secret_name
 
     # Handle legacy extra_config for backward compatibility
     if media_record.extra_config:

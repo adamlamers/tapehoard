@@ -19,7 +19,8 @@
         Download,
         Upload,
         Terminal,
-        Globe
+        Globe,
+        Key
     } from "lucide-svelte";
     import { Button } from "$lib/components/ui/button";
     import PageHeader from "$lib/components/ui/PageHeader.svelte";
@@ -33,7 +34,10 @@
         exportDatabase,
         importDatabase,
         testExclusions,
-        downloadExclusionReport
+        downloadExclusionReport,
+        listSecrets,
+        createSecret,
+        deleteSecret
     } from "$lib/api";
     import { toast } from "svelte-sonner";
     import { cn, formatSize } from "$lib/utils";
@@ -47,6 +51,12 @@
     let scanSchedule = $state("");
     let archivalSchedule = $state("");
     let notificationUrls = $state<string[]>([]);
+
+    // Secrets keystore
+    let secretsList = $state<string[]>([]);
+    let newSecretName = $state("");
+    let newSecretValue = $state("");
+    let showAddSecret = $state(false);
 
     let initialState = $state("");
     const isDirty = $derived(initialState !== JSON.stringify({
@@ -127,6 +137,7 @@
         { id: "paths", label: "Storage Paths", icon: HardDrive },
         { id: "exclusions", label: "Exclusions", icon: ListX },
         { id: "scheduling", label: "Scheduling", icon: CalendarClock },
+        { id: "secrets", label: "Secrets", icon: Key },
         { id: "notifications", label: "Alerting", icon: Bell },
         { id: "system", label: "System", icon: Cpu },
     ];
@@ -145,6 +156,10 @@
                 if (data.schedule_archival) archivalSchedule = data.schedule_archival;
                 if (data.notification_urls) notificationUrls = JSON.parse(data.notification_urls);
             }
+
+            // Load secrets
+            const secretsRes = await listSecrets();
+            if (secretsRes.data) secretsList = secretsRes.data as string[];
 
             // Capture snapshot for dirty check
             initialState = JSON.stringify({
@@ -192,6 +207,34 @@
             toast.error("Failed to save settings");
         } finally {
             saving = false;
+        }
+    }
+
+    async function handleAddSecret() {
+        if (!newSecretName.trim() || !newSecretValue.trim()) {
+            toast.error("Secret name and value are required");
+            return;
+        }
+        try {
+            await createSecret({ body: { name: newSecretName.trim(), value: newSecretValue.trim() } });
+            toast.success(`Secret '${newSecretName}' saved`);
+            secretsList = [...secretsList, newSecretName.trim()];
+            newSecretName = "";
+            newSecretValue = "";
+            showAddSecret = false;
+        } catch (error) {
+            toast.error("Failed to save secret");
+        }
+    }
+
+    async function handleDeleteSecret(name: string) {
+        if (!confirm(`Delete secret '${name}'? This may break media that references it.`)) return;
+        try {
+            await deleteSecret({ body: { name } });
+            toast.success(`Secret '${name}' deleted`);
+            secretsList = secretsList.filter(s => s !== name);
+        } catch (error) {
+            toast.error("Failed to delete secret");
         }
     }
 
@@ -550,6 +593,56 @@
                                 {/each}
                                 <Button variant="outline" class="w-full h-11 border-dashed border-2 font-medium text-sm" onclick={addNotify}><Plus size={20} class="mr-2" /> Add notification endpoint</Button>
                             </div>
+                        </Card>
+                    </div>
+
+                {:else if activeTab === 'secrets'}
+                    <div class="animate-in slide-in-from-bottom-4 duration-500 space-y-6">
+                        <Card class="p-5 shadow-xl">
+                            <SectionHeader title="Secrets Keystore" icon={Key} class="mb-6 px-0" />
+                            <p class="text-sm text-text-secondary opacity-60 mb-4">Store sensitive credentials centrally. Media configurations reference secrets by name instead of storing raw values.</p>
+
+                            {#if secretsList.length > 0}
+                                <div class="space-y-2 mb-4">
+                                    {#each secretsList as secret}
+                                        <div class="flex items-center justify-between p-3 bg-bg-primary/50 rounded-lg border border-border-color">
+                                            <div class="flex items-center gap-3">
+                                                <Key size={14} class="text-text-secondary opacity-40" />
+                                                <span class="text-sm font-medium text-text-primary">{secret}</span>
+                                            </div>
+                                            <Button variant="ghost" size="icon" class="h-8 w-8 text-error-color/60 hover:text-error-color hover:bg-error-color/10" onclick={() => handleDeleteSecret(secret)}>
+                                                <Trash2 size={14} />
+                                            </Button>
+                                        </div>
+                                    {/each}
+                                </div>
+                            {:else}
+                                <div class="text-center py-8 opacity-30 mb-4">
+                                    <Key size={32} class="mx-auto mb-2" />
+                                    <p class="text-sm">No secrets stored yet</p>
+                                </div>
+                            {/if}
+
+                            {#if showAddSecret}
+                                <div class="space-y-3 p-4 bg-bg-primary/30 rounded-lg border border-border-color">
+                                    <div class="space-y-2">
+                                        <label class="text-xs font-medium text-text-secondary ml-1">Secret Name</label>
+                                        <Input bind:value={newSecretName} placeholder="e.g., aws-production-key" class="h-10 bg-bg-primary border-border-color text-sm" />
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="text-xs font-medium text-text-secondary ml-1">Secret Value</label>
+                                        <Input bind:value={newSecretValue} type="password" placeholder="Enter secret value" class="h-10 bg-bg-primary border-border-color font-mono text-sm" />
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <Button variant="outline" class="flex-1 h-10" onclick={() => { showAddSecret = false; newSecretName = ''; newSecretValue = ''; }}>Cancel</Button>
+                                        <Button variant="default" class="flex-[2] h-10" onclick={handleAddSecret}>Save Secret</Button>
+                                    </div>
+                                </div>
+                            {:else}
+                                <Button variant="outline" class="w-full h-11 border-dashed border-2 font-medium text-sm" onclick={() => showAddSecret = true}>
+                                    <Plus size={20} class="mr-2" /> Add Secret
+                                </Button>
+                            {/if}
                         </Card>
                     </div>
 

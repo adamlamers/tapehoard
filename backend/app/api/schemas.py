@@ -91,12 +91,14 @@ class CloudCreateSchema(MediaBaseSchema):
     region: str
     bucket_name: str
     access_key_id: str
-    secret_access_key: str
+    # References to secrets in the settings keystore
+    secret_access_key_name: Optional[str] = None
     path_style_access: bool = False
     storage_class: Optional[str] = None
     max_part_size_mb: int = 5000
     obfuscate_filenames: bool = False
-    client_side_encryption_passphrase: Optional[str] = None
+    # Reference to encryption passphrase in the settings keystore
+    encryption_secret_name: Optional[str] = None
 
 
 # Discriminated union type for creating media
@@ -135,12 +137,12 @@ class MediaUpdateSchema(BaseModel):
     region: Optional[str] = None
     bucket_name: Optional[str] = None
     access_key_id: Optional[str] = None
-    secret_access_key: Optional[str] = None
+    secret_access_key_name: Optional[str] = None
     path_style_access: Optional[bool] = None
     storage_class: Optional[str] = None
     max_part_size_mb: Optional[int] = None
     obfuscate_filenames: Optional[bool] = None
-    client_side_encryption_passphrase: Optional[str] = None
+    encryption_secret_name: Optional[str] = None
 
 
 class MediaSchema(BaseModel):
@@ -179,10 +181,12 @@ class MediaSchema(BaseModel):
     region: Optional[str] = None
     bucket_name: Optional[str] = None
     access_key_id: Optional[str] = None
+    secret_access_key_name: Optional[str] = None
     path_style_access: bool = False
     storage_class: Optional[str] = None
     max_part_size_mb: int = 5000
     obfuscate_filenames: bool = False
+    encryption_secret_name: Optional[str] = None
     # Legacy config fallback
     config: Dict[str, Any] = {}
     # Runtime status

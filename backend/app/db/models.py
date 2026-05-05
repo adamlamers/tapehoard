@@ -94,12 +94,22 @@ class StorageMedia(Base):
     region: Mapped[Optional[str]] = mapped_column(String)
     bucket_name: Mapped[Optional[str]] = mapped_column(String)
     access_key_id: Mapped[Optional[str]] = mapped_column(String)
+    # DEPRECATED: raw secret values are no longer stored on media records.
+    # Use secret_access_key_name (reference to settings keystore) instead.
     secret_access_key: Mapped[Optional[str]] = mapped_column(String)
+    secret_access_key_name: Mapped[Optional[str]] = mapped_column(
+        String
+    )  # Reference to settings secrets keystore
     path_style_access: Mapped[bool] = mapped_column(Boolean, default=False)
     storage_class: Mapped[Optional[str]] = mapped_column(String)
     max_part_size_mb: Mapped[int] = mapped_column(Integer, default=5000)
     obfuscate_filenames: Mapped[bool] = mapped_column(Boolean, default=False)
+    # DEPRECATED: raw passphrase values are no longer stored on media records.
+    # Use encryption_secret_name (reference to settings keystore) instead.
     client_side_encryption_passphrase: Mapped[Optional[str]] = mapped_column(String)
+    encryption_secret_name: Mapped[Optional[str]] = mapped_column(
+        String
+    )  # Reference to settings secrets keystore
 
     versions: Mapped[List["FileVersion"]] = relationship(back_populates="media")
 

@@ -1,4 +1,5 @@
 import hashlib
+import json
 import boto3
 import os
 import io
@@ -11,7 +12,28 @@ from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA256
 
-from app.core.config import settings
+
+# Keystore helpers (avoid circular imports)
+def _get_secret(name: str) -> Optional[str]:
+    """Look up a secret value from the settings keystore by name."""
+    if not name:
+        return None
+    try:
+        from app.db.database import SessionLocal
+        from app.db import models
+
+        with SessionLocal() as db_session:
+            record = (
+                db_session.query(models.SystemSetting)
+                .filter(models.SystemSetting.key == "secrets")
+                .first()
+            )
+            if record and record.value:
+                secrets = json.loads(record.value)
+                return secrets.get(name)
+    except Exception:
+        pass
+    return None
 
 
 class CloudStorageProvider(AbstractStorageProvider):
@@ -48,9 +70,10 @@ class CloudStorageProvider(AbstractStorageProvider):
             "type": "string",
             "title": "Access Key ID",
         },
-        "secret_access_key": {
+        "secret_access_key_name": {
             "type": "string",
             "title": "Secret Access Key",
+            "description": "Name of a secret stored in the settings keystore.",
         },
         "path_style_access": {
             "type": "boolean",
@@ -69,10 +92,10 @@ class CloudStorageProvider(AbstractStorageProvider):
             "description": "Multipart upload chunk size.",
             "default": 5000,
         },
-        "encryption_passphrase": {
+        "encryption_secret_name": {
             "type": "string",
-            "title": "Client-Side Encryption Passphrase",
-            "description": "Used to encrypt data locally before uploading via AES-256-GCM.",
+            "title": "Encryption Secret",
+            "description": "Name of a secret in the settings keystore used for client-side encryption.",
         },
         "obfuscate_filenames": {
             "type": "boolean",
@@ -93,14 +116,20 @@ class CloudStorageProvider(AbstractStorageProvider):
         self.endpoint_url = endpoint or None
         self.obfuscate = config.get("obfuscate_filenames", False)
 
-        # Local Encryption Settings: Use provided or global default
+        # Resolve encryption passphrase from keystore (no global fallback)
+        encryption_secret_name = config.get("encryption_secret_name")
         self.passphrase = (
-            config.get("encryption_passphrase") or settings.encryption_passphrase
+            _get_secret(encryption_secret_name) if encryption_secret_name else None
         )
 
-        # Credentials
+        # Resolve credentials from keystore
         access_key = config.get("access_key")
-        secret_key = config.get("secret_key")
+        secret_key_name = config.get("secret_access_key_name")
+        secret_key = (
+            _get_secret(secret_key_name)
+            if secret_key_name
+            else config.get("secret_key")
+        )
 
         client_kwargs = {
             "aws_access_key_id": access_key,

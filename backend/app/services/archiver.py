@@ -153,12 +153,14 @@ class ArchiverService:
                 provider_config.setdefault("bucket_name", media_record.bucket_name)
             if media_record.access_key_id:
                 provider_config.setdefault("access_key", media_record.access_key_id)
-            if media_record.secret_access_key:
-                provider_config.setdefault("secret_key", media_record.secret_access_key)
-            if media_record.client_side_encryption_passphrase:
+            if media_record.secret_access_key_name:
                 provider_config.setdefault(
-                    "encryption_passphrase",
-                    media_record.client_side_encryption_passphrase,
+                    "secret_access_key_name", media_record.secret_access_key_name
+                )
+            if media_record.encryption_secret_name:
+                provider_config.setdefault(
+                    "encryption_secret_name",
+                    media_record.encryption_secret_name,
                 )
             provider_config.setdefault(
                 "obfuscate_filenames", media_record.obfuscate_filenames
