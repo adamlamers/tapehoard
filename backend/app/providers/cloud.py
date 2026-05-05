@@ -24,27 +24,50 @@ class CloudStorageProvider(AbstractStorageProvider):
         "supports_hardware_encryption": True,
     }
     config_schema = {
+        "provider_template": {
+            "type": "string",
+            "title": "Provider Template",
+            "description": "AWS S3, MinIO, Wasabi, Backblaze B2, DigitalOcean Spaces, Custom.",
+            "enum": ["aws", "minio", "wasabi", "backblaze", "digitalocean", "custom"],
+        },
         "endpoint_url": {
             "type": "string",
             "title": "Endpoint URL",
             "description": "e.g., https://s3.us-west-004.backblazeb2.com",
-        },
-        "bucket_name": {
-            "type": "string",
-            "title": "Bucket Name",
         },
         "region": {
             "type": "string",
             "title": "Region",
             "description": "Optional region",
         },
-        "access_key": {
+        "bucket_name": {
+            "type": "string",
+            "title": "Bucket Name",
+        },
+        "access_key_id": {
             "type": "string",
             "title": "Access Key ID",
         },
-        "secret_key": {
+        "secret_access_key": {
             "type": "string",
             "title": "Secret Access Key",
+        },
+        "path_style_access": {
+            "type": "boolean",
+            "title": "Path-Style Access",
+            "description": "Required for MinIO and some self-hosted S3.",
+            "default": False,
+        },
+        "storage_class": {
+            "type": "string",
+            "title": "Storage Class",
+            "description": "Standard, Glacier, Glacier Deep Archive, etc.",
+        },
+        "max_part_size_mb": {
+            "type": "integer",
+            "title": "Max Part Size (MB)",
+            "description": "Multipart upload chunk size.",
+            "default": 5000,
         },
         "encryption_passphrase": {
             "type": "string",
@@ -63,7 +86,11 @@ class CloudStorageProvider(AbstractStorageProvider):
         self.provider_type = config.get("provider", "S3")
         self.bucket_name = config.get("bucket_name")
         self.region = config.get("region", "us-east-1")
-        self.endpoint_url = config.get("endpoint_url")
+        endpoint = config.get("endpoint_url", "")
+        # Normalize endpoint: add https:// if no protocol is present
+        if endpoint and not endpoint.startswith(("http://", "https://")):
+            endpoint = f"https://{endpoint}"
+        self.endpoint_url = endpoint or None
         self.obfuscate = config.get("obfuscate_filenames", False)
 
         # Local Encryption Settings: Use provided or global default
@@ -75,13 +102,15 @@ class CloudStorageProvider(AbstractStorageProvider):
         access_key = config.get("access_key")
         secret_key = config.get("secret_key")
 
-        self.s3 = boto3.client(
-            "s3",
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            region_name=self.region,
-            endpoint_url=self.endpoint_url,
-        )
+        client_kwargs = {
+            "aws_access_key_id": access_key,
+            "aws_secret_access_key": secret_key,
+            "region_name": self.region,
+        }
+        if self.endpoint_url:
+            client_kwargs["endpoint_url"] = self.endpoint_url
+
+        self.s3 = boto3.client("s3", **client_kwargs)
 
     def _derive_key(self, salt: bytes) -> bytes:
         """Derives a 256-bit AES key using PBKDF2-HMAC-SHA256"""

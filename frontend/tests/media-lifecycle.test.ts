@@ -11,11 +11,10 @@ test.describe('Media Lifecycle', () => {
     const registerResp = await requestContext.post(`${API_URL}/inventory/media`, {
       data: {
         identifier: 'TEST_LTO_001',
-        media_type: 'mock_lto',
-        generation_tier: 'LTO-8',
+        media_type: 'lto_tape',
+        generation: 'LTO-8',
         capacity: 12000,
-        location: 'Test Lab',
-        config: {}
+        location: 'Test Lab'
       }
     });
     expect(registerResp.ok()).toBe(true);
@@ -52,16 +51,15 @@ test.describe('Media Lifecycle', () => {
       const registerResp = await requestContext.post(`${API_URL}/inventory/media`, {
         data: {
           identifier: 'TEST_HDD_001',
-          media_type: 'hdd',
-          generation_tier: 'HDD',
+          media_type: 'local_hdd',
           capacity: 1000000,
           location: 'Test Lab',
-          config: { mount_path: hddPath }
+          mount_path: hddPath
         }
       });
       expect(registerResp.ok()).toBe(true);
       const media = await registerResp.json();
-      expect(media.media_type).toBe('hdd');
+      expect(media.media_type).toBe('local_hdd');
 
       console.log('Step 2: Retire media');
       const retireResp = await requestContext.patch(`${API_URL}/inventory/media/${media.id}`, {
@@ -102,10 +100,9 @@ test.describe('Media Lifecycle', () => {
     const registerResp = await requestContext.post(`${API_URL}/inventory/media`, {
       data: {
         identifier: 'TEST_DUP_001',
-        media_type: 'mock_lto',
-        generation_tier: 'LTO-7',
-        capacity: 6000,
-        config: {}
+        media_type: 'lto_tape',
+        generation: 'LTO-7',
+        capacity: 6000
       }
     });
     expect(registerResp.ok()).toBe(true);
@@ -115,10 +112,9 @@ test.describe('Media Lifecycle', () => {
       const dupResp = await requestContext.post(`${API_URL}/inventory/media`, {
         data: {
           identifier: 'TEST_DUP_001',
-          media_type: 'mock_lto',
-          generation_tier: 'LTO-7',
-          capacity: 6000,
-          config: {}
+          media_type: 'lto_tape',
+          generation: 'LTO-7',
+          capacity: 6000
         }
       });
       expect(dupResp.status()).toBe(400);
@@ -133,21 +129,21 @@ test.describe('Media Lifecycle', () => {
     const requestContext = await setupRequestContext();
 
     const activeMedia = await requestContext.post(`${API_URL}/inventory/media`, {
-      data: { identifier: 'CAT_ACTIVE', media_type: 'mock_lto', generation_tier: 'LTO-8', capacity: 12000, config: {} }
+      data: { identifier: 'CAT_ACTIVE', media_type: 'lto_tape', generation: 'LTO-8', capacity: 12000 }
     }).then(r => r.json());
 
     const fullMedia = await requestContext.post(`${API_URL}/inventory/media`, {
-      data: { identifier: 'CAT_FULL', media_type: 'mock_lto', generation_tier: 'LTO-8', capacity: 12000, config: {} }
+      data: { identifier: 'CAT_FULL', media_type: 'lto_tape', generation: 'LTO-8', capacity: 12000 }
     }).then(r => r.json());
     await requestContext.patch(`${API_URL}/inventory/media/${fullMedia.id}`, { data: { status: 'full' } });
 
     const failedMedia = await requestContext.post(`${API_URL}/inventory/media`, {
-      data: { identifier: 'CAT_FAILED', media_type: 'mock_lto', generation_tier: 'LTO-8', capacity: 12000, config: {} }
+      data: { identifier: 'CAT_FAILED', media_type: 'lto_tape', generation: 'LTO-8', capacity: 12000 }
     }).then(r => r.json());
     await requestContext.patch(`${API_URL}/inventory/media/${failedMedia.id}`, { data: { status: 'failed' } });
 
     const retiredMedia = await requestContext.post(`${API_URL}/inventory/media`, {
-      data: { identifier: 'CAT_RETIRED', media_type: 'mock_lto', generation_tier: 'LTO-8', capacity: 12000, config: {} }
+      data: { identifier: 'CAT_RETIRED', media_type: 'lto_tape', generation: 'LTO-8', capacity: 12000 }
     }).then(r => r.json());
     await requestContext.patch(`${API_URL}/inventory/media/${retiredMedia.id}`, { data: { status: 'retired' } });
 

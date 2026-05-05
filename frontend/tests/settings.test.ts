@@ -37,7 +37,7 @@ test.describe('Settings & System', () => {
 
   test('dashboard stats reflect system state', async ({ page }) => {
     const requestContext = await setupRequestContext();
-    configureBackend(requestContext);
+    await configureBackend(requestContext);
 
     const statsResp = await requestContext.get(`${API_URL}/system/dashboard/stats`);
     expect(statsResp.ok()).toBe(true);
@@ -69,7 +69,7 @@ test.describe('Settings & System', () => {
 
   test('tree endpoint returns source roots', async ({ page }) => {
     const requestContext = await setupRequestContext();
-    configureBackend(requestContext);
+    await configureBackend(requestContext);
 
     const treeResp = await requestContext.get(`${API_URL}/system/tree`);
     expect(treeResp.ok()).toBe(true);

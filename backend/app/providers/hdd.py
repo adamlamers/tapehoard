@@ -27,6 +27,40 @@ class OfflineHDDProvider(AbstractStorageProvider):
             "title": "Device UUID",
             "description": "Optional UUID to verify the correct drive is mounted.",
         },
+        "drive_model": {
+            "type": "string",
+            "title": "Drive Model",
+            "description": "e.g., Samsung T7 Shield, WD My Passport.",
+        },
+        "is_ssd": {
+            "type": "boolean",
+            "title": "Is SSD",
+            "description": "Check if this is a solid-state drive.",
+            "default": False,
+        },
+        "filesystem_type": {
+            "type": "string",
+            "title": "Filesystem Type",
+            "description": "ext4, NTFS, APFS, exFAT, etc.",
+            "enum": ["ext4", "NTFS", "APFS", "exFAT"],
+        },
+        "connection_interface": {
+            "type": "string",
+            "title": "Connection Interface",
+            "description": "USB-A, USB-C, Thunderbolt, SATA, NVMe.",
+            "enum": ["USB-A", "USB-C", "Thunderbolt", "SATA", "NVMe"],
+        },
+        "encrypted": {
+            "type": "boolean",
+            "title": "Drive Encrypted",
+            "description": "Drive-level encryption (BitLocker, LUKS, FileVault).",
+            "default": False,
+        },
+        "encryption_key_id": {
+            "type": "string",
+            "title": "Encryption Key ID",
+            "description": "Reference to key in system keystore.",
+        },
     }
 
     def __init__(self, config: Dict[str, Any]):

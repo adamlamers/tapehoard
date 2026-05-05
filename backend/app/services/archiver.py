@@ -106,6 +106,11 @@ class ArchiverService:
         if os.environ.get("TAPEHOARD_TEST_MODE") == "true":
             from app.providers.mock import MockLTOProvider
 
+            # In test mode, replace LTOProvider with MockLTOProvider
+            provider_map[LTOProvider.provider_id] = (
+                MockLTOProvider  # ty: ignore[invalid-assignment]
+            )
+            # Also keep mock_lto mapping for backward compatibility
             provider_map[MockLTOProvider.provider_id] = (
                 MockLTOProvider  # ty: ignore[invalid-assignment]
             )
@@ -114,6 +119,7 @@ class ArchiverService:
         if not provider_cls:
             return None
 
+        # Build provider config from extra_config (legacy) and first-class columns
         provider_config: Dict[str, Any] = {}
         if media_record.extra_config:
             try:
@@ -123,10 +129,40 @@ class ArchiverService:
                     f"Failed to decode config for media {media_record.identifier}"
                 )
 
-        # Standards fallback for legacy config keys
-        if provider_cls == OfflineHDDProvider and "mount_path" not in provider_config:
-            # Older DBs might have used mount_base in some contexts, though hdd used mount_path in code
-            pass
+        # Add first-class columns to config based on media type
+        if media_record.media_type == "lto_tape":
+            if media_record.compression is not None:
+                provider_config.setdefault("compression", media_record.compression)
+            if media_record.encryption_key_id:
+                provider_config.setdefault(
+                    "encryption_key", media_record.encryption_key_id
+                )
+            if media_record.generation:
+                provider_config.setdefault("generation", media_record.generation)
+        elif media_record.media_type == "local_hdd":
+            if media_record.mount_path:
+                provider_config.setdefault("mount_path", media_record.mount_path)
+            if media_record.device_uuid:
+                provider_config.setdefault("device_uuid", media_record.device_uuid)
+        elif media_record.media_type == "s3_compat":
+            if media_record.endpoint_url:
+                provider_config.setdefault("endpoint_url", media_record.endpoint_url)
+            if media_record.region:
+                provider_config.setdefault("region", media_record.region)
+            if media_record.bucket_name:
+                provider_config.setdefault("bucket_name", media_record.bucket_name)
+            if media_record.access_key_id:
+                provider_config.setdefault("access_key", media_record.access_key_id)
+            if media_record.secret_access_key:
+                provider_config.setdefault("secret_key", media_record.secret_access_key)
+            if media_record.client_side_encryption_passphrase:
+                provider_config.setdefault(
+                    "encryption_passphrase",
+                    media_record.client_side_encryption_passphrase,
+                )
+            provider_config.setdefault(
+                "obfuscate_filenames", media_record.obfuscate_filenames
+            )
 
         return provider_cls(config=provider_config)
 

@@ -102,19 +102,19 @@ test.describe('TapeHoard Golden Path', () => {
     // Tape media is registered via API (discovery-only flow — no UI form for tape)
     const registerResp = await request.post(`${API_URL}/inventory/media`, {
         data: {
-            media_type: 'mock_lto',
+            media_type: "lto_tape",
             identifier: 'TAPE001',
-            generation_tier: 'LTO-6',
+            generation: 'LTO-6',
             capacity: 100 * 1024 * 1024 * 1024,
-            location: 'Test Shelf',
-            config: { device_path: MOCK_LTO_PATH }
+            location: 'Test Shelf'
         }
     });
     expect(registerResp.ok()).toBe(true);
 
     await page.goto('/inventory');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByText('TAPE001')).toBeVisible({ timeout: 10000 });
+    // Use first() to handle multiple matches (e.g., in both Active and Discovered sections)
+    await expect(page.getByText('TAPE001').first()).toBeVisible({ timeout: 10000 });
 
     console.log('Step 4: Initialization');
     page.on('dialog', dialog => {
@@ -125,7 +125,8 @@ test.describe('TapeHoard Golden Path', () => {
     await expect(page.getByText(/initialized successfully/i)).toBeVisible({ timeout: 10000 });
 
     console.log('Step 5: Archival');
-    await expect(page.getByText('TAPE001', { exact: true })).toBeVisible();
+    const tapeLocator = page.getByText('TAPE001', { exact: true });
+    await expect(tapeLocator.first()).toBeVisible();
     await page.getByRole('button', { name: /Auto archive/i }).click();
     await expect(page.getByText(/Archival job initiated/i)).toBeVisible();
 
@@ -143,7 +144,9 @@ test.describe('TapeHoard Golden Path', () => {
     await page.getByRole('button', { name: SOURCE_ROOT }).first().dblclick();
     await page.getByText('subfolder').first().dblclick();
     await expect(page.getByText('test_file_2.txt')).toBeVisible();
-    await expect(page.getByText('TAPE001')).toBeVisible();
+    // Use first() to handle multiple matches
+    const tapeLocator2 = page.getByText('TAPE001');
+    await expect(tapeLocator2.first()).toBeVisible();
 
     console.log('Step 8: Data Recovery');
     const fileRow = page.locator('div[role="button"]', { hasText: 'test_file_2.txt' });

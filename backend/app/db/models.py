@@ -42,16 +42,21 @@ class StorageMedia(Base):
     __tablename__ = "storage_media"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    media_type: Mapped[str] = mapped_column(String)  # tape, hdd, cloud
+    media_type: Mapped[str] = mapped_column(String)  # lto_tape, local_hdd, s3_compat
     identifier: Mapped[str] = mapped_column(
         String, unique=True, index=True
     )  # barcode, UUID, bucket
     generation_tier: Mapped[Optional[str]] = mapped_column(
         String
-    )  # e.g., LTO-6, S3 Standard
+    )  # e.g., LTO-6, S3 Standard (kept for backward compat)
     capacity: Mapped[int] = mapped_column(BigInteger)  # Native capacity in bytes
     bytes_used: Mapped[int] = mapped_column(BigInteger, default=0)
-    location: Mapped[Optional[str]] = mapped_column(String)
+    # Structured location fields
+    location: Mapped[Optional[str]] = mapped_column(String)  # Kept as display fallback
+    location_building: Mapped[Optional[str]] = mapped_column(String)
+    location_room: Mapped[Optional[str]] = mapped_column(String)
+    location_rack: Mapped[Optional[str]] = mapped_column(String)
+    location_slot: Mapped[Optional[str]] = mapped_column(String)
     status: Mapped[str] = mapped_column(
         String, default="active"
     )  # active, full, retired, offline
@@ -63,6 +68,38 @@ class StorageMedia(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
+
+    # Type-specific fields for LTO Tape
+    generation: Mapped[Optional[str]] = mapped_column(String)  # LTO-6, LTO-7, etc.
+    worm: Mapped[bool] = mapped_column(Boolean, default=False)
+    write_protected: Mapped[bool] = mapped_column(Boolean, default=False)
+    compression: Mapped[bool] = mapped_column(Boolean, default=True)
+    encryption_key_id: Mapped[Optional[str]] = mapped_column(String)
+    cleaning_cartridge: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Type-specific fields for Offline HDD
+    drive_model: Mapped[Optional[str]] = mapped_column(String)
+    device_uuid: Mapped[Optional[str]] = mapped_column(String)
+    is_ssd: Mapped[bool] = mapped_column(Boolean, default=False)
+    mount_path: Mapped[Optional[str]] = mapped_column(String)
+    filesystem_type: Mapped[Optional[str]] = mapped_column(String)
+    connection_interface: Mapped[Optional[str]] = mapped_column(String)
+    encrypted: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Type-specific fields for S3-Compatible Cloud
+    provider_template: Mapped[Optional[str]] = mapped_column(
+        String
+    )  # aws, minio, wasabi, etc.
+    endpoint_url: Mapped[Optional[str]] = mapped_column(String)
+    region: Mapped[Optional[str]] = mapped_column(String)
+    bucket_name: Mapped[Optional[str]] = mapped_column(String)
+    access_key_id: Mapped[Optional[str]] = mapped_column(String)
+    secret_access_key: Mapped[Optional[str]] = mapped_column(String)
+    path_style_access: Mapped[bool] = mapped_column(Boolean, default=False)
+    storage_class: Mapped[Optional[str]] = mapped_column(String)
+    max_part_size_mb: Mapped[int] = mapped_column(Integer, default=5000)
+    obfuscate_filenames: Mapped[bool] = mapped_column(Boolean, default=False)
+    client_side_encryption_passphrase: Mapped[Optional[str]] = mapped_column(String)
 
     versions: Mapped[List["FileVersion"]] = relationship(back_populates="media")
 

@@ -19,10 +19,9 @@ test.describe('Backup & Restore', () => {
     const registerResp = await requestContext.post(`${API_URL}/inventory/media`, {
       data: {
         identifier: 'SPECIFIC_TAPE_001',
-        media_type: 'mock_lto',
-        generation_tier: 'LTO-7',
-        capacity: 6000,
-        config: {}
+        media_type: "lto_tape",
+        generation: 'LTO-7',
+        capacity: 6000
       }
     });
     const media = await registerResp.json();
@@ -61,10 +60,9 @@ test.describe('Backup & Restore', () => {
     const registerResp = await requestContext.post(`${API_URL}/inventory/media`, {
       data: {
         identifier: 'RESTORE_TAPE_001',
-        media_type: 'mock_lto',
-        generation_tier: 'LTO-8',
-        capacity: 12000,
-        config: {}
+        media_type: "lto_tape",
+        generation: 'LTO-8',
+        capacity: 12000
       }
     });
     const media = await registerResp.json();
@@ -116,10 +114,9 @@ test.describe('Backup & Restore', () => {
     const registerResp = await requestContext.post(`${API_URL}/inventory/media`, {
       data: {
         identifier: 'DELETE_TAPE_001',
-        media_type: 'mock_lto',
-        generation_tier: 'LTO-8',
-        capacity: 12000,
-        config: {}
+        media_type: "lto_tape",
+        generation: 'LTO-8',
+        capacity: 12000
       }
     });
     const media = await registerResp.json();
@@ -165,10 +162,9 @@ test.describe('Backup & Restore', () => {
     const registerResp = await requestContext.post(`${API_URL}/inventory/media`, {
       data: {
         identifier: 'MANIFEST_TAPE_001',
-        media_type: 'mock_lto',
-        generation_tier: 'LTO-8',
-        capacity: 12000,
-        config: {}
+        media_type: "lto_tape",
+        generation: 'LTO-8',
+        capacity: 12000
       }
     });
     const media = await registerResp.json();

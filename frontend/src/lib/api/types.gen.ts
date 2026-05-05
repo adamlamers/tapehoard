@@ -161,6 +161,90 @@ export type CartTreeNodeSchema = {
 };
 
 /**
+ * CloudCreateSchema
+ *
+ * Schema for creating S3-Compatible Cloud media.
+ */
+export type CloudCreateSchema = {
+    /**
+     * Identifier
+     */
+    identifier: string;
+    /**
+     * Media Type
+     */
+    media_type?: 's3_compat';
+    /**
+     * Capacity
+     */
+    capacity: number;
+    /**
+     * Location
+     */
+    location?: string | null;
+    /**
+     * Location Building
+     */
+    location_building?: string | null;
+    /**
+     * Location Room
+     */
+    location_room?: string | null;
+    /**
+     * Location Rack
+     */
+    location_rack?: string | null;
+    /**
+     * Location Slot
+     */
+    location_slot?: string | null;
+    /**
+     * Provider Template
+     */
+    provider_template: string;
+    /**
+     * Endpoint Url
+     */
+    endpoint_url: string;
+    /**
+     * Region
+     */
+    region: string;
+    /**
+     * Bucket Name
+     */
+    bucket_name: string;
+    /**
+     * Access Key Id
+     */
+    access_key_id: string;
+    /**
+     * Secret Access Key
+     */
+    secret_access_key: string;
+    /**
+     * Path Style Access
+     */
+    path_style_access?: boolean;
+    /**
+     * Storage Class
+     */
+    storage_class?: string | null;
+    /**
+     * Max Part Size Mb
+     */
+    max_part_size_mb?: number;
+    /**
+     * Obfuscate Filenames
+     */
+    obfuscate_filenames?: boolean;
+    /**
+     * Client Side Encryption Passphrase
+     */
+    client_side_encryption_passphrase?: string | null;
+};
+
+/**
  * DashboardStatsSchema
  */
 export type DashboardStatsSchema = {
@@ -397,6 +481,70 @@ export type JobLogSchema = {
 };
 
 /**
+ * LtoTapeCreateSchema
+ *
+ * Schema for creating LTO Tape media.
+ */
+export type LtoTapeCreateSchema = {
+    /**
+     * Identifier
+     */
+    identifier: string;
+    /**
+     * Media Type
+     */
+    media_type?: 'lto_tape';
+    /**
+     * Capacity
+     */
+    capacity: number;
+    /**
+     * Location
+     */
+    location?: string | null;
+    /**
+     * Location Building
+     */
+    location_building?: string | null;
+    /**
+     * Location Room
+     */
+    location_room?: string | null;
+    /**
+     * Location Rack
+     */
+    location_rack?: string | null;
+    /**
+     * Location Slot
+     */
+    location_slot?: string | null;
+    /**
+     * Generation
+     */
+    generation: string;
+    /**
+     * Worm
+     */
+    worm?: boolean;
+    /**
+     * Write Protected
+     */
+    write_protected?: boolean;
+    /**
+     * Compression
+     */
+    compression?: boolean;
+    /**
+     * Encryption Key Id
+     */
+    encryption_key_id?: string | null;
+    /**
+     * Cleaning Cartridge
+     */
+    cleaning_cartridge?: boolean;
+};
+
+/**
  * ManifestMediaSchema
  */
 export type ManifestMediaSchema = {
@@ -416,38 +564,6 @@ export type ManifestMediaSchema = {
      * Total Size
      */
     total_size: number;
-};
-
-/**
- * MediaCreateSchema
- */
-export type MediaCreateSchema = {
-    /**
-     * Identifier
-     */
-    identifier: string;
-    /**
-     * Media Type
-     */
-    media_type: string;
-    /**
-     * Generation Tier
-     */
-    generation_tier?: string | null;
-    /**
-     * Capacity
-     */
-    capacity: number;
-    /**
-     * Location
-     */
-    location?: string | null;
-    /**
-     * Config
-     */
-    config?: {
-        [key: string]: unknown;
-    };
 };
 
 /**
@@ -487,6 +603,22 @@ export type MediaSchema = {
      */
     location?: string | null;
     /**
+     * Location Building
+     */
+    location_building?: string | null;
+    /**
+     * Location Room
+     */
+    location_room?: string | null;
+    /**
+     * Location Rack
+     */
+    location_rack?: string | null;
+    /**
+     * Location Slot
+     */
+    location_slot?: string | null;
+    /**
      * Last Seen
      */
     last_seen?: string | null;
@@ -495,9 +627,97 @@ export type MediaSchema = {
      */
     created_at: string;
     /**
+     * Generation
+     */
+    generation?: string | null;
+    /**
+     * Worm
+     */
+    worm?: boolean;
+    /**
+     * Write Protected
+     */
+    write_protected?: boolean;
+    /**
+     * Compression
+     */
+    compression?: boolean;
+    /**
+     * Encryption Key Id
+     */
+    encryption_key_id?: string | null;
+    /**
+     * Cleaning Cartridge
+     */
+    cleaning_cartridge?: boolean;
+    /**
+     * Drive Model
+     */
+    drive_model?: string | null;
+    /**
+     * Device Uuid
+     */
+    device_uuid?: string | null;
+    /**
+     * Is Ssd
+     */
+    is_ssd?: boolean;
+    /**
+     * Mount Path
+     */
+    mount_path?: string | null;
+    /**
+     * Filesystem Type
+     */
+    filesystem_type?: string | null;
+    /**
+     * Connection Interface
+     */
+    connection_interface?: string | null;
+    /**
+     * Encrypted
+     */
+    encrypted?: boolean;
+    /**
+     * Provider Template
+     */
+    provider_template?: string | null;
+    /**
+     * Endpoint Url
+     */
+    endpoint_url?: string | null;
+    /**
+     * Region
+     */
+    region?: string | null;
+    /**
+     * Bucket Name
+     */
+    bucket_name?: string | null;
+    /**
+     * Access Key Id
+     */
+    access_key_id?: string | null;
+    /**
+     * Path Style Access
+     */
+    path_style_access?: boolean;
+    /**
+     * Storage Class
+     */
+    storage_class?: string | null;
+    /**
+     * Max Part Size Mb
+     */
+    max_part_size_mb?: number;
+    /**
+     * Obfuscate Filenames
+     */
+    obfuscate_filenames?: boolean;
+    /**
      * Config
      */
-    config: {
+    config?: {
         [key: string]: unknown;
     };
     /**
@@ -534,6 +754,8 @@ export type MediaSchema = {
 
 /**
  * MediaUpdateSchema
+ *
+ * Schema for updating media - all fields optional.
  */
 export type MediaUpdateSchema = {
     /**
@@ -545,15 +767,193 @@ export type MediaUpdateSchema = {
      */
     location?: string | null;
     /**
+     * Location Building
+     */
+    location_building?: string | null;
+    /**
+     * Location Room
+     */
+    location_room?: string | null;
+    /**
+     * Location Rack
+     */
+    location_rack?: string | null;
+    /**
+     * Location Slot
+     */
+    location_slot?: string | null;
+    /**
      * Capacity
      */
     capacity?: number | null;
     /**
-     * Config
+     * Generation
      */
-    config?: {
-        [key: string]: unknown;
-    } | null;
+    generation?: string | null;
+    /**
+     * Worm
+     */
+    worm?: boolean | null;
+    /**
+     * Write Protected
+     */
+    write_protected?: boolean | null;
+    /**
+     * Compression
+     */
+    compression?: boolean | null;
+    /**
+     * Encryption Key Id
+     */
+    encryption_key_id?: string | null;
+    /**
+     * Cleaning Cartridge
+     */
+    cleaning_cartridge?: boolean | null;
+    /**
+     * Drive Model
+     */
+    drive_model?: string | null;
+    /**
+     * Device Uuid
+     */
+    device_uuid?: string | null;
+    /**
+     * Is Ssd
+     */
+    is_ssd?: boolean | null;
+    /**
+     * Mount Path
+     */
+    mount_path?: string | null;
+    /**
+     * Filesystem Type
+     */
+    filesystem_type?: string | null;
+    /**
+     * Connection Interface
+     */
+    connection_interface?: string | null;
+    /**
+     * Encrypted
+     */
+    encrypted?: boolean | null;
+    /**
+     * Provider Template
+     */
+    provider_template?: string | null;
+    /**
+     * Endpoint Url
+     */
+    endpoint_url?: string | null;
+    /**
+     * Region
+     */
+    region?: string | null;
+    /**
+     * Bucket Name
+     */
+    bucket_name?: string | null;
+    /**
+     * Access Key Id
+     */
+    access_key_id?: string | null;
+    /**
+     * Secret Access Key
+     */
+    secret_access_key?: string | null;
+    /**
+     * Path Style Access
+     */
+    path_style_access?: boolean | null;
+    /**
+     * Storage Class
+     */
+    storage_class?: string | null;
+    /**
+     * Max Part Size Mb
+     */
+    max_part_size_mb?: number | null;
+    /**
+     * Obfuscate Filenames
+     */
+    obfuscate_filenames?: boolean | null;
+    /**
+     * Client Side Encryption Passphrase
+     */
+    client_side_encryption_passphrase?: string | null;
+};
+
+/**
+ * OfflineHddCreateSchema
+ *
+ * Schema for creating Offline HDD media.
+ */
+export type OfflineHddCreateSchema = {
+    /**
+     * Identifier
+     */
+    identifier: string;
+    /**
+     * Media Type
+     */
+    media_type?: 'local_hdd';
+    /**
+     * Capacity
+     */
+    capacity: number;
+    /**
+     * Location
+     */
+    location?: string | null;
+    /**
+     * Location Building
+     */
+    location_building?: string | null;
+    /**
+     * Location Room
+     */
+    location_room?: string | null;
+    /**
+     * Location Rack
+     */
+    location_rack?: string | null;
+    /**
+     * Location Slot
+     */
+    location_slot?: string | null;
+    /**
+     * Drive Model
+     */
+    drive_model?: string | null;
+    /**
+     * Device Uuid
+     */
+    device_uuid?: string | null;
+    /**
+     * Is Ssd
+     */
+    is_ssd?: boolean;
+    /**
+     * Mount Path
+     */
+    mount_path?: string | null;
+    /**
+     * Filesystem Type
+     */
+    filesystem_type?: string | null;
+    /**
+     * Connection Interface
+     */
+    connection_interface?: string | null;
+    /**
+     * Encrypted
+     */
+    encrypted?: boolean;
+    /**
+     * Encryption Key Id
+     */
+    encryption_key_id?: string | null;
 };
 
 /**
@@ -1821,7 +2221,10 @@ export type ListMediaResponses = {
 export type ListMediaResponse = ListMediaResponses[keyof ListMediaResponses];
 
 export type CreateMediaData = {
-    body: MediaCreateSchema;
+    /**
+     * Request Data
+     */
+    body: LtoTapeCreateSchema | OfflineHddCreateSchema | CloudCreateSchema;
     path?: never;
     query?: never;
     url: '/inventory/media';

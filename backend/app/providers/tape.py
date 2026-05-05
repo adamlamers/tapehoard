@@ -24,10 +24,34 @@ class LTOProvider(AbstractStorageProvider):
             "description": "Enable LTO hardware-level compression (default: True).",
             "default": True,
         },
-        "encryption_key": {
+        "encryption_key_id": {
             "type": "string",
-            "title": "Hardware Encryption Key",
-            "description": "Optional 256-bit hex key for LTO hardware encryption.",
+            "title": "Encryption Key ID",
+            "description": "Reference to a key stored in the system keystore.",
+        },
+        "generation": {
+            "type": "string",
+            "title": "LTO Generation",
+            "description": "Tape generation (LTO-5, LTO-6, LTO-7, LTO-8, LTO-9).",
+            "enum": ["LTO-5", "LTO-6", "LTO-7", "LTO-8", "LTO-9"],
+        },
+        "worm": {
+            "type": "boolean",
+            "title": "WORM (Write Once Read Many)",
+            "description": "Mark tape as Write Once Read Many.",
+            "default": False,
+        },
+        "write_protected": {
+            "type": "boolean",
+            "title": "Write Protected",
+            "description": "Physical write-protect switch status.",
+            "default": False,
+        },
+        "cleaning_cartridge": {
+            "type": "boolean",
+            "title": "Cleaning Cartridge",
+            "description": "Mark if this is a cleaning tape.",
+            "default": False,
         },
     }
 

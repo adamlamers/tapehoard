@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Dict, Any
 
 import psutil
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.archive import get_source_roots
+from app.api import schemas
 from app.api.schemas import (
     MediaCreateSchema,
     MediaSchema,
@@ -29,6 +30,49 @@ class ReorderMediaRequest(BaseModel):
 
 
 # --- Core Logic ---
+
+
+def _media_to_schema(media: models.StorageMedia, config: Dict[str, Any]) -> MediaSchema:
+    """Convert a StorageMedia model to MediaSchema."""
+    return MediaSchema(
+        id=media.id,
+        identifier=media.identifier,
+        media_type=media.media_type,
+        generation_tier=media.generation_tier,
+        capacity=media.capacity,
+        bytes_used=media.bytes_used,
+        status=media.status,
+        location=media.location,
+        location_building=media.location_building,
+        location_room=media.location_room,
+        location_rack=media.location_rack,
+        location_slot=media.location_slot,
+        last_seen=media.last_seen,
+        created_at=media.created_at,
+        generation=media.generation,
+        worm=media.worm,
+        write_protected=media.write_protected,
+        compression=media.compression,
+        encryption_key_id=media.encryption_key_id,
+        cleaning_cartridge=media.cleaning_cartridge,
+        drive_model=media.drive_model,
+        device_uuid=media.device_uuid,
+        is_ssd=media.is_ssd,
+        mount_path=media.mount_path,
+        filesystem_type=media.filesystem_type,
+        connection_interface=media.connection_interface,
+        encrypted=media.encrypted,
+        provider_template=media.provider_template,
+        endpoint_url=media.endpoint_url,
+        region=media.region,
+        bucket_name=media.bucket_name,
+        access_key_id=media.access_key_id,
+        path_style_access=media.path_style_access,
+        storage_class=media.storage_class,
+        max_part_size_mb=media.max_part_size_mb,
+        obfuscate_filenames=media.obfuscate_filenames,
+        config=config,
+    )
 
 
 @router.get(
@@ -123,28 +167,15 @@ def list_media(refresh: bool = False, db_session: Session = Depends(get_db)):
             except Exception:
                 pass
 
-        results.append(
-            MediaSchema(
-                id=media.id,
-                identifier=media.identifier,
-                media_type=media.media_type,
-                generation_tier=media.generation_tier,
-                capacity=media.capacity,
-                bytes_used=media.bytes_used,
-                status=media.status,
-                location=media.location,
-                last_seen=media.last_seen,
-                created_at=media.created_at,
-                config=final_config,
-                is_online=is_online,
-                is_identified=hardware_identified,
-                needs_registration=needs_registration,
-                priority_index=media.priority_index,
-                host_free_bytes=host_free_bytes,
-                host_total_bytes=host_total_bytes,
-                live_info=live_info,
-            )
-        )
+        schema = _media_to_schema(media, final_config)
+        schema.is_online = is_online
+        schema.is_identified = hardware_identified
+        schema.needs_registration = needs_registration
+        schema.priority_index = media.priority_index
+        schema.host_free_bytes = host_free_bytes
+        schema.host_total_bytes = host_total_bytes
+        schema.live_info = live_info
+        results.append(schema)
     return results
 
 
@@ -175,30 +206,59 @@ def create_media(
     if existing_record:
         raise HTTPException(status_code=400, detail="Media identifier already exists.")
 
+    # Build base media record
     new_media = models.StorageMedia(
         identifier=request_data.identifier,
         media_type=request_data.media_type,
-        generation_tier=request_data.generation_tier,
         capacity=request_data.capacity,
         location=request_data.location,
-        extra_config=json.dumps(request_data.config),
+        location_building=request_data.location_building,
+        location_room=request_data.location_room,
+        location_rack=request_data.location_rack,
+        location_slot=request_data.location_slot,
     )
+
+    # Type-specific fields
+    if request_data.media_type == "lto_tape":
+        assert isinstance(request_data, schemas.LtoTapeCreateSchema)
+        new_media.generation = request_data.generation
+        new_media.generation_tier = request_data.generation
+        new_media.worm = request_data.worm
+        new_media.write_protected = request_data.write_protected
+        new_media.compression = request_data.compression
+        new_media.encryption_key_id = request_data.encryption_key_id
+        new_media.cleaning_cartridge = request_data.cleaning_cartridge
+    elif request_data.media_type == "local_hdd":
+        assert isinstance(request_data, schemas.OfflineHddCreateSchema)
+        new_media.drive_model = request_data.drive_model
+        new_media.device_uuid = request_data.device_uuid
+        new_media.is_ssd = request_data.is_ssd
+        new_media.mount_path = request_data.mount_path
+        new_media.filesystem_type = request_data.filesystem_type
+        new_media.connection_interface = request_data.connection_interface
+        new_media.encrypted = request_data.encrypted
+        new_media.encryption_key_id = request_data.encryption_key_id
+    elif request_data.media_type == "s3_compat":
+        assert isinstance(request_data, schemas.CloudCreateSchema)
+        new_media.provider_template = request_data.provider_template
+        new_media.endpoint_url = request_data.endpoint_url
+        new_media.region = request_data.region
+        new_media.bucket_name = request_data.bucket_name
+        new_media.access_key_id = request_data.access_key_id
+        new_media.secret_access_key = request_data.secret_access_key
+        new_media.path_style_access = request_data.path_style_access
+        new_media.storage_class = request_data.storage_class
+        new_media.max_part_size_mb = request_data.max_part_size_mb
+        new_media.obfuscate_filenames = request_data.obfuscate_filenames
+        new_media.client_side_encryption_passphrase = (
+            request_data.client_side_encryption_passphrase
+        )
+
     db_session.add(new_media)
     db_session.commit()
     db_session.refresh(new_media)
 
-    return MediaSchema(
-        id=new_media.id,
-        identifier=new_media.identifier,
-        media_type=new_media.media_type,
-        generation_tier=new_media.generation_tier,
-        capacity=new_media.capacity,
-        bytes_used=new_media.bytes_used,
-        created_at=new_media.created_at,
-        location=new_media.location,
-        status=new_media.status,
-        config=request_data.config,
-    )
+    return _media_to_schema(new_media, {})
 
 
 @router.patch(
@@ -224,16 +284,107 @@ def update_media(
 
     if request_data.location is not None:
         media_record.location = request_data.location
+    if request_data.location_building is not None:
+        media_record.location_building = request_data.location_building
+    if request_data.location_room is not None:
+        media_record.location_room = request_data.location_room
+    if request_data.location_rack is not None:
+        media_record.location_rack = request_data.location_rack
+    if request_data.location_slot is not None:
+        media_record.location_slot = request_data.location_slot
 
-    if request_data.capacity:
+    if request_data.capacity is not None:
+        if request_data.capacity < media_record.bytes_used:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Capacity cannot be less than utilized space ({media_record.bytes_used} bytes).",
+            )
         media_record.capacity = request_data.capacity
+        # If media was marked as full but now has free space, reactivate it
+        if (
+            media_record.status == "full"
+            and media_record.bytes_used / media_record.capacity < 0.98
+        ):
+            media_record.status = "active"
 
-    if request_data.config:
-        current_config = (
-            json.loads(media_record.extra_config) if media_record.extra_config else {}
+    # LTO fields
+    if request_data.generation is not None:
+        media_record.generation = request_data.generation
+        media_record.generation_tier = request_data.generation
+    if request_data.worm is not None:
+        media_record.worm = request_data.worm
+    if request_data.write_protected is not None:
+        media_record.write_protected = request_data.write_protected
+    if request_data.compression is not None:
+        media_record.compression = request_data.compression
+    if request_data.encryption_key_id is not None:
+        media_record.encryption_key_id = request_data.encryption_key_id
+    if request_data.cleaning_cartridge is not None:
+        media_record.cleaning_cartridge = request_data.cleaning_cartridge
+
+    # HDD fields
+    if request_data.drive_model is not None:
+        media_record.drive_model = request_data.drive_model
+    if request_data.device_uuid is not None:
+        media_record.device_uuid = request_data.device_uuid
+    if request_data.is_ssd is not None:
+        media_record.is_ssd = request_data.is_ssd
+    if request_data.mount_path is not None:
+        media_record.mount_path = request_data.mount_path
+    if request_data.filesystem_type is not None:
+        media_record.filesystem_type = request_data.filesystem_type
+    if request_data.connection_interface is not None:
+        media_record.connection_interface = request_data.connection_interface
+    if request_data.encrypted is not None:
+        media_record.encrypted = request_data.encrypted
+
+    # Cloud fields
+    if request_data.provider_template is not None:
+        media_record.provider_template = request_data.provider_template
+    if request_data.endpoint_url is not None:
+        media_record.endpoint_url = request_data.endpoint_url
+    if request_data.region is not None:
+        media_record.region = request_data.region
+    if request_data.bucket_name is not None:
+        media_record.bucket_name = request_data.bucket_name
+    if request_data.access_key_id is not None:
+        media_record.access_key_id = request_data.access_key_id
+    if request_data.secret_access_key is not None:
+        media_record.secret_access_key = request_data.secret_access_key
+    if request_data.path_style_access is not None:
+        media_record.path_style_access = request_data.path_style_access
+    if request_data.storage_class is not None:
+        media_record.storage_class = request_data.storage_class
+    if request_data.max_part_size_mb is not None:
+        media_record.max_part_size_mb = request_data.max_part_size_mb
+    if request_data.obfuscate_filenames is not None:
+        media_record.obfuscate_filenames = request_data.obfuscate_filenames
+    if request_data.client_side_encryption_passphrase is not None:
+        media_record.client_side_encryption_passphrase = (
+            request_data.client_side_encryption_passphrase
         )
-        current_config.update(request_data.config)
-        media_record.extra_config = json.dumps(current_config)
+
+    # Handle legacy extra_config for backward compatibility
+    if media_record.extra_config:
+        try:
+            current_config = json.loads(media_record.extra_config)
+            # Migrate any legacy keys to first-class columns if not already set
+            if "device_path" in current_config and not media_record.mount_path:
+                media_record.mount_path = current_config["device_path"]
+            if (
+                "encryption_key" in current_config
+                and not media_record.encryption_key_id
+            ):
+                media_record.encryption_key_id = current_config["encryption_key"]
+            if (
+                "encryption_passphrase" in current_config
+                and not media_record.client_side_encryption_passphrase
+            ):
+                media_record.client_side_encryption_passphrase = current_config[
+                    "encryption_passphrase"
+                ]
+        except Exception:
+            pass
 
     db_session.commit()
     db_session.refresh(media_record)
@@ -245,17 +396,7 @@ def update_media(
         except Exception:
             pass
 
-    return MediaSchema(
-        id=media_record.id,
-        identifier=media_record.identifier,
-        media_type=media_record.media_type,
-        capacity=media_record.capacity,
-        bytes_used=media_record.bytes_used,
-        created_at=media_record.created_at,
-        location=media_record.location,
-        status=media_record.status,
-        config=final_config,
-    )
+    return _media_to_schema(media_record, final_config)
 
 
 @router.delete("/media/{media_id}", operation_id="delete_media")
@@ -301,15 +442,19 @@ def initialize_media(
     try:
         if storage_provider.initialize_media(media_record.identifier):
             # Persist auto-generated device_path to DB so archiver finds the same dir
-            current_config = (
-                json.loads(media_record.extra_config)
-                if media_record.extra_config
-                else {}
-            )
-            if "device_path" not in current_config:
-                current_config["device_path"] = storage_provider.device_path
-                media_record.extra_config = json.dumps(current_config)
-                db_session.commit()
+            if media_record.media_type == "s3_compat":
+                # Cloud providers don't have device_path
+                pass
+            else:
+                current_config = (
+                    json.loads(media_record.extra_config)
+                    if media_record.extra_config
+                    else {}
+                )
+                if "device_path" not in current_config:
+                    current_config["device_path"] = storage_provider.device_path
+                    media_record.extra_config = json.dumps(current_config)
+                    db_session.commit()
             return {"message": "Hardware initialization complete."}
     except PermissionError as pe:
         raise HTTPException(status_code=403, detail=str(pe))

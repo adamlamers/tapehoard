@@ -13,12 +13,11 @@ def test_list_media_empty(client):
 def test_register_media(client):
     """Tests registering a new storage medium."""
     media_data = {
-        "media_type": "hdd",
+        "media_type": "local_hdd",
         "identifier": "DISK_001",
-        "generation_tier": "SATA",
         "capacity": 1000000000,
         "location": "Safe A",
-        "config": {"mount_path": "/mnt/test"},
+        "mount_path": "/mnt/test",
     }
     response = client.post("/inventory/media", json=media_data)
     assert response.status_code == 200

@@ -172,7 +172,7 @@
         </div>
 
         <!-- NAME & ICON -->
-        <div class="flex flex-auto min-w-[200px] items-center gap-3 px-4 h-full border-r border-border-color/10 overflow-hidden">
+        <div class="flex flex-auto min-w-[300px] items-center gap-3 px-4 h-full border-r border-border-color/10 overflow-hidden">
                 <div class="shrink-0 relative">
                         <FileIcon
                                 size={18}
@@ -260,7 +260,7 @@
         </div>
 
         <!-- QUICK ACTIONS -->
-        <div class="w-24 shrink-0 flex items-center justify-end gap-1 px-2">
+        <div class="w-10 shrink-0 flex items-center justify-end gap-1 px-2">
                 {#if mode === "discrepancies"}
                         {#if item.discrepancy_id && item.has_versions && !item.is_deleted}
                                 <Button
