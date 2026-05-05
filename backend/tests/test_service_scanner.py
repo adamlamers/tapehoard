@@ -114,9 +114,6 @@ def test_scan_sources_mocked(db_session, mocker):
     """Tests the discovery scan with mocked filesystem."""
     scanner = ScannerService()
 
-    # Disable fast find so the test uses the os.walk fallback path
-    mocker.patch("app.services.scanner._FAST_FIND_BINARY", None)
-
     # Mock settings
     mocker.patch("app.api.common.get_source_roots", return_value=["/mock_source"])
     mocker.patch("app.api.common.get_exclusion_spec", return_value=None)
@@ -146,7 +143,6 @@ def test_missing_file_marked_deleted_at_end_of_scan(db_session, mocker):
     """Tests that files not seen during a scan are marked as deleted."""
     scanner = ScannerService()
 
-    mocker.patch("app.services.scanner._FAST_FIND_BINARY", None)
     mocker.patch("app.api.common.get_source_roots", return_value=["/mock_source"])
     mocker.patch("app.api.common.get_exclusion_spec", return_value=None)
     mocker.patch("os.walk", return_value=[])
@@ -181,7 +177,6 @@ def test_existing_file_not_marked_deleted(db_session, mocker):
     """Tests that files found during scan retain is_deleted=False."""
     scanner = ScannerService()
 
-    mocker.patch("app.services.scanner._FAST_FIND_BINARY", None)
     mocker.patch("app.api.common.get_source_roots", return_value=["/mock_source"])
     mocker.patch("app.api.common.get_exclusion_spec", return_value=None)
     mocker.patch("os.path.exists", return_value=True)
