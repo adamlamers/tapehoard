@@ -76,7 +76,9 @@ def browse_system_path(
                         entry_path = entry.path
                         is_dir = entry.is_dir()
                         is_ignored = get_ignored_status(
-                            entry_path, tracking_map, exclusion_spec
+                            entry_path + "/" if is_dir else entry_path,
+                            tracking_map,
+                            exclusion_spec,
                         )
                         if is_dir:
                             live_results.append(
@@ -129,7 +131,7 @@ def browse_system_path(
             if child_path not in seen:
                 seen.add(child_path)
                 dir_ignored = get_ignored_status(
-                    child_path, tracking_map, exclusion_spec
+                    child_path + "/", tracking_map, exclusion_spec
                 )
                 results.append(
                     FileItemSchema(

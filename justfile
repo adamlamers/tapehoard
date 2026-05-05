@@ -64,11 +64,24 @@ db-migrate message:
 
 # --- Code Generation ---
 
+# Export the OpenAPI spec JSON without regenerating the TypeScript client
+export-openapi:
+    @echo "Exporting OpenAPI spec..."
+    @cd backend && uv run python scripts/generate_openapi.py /tmp/tapehoard_openapi.json
+
 # Generate the TypeScript API client from the FastAPI OpenAPI spec
 generate-client: db-upgrade
     @echo "Generating TypeScript API client..."
     @cd backend && uv run python scripts/generate_openapi.py /tmp/tapehoard_openapi.json
     @cd frontend && npx @hey-api/openapi-ts -i /tmp/tapehoard_openapi.json -o src/lib/api -c @hey-api/client-fetch
+
+# Full regeneration workflow after schema changes: migrate, upgrade, generate client, lint
+regenerate message: db-upgrade
+    @echo "Running full regeneration workflow..."
+    cd backend && uv run alembic revision --autogenerate -m "{{message}}"
+    cd backend && uv run alembic upgrade head
+    @just generate-client
+    @just lint
 
 # --- Docker ---
 
@@ -97,3 +110,10 @@ playwright:
 playwright-ui:
     @echo "Starting playweight UI..."
     cd frontend && npx playwright test --ui
+
+# Clean test artifacts and kill stale test servers
+clean-test:
+    @echo "Cleaning test artifacts..."
+    pkill -f "start_test_server" 2>/dev/null || true
+    rm -f backend/e2e_test.db backend/e2e_test.db-*
+    rm -rf frontend/test-results/

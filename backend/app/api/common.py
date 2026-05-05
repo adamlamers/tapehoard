@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 
 import pathspec
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import models
@@ -80,6 +81,41 @@ def get_ignored_status(
         return True
 
     return False
+
+
+def get_ignored_by_policy(
+    absolute_path: str,
+    exclusion_spec: Optional[pathspec.PathSpec],
+) -> bool:
+    """Determines if a path is excluded by global policy only (ignores manual tracking rules)."""
+    if exclusion_spec and exclusion_spec.match_file(absolute_path):
+        return True
+    return False
+
+
+def recompute_exclusion_policy(db_session: Session) -> None:
+    """Recomputes is_ignored_by_policy and effective is_ignored for all indexed files."""
+    exclusion_spec = get_exclusion_spec(db_session)
+    tracking_rules = db_session.query(models.TrackedSource).all()
+    tracking_map = {rule.path: rule.action for rule in tracking_rules}
+
+    # Update is_ignored_by_policy in batches
+    all_files = db_session.query(
+        models.FilesystemState.id, models.FilesystemState.file_path
+    ).all()
+
+    for file_id, file_path in all_files:
+        is_ignored_by_policy = get_ignored_by_policy(file_path, exclusion_spec)
+        is_ignored = get_ignored_status(file_path, tracking_map, exclusion_spec)
+
+        db_session.execute(
+            text(
+                "UPDATE filesystem_state SET is_ignored_by_policy = :policy, is_ignored = :ignored WHERE id = :id"
+            ),
+            {"policy": is_ignored_by_policy, "ignored": is_ignored, "id": file_id},
+        )
+
+    db_session.commit()
 
 
 def _validate_path_within_roots(path: str, roots: List[str]) -> bool:

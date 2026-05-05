@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.common import FileItemSchema, SettingSchema
+from app.api.common import FileItemSchema, SettingSchema, recompute_exclusion_policy
 from app.db import models
 from app.db.database import get_db
 
@@ -56,6 +56,10 @@ def update_settings(setting_data: SettingSchema, db_session: Session = Depends(g
         from app.services.scheduler import scheduler_manager
 
         scheduler_manager.reload()
+
+    # Recompute exclusion policy when global exclusions change
+    if setting_data.key == "global_exclusions":
+        recompute_exclusion_policy(db_session)
 
     return {"message": "Setting committed."}
 

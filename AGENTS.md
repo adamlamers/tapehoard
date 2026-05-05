@@ -92,9 +92,10 @@ All FastAPI route handlers must declare explicit `operation_id` to control the g
 Generated from the backend OpenAPI spec using `@hey-api/openapi-ts`:
 
 ```bash
-cd backend && uv run python -c "import json; from app.main import app; json.dump(app.openapi(), open('openapi.json', 'w'))"
-cd ../frontend && npx @hey-api/openapi-ts -i ../backend/openapi.json -o src/lib/api
+just generate-client
 ```
+
+This runs the full pipeline: exports the OpenAPI spec from the running FastAPI app and regenerates the TypeScript SDK in `frontend/src/lib/api/`. Use this **after any backend change** that adds, renames, or modifies endpoints or schemas.
 
 The generated SDK exports clean camelCase functions (e.g., `getDashboardStats`, `listJobs`, `triggerScan`).
 
@@ -151,10 +152,19 @@ On macOS, `localhost` resolves to `::1` (IPv6) by default, but uvicorn may bind 
 7. Add backend tests in `backend/tests/test_api_system.py` (or a new test file if it's a new domain).
 8. Run `just lint` before finishing.
 
-### Regenerating the OpenAPI Spec
+### Regenerating the OpenAPI Spec / TypeScript SDK
+
+Use the convenience command:
+
+```bash
+just generate-client
+```
+
+Or run the steps manually:
 
 ```bash
 cd backend && uv run python -c "import json; from app.main import app; json.dump(app.openapi(), open('openapi.json', 'w'), indent=2)"
+cd ../frontend && npx @hey-api/openapi-ts -i ../backend/openapi.json -o src/lib/api
 ```
 
 ### Verifying No Auto-Generated operationIds

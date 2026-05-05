@@ -677,6 +677,32 @@ export type TestExclusionsRequest = {
 };
 
 /**
+ * TestExclusionsResponse
+ */
+export type TestExclusionsResponse = {
+    /**
+     * Total Files
+     */
+    total_files: number;
+    /**
+     * Total Size
+     */
+    total_size: number;
+    /**
+     * Matched Count
+     */
+    matched_count: number;
+    /**
+     * Matched Size
+     */
+    matched_size: number;
+    /**
+     * Sample
+     */
+    sample: Array<FileItemSchema>;
+};
+
+/**
  * TestNotificationRequest
  */
 export type TestNotificationRequest = {
@@ -1185,7 +1211,7 @@ export type GetSettingsResponses = {
      * Successful Response
      */
     200: {
-        [key: string]: unknown;
+        [key: string]: string;
     };
 };
 
@@ -1234,8 +1260,10 @@ export type TestExclusionsResponses = {
     /**
      * Successful Response
      */
-    200: unknown;
+    200: TestExclusionsResponse;
 };
+
+export type TestExclusionsResponse2 = TestExclusionsResponses[keyof TestExclusionsResponses];
 
 export type DownloadExclusionReportData = {
     body: TestExclusionsRequest;

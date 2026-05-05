@@ -21,7 +21,10 @@ class FilesystemState(Base):
     )
     is_ignored: Mapped[bool] = mapped_column(
         Boolean, default=False
-    )  # True if matches exclusion
+    )  # Effective ignored state (manual OR policy, with manual override)
+    is_ignored_by_policy: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # True if excluded by global policy (excludes manual tracking rules)
     is_deleted: Mapped[bool] = mapped_column(
         Boolean, default=False
     )  # True if confirmed missing from disk
