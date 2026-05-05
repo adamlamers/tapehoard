@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from app.db import models
@@ -560,3 +561,67 @@ def test_test_notification_invalid_url(client):
     )
     assert response.status_code == 500
     assert "Failed to dispatch test alert" in response.json()["detail"]
+
+
+# ── Host Directory Listing ──
+
+
+def test_ls_traversal_rejected(client):
+    """Tests that path traversal attempts are blocked."""
+    response = client.get("/system/ls?path=/etc/../secret")
+    assert response.status_code == 403
+    assert "Path traversal not allowed" in response.json()["detail"]
+
+
+def test_ls_nonexistent_path(client):
+    """Tests listing a non-existent directory returns empty list."""
+    response = client.get("/system/ls?path=/nonexistent_path_12345")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+# ── System Tree ──
+
+
+def test_system_tree_root(client, db_session):
+    """Tests system tree at ROOT returns configured source roots."""
+    db_session.add(models.SystemSetting(key="source_roots", value='["/source_data"]'))
+    db_session.commit()
+
+    response = client.get("/system/tree")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["name"] == "/source_data"
+    assert data[0]["has_children"] is True
+
+
+def test_system_tree_subdirectory(client, db_session):
+    """Tests system tree browsing a subdirectory."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_session.add(
+            models.SystemSetting(key="source_roots", value=json.dumps([tmpdir]))
+        )
+        db_session.commit()
+
+        # Create a subdirectory
+        import os
+
+        os.makedirs(os.path.join(tmpdir, "subdir"))
+
+        response = client.get(f"/system/tree?path={tmpdir}")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "subdir"
+
+
+def test_system_tree_outside_roots(client, db_session):
+    """Tests tree browsing outside roots returns 403."""
+    db_session.add(models.SystemSetting(key="source_roots", value='["/source_data"]'))
+    db_session.commit()
+
+    response = client.get("/system/tree?path=/etc")
+    assert response.status_code == 403

@@ -127,7 +127,7 @@ def test_exclusions(
             total_files=0, total_size=0, matched_count=0, matched_size=0, sample=[]
         )
 
-    spec = pathspec.PathSpec.from_lines("gitwildmatch", patterns)
+    spec = pathspec.PathSpec.from_lines("gitignore", patterns)
 
     all_files = (
         db_session.query(models.FilesystemState)
@@ -179,7 +179,7 @@ def download_exclusion_report(
     if not patterns:
         raise HTTPException(status_code=400, detail="No patterns provided")
 
-    spec = pathspec.PathSpec.from_lines("gitwildmatch", patterns)
+    spec = pathspec.PathSpec.from_lines("gitignore", patterns)
 
     all_files = (
         db_session.query(models.FilesystemState)

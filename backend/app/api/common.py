@@ -56,7 +56,7 @@ def get_exclusion_spec(db_session: Session) -> Optional[pathspec.PathSpec]:
         for pattern in settings_record.value.splitlines()
         if pattern.strip()
     ]
-    return pathspec.PathSpec.from_lines("gitwildmatch", exclusion_patterns)
+    return pathspec.PathSpec.from_lines("gitignore", exclusion_patterns)
 
 
 def get_ignored_status(
