@@ -176,13 +176,13 @@ def test_hash_file_batch_fast_empty():
 
 
 def test_hash_file_batch_fast_nonexistent():
-    """Tests that non-existent files are gracefully handled."""
+    """Tests that non-existent files are silently skipped."""
     if _FAST_HASH_BINARY is None:
         pytest.skip("No native hash binary available")
 
     results = _hash_file_batch_fast(["/nonexistent/path"], _FAST_HASH_BINARY)
-    # Non-existent files may or may not appear in results depending on binary behavior
-    assert isinstance(results, dict)
+    # Non-existent files should not produce hash entries
+    assert results == {}
 
 
 def test_missing_file_marked_deleted_at_end_of_scan(db_session, mocker):
@@ -275,8 +275,11 @@ def test_missing_file_during_hashing_marked_deleted(db_session, mocker):
     assert f.is_deleted is True
 
 
-def test_missing_file_skipped_in_hashing_query(db_session):
-    """Tests that already-deleted files are excluded from hashing targets."""
+def test_deleted_files_excluded_from_hashing(db_session):
+    """Tests that run_hashing skips already-deleted files."""
+    scanner = ScannerService()
+    scanner.is_running = False  # Causes run_hashing to exit when no targets found
+
     deleted_file = models.FilesystemState(
         file_path="/data/deleted.bin",
         size=10,
@@ -288,13 +291,13 @@ def test_missing_file_skipped_in_hashing_query(db_session):
     db_session.add(deleted_file)
     db_session.commit()
 
-    pending = (
-        db_session.query(models.FilesystemState)
-        .filter(
-            models.FilesystemState.sha256_hash.is_(None),
-            models.FilesystemState.is_ignored.is_(False),
-            models.FilesystemState.is_deleted.is_(False),
-        )
-        .all()
-    )
-    assert len(pending) == 0
+    scanner.run_hashing()
+
+    # Deleted file should not have been processed (hash still None)
+    db_session.refresh(deleted_file)
+    assert deleted_file.sha256_hash is None
+
+    # A HASH job should have been created and completed (no work to do)
+    job = db_session.query(models.Job).filter_by(job_type="HASH").first()
+    assert job is not None
+    assert job.status == "COMPLETED"

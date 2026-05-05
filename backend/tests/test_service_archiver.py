@@ -150,7 +150,30 @@ def test_run_backup_mocked(db_session, mocker, tmp_path):
 
     # Verify result
     db_session.expire_all()
+
+    # Media usage updated
     assert media.bytes_used > 0
+
+    # FileVersion recorded for the archived file
+    version = (
+        db_session.query(models.FileVersion)
+        .filter_by(filesystem_state_id=f1.id)
+        .first()
+    )
+    assert version is not None
+    assert version.media_id == media.id
+    assert version.offset_start == 0
+    assert version.offset_end == f1.size
+
+    # Backup job completed successfully
+    refreshed_job = db_session.get(models.Job, job.id)
+    assert refreshed_job.status == "COMPLETED"
+    assert refreshed_job.progress == 100.0
+
+    # Provider was asked to write the archive
+    mock_provider.write_archive.assert_called_once()
+    call_args = mock_provider.write_archive.call_args
+    assert call_args[0][0] == "DISK_001"  # media identifier
 
 
 def test_archiver_saturated_media_logic(db_session, mocker, tmp_path):
