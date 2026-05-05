@@ -82,9 +82,11 @@ def db_session():
             conn.execute(text("PRAGMA foreign_keys = OFF"))
             # Fetch all tables from the metadata
             for table_name in reversed(Base.metadata.tables.keys()):
-                # Avoid truncating internal alembic or FTS tables
-                if "alembic" not in table_name and "fts" not in table_name:
+                # Avoid truncating internal alembic tables
+                if "alembic" not in table_name:
                     conn.execute(text(f"DELETE FROM {table_name}"))
+            # FTS5 virtual table is not in Base.metadata; clear it explicitly
+            conn.execute(text("DELETE FROM filesystem_fts"))
             conn.execute(text("PRAGMA foreign_keys = ON"))
 
 

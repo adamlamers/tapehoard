@@ -147,14 +147,21 @@ def test_search_index(client, db_session):
     )
     db_session.commit()
 
-    # Trigger FTS manually since we are using raw SQL triggers which might not have fired
-    # if we didn't insert via SQL or if there are issues in :memory:
-    # but conftest uses a real temp file.
+    # Manually insert into FTS5 since triggers may not fire on ORM inserts in tests
+    from sqlalchemy import text
+
+    db_session.execute(
+        text("INSERT INTO filesystem_fts(rowid, file_path) VALUES (:rowid, :path)"),
+        {"rowid": file1.id, "path": file1.file_path},
+    )
     db_session.commit()
 
     response = client.get("/archive/search?q=important")
     assert response.status_code == 200
-    # If FTS5 is working, it should return results.
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["path"] == "data/important.doc"
+    assert data[0]["name"] == "important.doc"
 
 
 def test_get_metadata(client, db_session):

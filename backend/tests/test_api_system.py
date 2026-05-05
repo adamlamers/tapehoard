@@ -70,10 +70,17 @@ def test_get_scan_status(client):
 
 
 def test_ls_root(client):
-    """Tests listing the root directory."""
+    """Tests listing the root directory returns actual subdirectories."""
     response = client.get("/system/ls?path=/")
     assert response.status_code == 200
-    assert isinstance(response.json(), list)
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) > 0
+    for entry in data:
+        assert "name" in entry
+        assert "path" in entry
+        assert entry["name"] != ""
+        assert entry["path"] != ""
 
 
 def test_ignore_hardware(client):
@@ -465,10 +472,13 @@ def test_ignore_hardware_duplicate(client):
 
 
 def test_database_export(client):
-    """Tests database export endpoint returns a file response."""
+    """Tests database export endpoint returns a SQLite file download."""
     response = client.get("/system/database/export")
-    # May return 200 with file or 404 if db path not found
-    assert response.status_code in (200, 404)
+    assert response.status_code == 200
+    assert "tapehoard_index_" in response.headers["content-disposition"]
+    assert ".db" in response.headers["content-disposition"]
+    # Should contain SQLite magic bytes
+    assert response.content[:16] == b"SQLite format 3\x00"
 
 
 # ── Tracking Batch ──
@@ -548,5 +558,5 @@ def test_test_notification_invalid_url(client):
     response = client.post(
         "/system/notifications/test", json={"url": "not-a-valid-url"}
     )
-    # Notification manager may succeed or fail depending on apprise parsing
-    assert response.status_code in (200, 500)
+    assert response.status_code == 500
+    assert "Failed to dispatch test alert" in response.json()["detail"]
