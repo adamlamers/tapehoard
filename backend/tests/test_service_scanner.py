@@ -1,5 +1,7 @@
 import hashlib
 from datetime import datetime, timezone
+
+import pytest
 from app.services.scanner import (
     ScannerService,
     JobManager,
@@ -146,8 +148,7 @@ def test_scan_sources_mocked(db_session, mocker):
 def test_hash_file_batch_fast(tmp_path):
     """Tests native sha256sum/shasum batch hashing if available."""
     if _FAST_HASH_BINARY is None:
-        # Skip if no native hash binary is available
-        return
+        pytest.skip("No native hash binary available")
 
     # Create test files
     files = {}
@@ -168,7 +169,7 @@ def test_hash_file_batch_fast(tmp_path):
 def test_hash_file_batch_fast_empty():
     """Tests that empty batch returns empty results."""
     if _FAST_HASH_BINARY is None:
-        return
+        pytest.skip("No native hash binary available")
 
     results = _hash_file_batch_fast([], _FAST_HASH_BINARY)
     assert results == {}
@@ -177,7 +178,7 @@ def test_hash_file_batch_fast_empty():
 def test_hash_file_batch_fast_nonexistent():
     """Tests that non-existent files are gracefully handled."""
     if _FAST_HASH_BINARY is None:
-        return
+        pytest.skip("No native hash binary available")
 
     results = _hash_file_batch_fast(["/nonexistent/path"], _FAST_HASH_BINARY)
     # Non-existent files may or may not appear in results depending on binary behavior
@@ -222,8 +223,6 @@ def test_missing_file_marked_deleted_at_end_of_scan(db_session, mocker):
 def test_existing_file_not_marked_deleted(db_session, mocker):
     """Tests that files found during scan retain is_deleted=False."""
     scanner = ScannerService()
-    print(f"DEBUG test_existing: scanner.is_running = {scanner.is_running}")
-    print(f"DEBUG test_existing: scanner.is_hashing = {scanner.is_hashing}")
 
     mocker.patch("app.services.scanner._FAST_FIND_BINARY", None)
     mocker.patch("app.api.common.get_source_roots", return_value=["/mock_source"])
