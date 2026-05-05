@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.api.schemas import BatchDiscrepancyAction, DiscrepancySchema, TreeNodeSchema
@@ -177,6 +178,73 @@ def batch_delete_discrepancies(
     ).delete(synchronize_session="fetch")
     db_session.commit()
     return {"message": f"{len(ids)} record(s) permanently deleted", "count": len(ids)}
+
+
+class BatchResolveReport(BaseModel):
+    recovered_count: int
+    lost_count: int
+    recovered_paths: List[str]
+    lost_paths: List[str]
+    message: str
+
+
+@router.post(
+    "/discrepancies/batch/resolve",
+    response_model=BatchResolveReport,
+    operation_id="batch_resolve_discrepancies",
+)
+def batch_resolve_discrepancies(
+    action: BatchDiscrepancyAction, db_session: Session = Depends(get_db)
+):
+    """Smart batch action: add files with backups to restore queue, confirm deletion for files without backups."""
+    ids = _resolve_ids_from_action(action, db_session)
+    if not ids:
+        raise HTTPException(status_code=400, detail="No IDs or path prefix provided")
+
+    records = (
+        db_session.query(models.FilesystemState)
+        .filter(models.FilesystemState.id.in_(ids))
+        .all()
+    )
+
+    recoverable = [r for r in records if r.versions]
+    lost = [r for r in records if not r.versions]
+
+    # Add recoverable files to restore queue
+    now = datetime.now(timezone.utc)
+    for r in recoverable:
+        existing = (
+            db_session.query(models.RestoreCart)
+            .filter(models.RestoreCart.filesystem_state_id == r.id)
+            .first()
+        )
+        if not existing:
+            db_session.add(models.RestoreCart(filesystem_state_id=r.id, created_at=now))
+
+    # Mark lost files as confirmed deleted and dismiss from discrepancies
+    lost_ids = [r.id for r in lost]
+    if lost_ids:
+        db_session.query(models.FilesystemState).filter(
+            models.FilesystemState.id.in_(lost_ids)
+        ).update(
+            {
+                models.FilesystemState.is_deleted: True,
+                models.FilesystemState.missing_acknowledged_at: datetime.now(
+                    timezone.utc
+                ),
+            },
+            synchronize_session="fetch",
+        )
+
+    db_session.commit()
+
+    return BatchResolveReport(
+        recovered_count=len(recoverable),
+        lost_count=len(lost),
+        recovered_paths=[r.file_path for r in recoverable],
+        lost_paths=[r.file_path for r in lost],
+        message=f"{len(recoverable)} file(s) queued for recovery, {len(lost)} file(s) confirmed as permanently lost",
+    )
 
 
 @router.post("/discrepancies/{file_id}/confirm", operation_id="confirm_discrepancy")

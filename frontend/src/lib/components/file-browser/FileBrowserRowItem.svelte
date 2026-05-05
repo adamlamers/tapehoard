@@ -130,12 +130,13 @@
                 onclick={(e) => {
                         e.stopPropagation();
                         if (mode === 'discrepancies') {
-                                onToggleSelect();
+                                // Checkbox handles its own toggle; prevent double-trigger
+                                return;
                         } else {
                                 onToggleTrack();
                         }
                 }}
-                onkeydown={(e) => e.key === " " && e.stopPropagation()}
+                onkeydown={(e) => e.key === ' ' && e.stopPropagation()}
                 role="none"
         >
                 {#if mode === 'host' || mode === 'live'}

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { AlertTriangle, RotateCw, ShieldCheck, HardDriveDownload } from 'lucide-svelte';
+    import { AlertTriangle, RotateCw, ShieldCheck, HardDriveDownload, Download, FileX } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import PageHeader from '$lib/components/ui/PageHeader.svelte';
     import StatCard from '$lib/components/ui/StatCard.svelte';
@@ -9,13 +9,9 @@
     import { toast } from 'svelte-sonner';
     import {
         listDiscrepancies,
-        dismissDiscrepancy,
-        batchDismissDiscrepancies,
-        batchDeleteDiscrepancies,
+        batchResolveDiscrepancies,
         addFileToRestoreQueue,
-        batchAddToRestoreQueue,
         browseDiscrepancies,
-        getDiscrepancyTree,
         type DiscrepancySchema,
     } from '$lib/api';
     import { type FileItem } from '$lib/types';
@@ -27,6 +23,16 @@
     let currentPath = $state("ROOT");
     let selectedPaths = $state<Set<string>>(new Set());
     let batchLoading = $state(false);
+
+    // Report modal state
+    let showReport = $state(false);
+    let reportData = $state<{
+        recovered_count: number;
+        lost_count: number;
+        recovered_paths: string[];
+        lost_paths: string[];
+        message: string;
+    } | null>(null);
 
     async function loadDiscrepancies() {
         loading = true;
@@ -91,20 +97,7 @@
         }
     }
 
-    async function deletePermanently(item: FileItem) {
-        if (!item.discrepancy_id) return;
-        try {
-            await batchDeleteDiscrepancies({
-                body: { ids: [item.discrepancy_id] }
-            });
-            toast.success("File record deleted permanently");
-            await loadDiscrepancies();
-        } catch (error: any) {
-            toast.error(error.body?.detail || "Failed to delete file record");
-        }
-    }
-
-    async function batchDismiss() {
+    async function batchResolve() {
         const ids = getDiscrepancyIdsFromPaths(selectedPaths);
         if (ids.length === 0) {
             toast.error("No files selected");
@@ -112,68 +105,89 @@
         }
         batchLoading = true;
         try {
-            await batchDismissDiscrepancies({
+            const response = await batchResolveDiscrepancies({
                 body: { ids }
             });
-            toast.success(`Dismissed ${ids.length} files`);
-            selectedPaths = new Set();
-            await loadDiscrepancies();
+            if (response.data) {
+                reportData = response.data;
+                showReport = true;
+                selectedPaths = new Set();
+                await loadDiscrepancies();
+            }
         } catch (error: any) {
-            toast.error(error.body?.detail || "Failed to dismiss files");
+            toast.error(error.body?.detail || "Failed to resolve discrepancies");
         } finally {
             batchLoading = false;
         }
     }
 
-    async function batchDelete() {
-        const ids = getDiscrepancyIdsFromPaths(selectedPaths);
-        if (ids.length === 0) {
-            toast.error("No files selected");
-            return;
-        }
-        batchLoading = true;
-        try {
-            await batchDeleteDiscrepancies({
-                body: { ids }
-            });
-            toast.success(`Deleted ${ids.length} file records`);
-            selectedPaths = new Set();
-            await loadDiscrepancies();
-        } catch (error: any) {
-            toast.error(error.body?.detail || "Failed to delete files");
-        } finally {
-            batchLoading = false;
-        }
-    }
-
-    async function batchAddToCart() {
-        const ids = getDiscrepancyIdsFromPaths(selectedPaths);
-        if (ids.length === 0) {
-            toast.error("No files selected");
-            return;
-        }
-        batchLoading = true;
-        try {
-            await batchAddToRestoreQueue({
-                body: { ids }
-            });
-            toast.success(`Added ${ids.length} files to restore cart`);
-            selectedPaths = new Set();
-        } catch (error: any) {
-            toast.error(error.body?.detail || "Failed to add files to cart");
-        } finally {
-            batchLoading = false;
-        }
+    function downloadReport() {
+        if (!reportData) return;
+        const lines = [
+            "TapeHoard Discrepancy Resolution Report",
+            `Generated: ${new Date().toISOString()}`,
+            "",
+            `Recovered files (${reportData.recovered_count}):`,
+            ...reportData.recovered_paths.map(p => `  [RECOVERABLE] ${p}`),
+            "",
+            `Permanently lost files (${reportData.lost_count}):`,
+            ...reportData.lost_paths.map(p => `  [LOST] ${p}`),
+            "",
+            "End of report"
+        ];
+        const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `discrepancy_report_${new Date().toISOString().split("T")[0]}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     function getDiscrepancyIdsFromPaths(paths: Set<string>): number[] {
         const ids: number[] = [];
-        for (const item of files) {
-            if (paths.has(item.path) && item.discrepancy_id) {
-                ids.push(item.discrepancy_id);
+        for (const d of discrepancies) {
+            const path = d.path;
+            if (paths.has(path)) {
+                ids.push(d.id);
+                continue;
+            }
+            // Check if this discrepancy is under a selected directory
+            for (const selectedPath of paths) {
+                if (path.startsWith(selectedPath + '/')) {
+                    ids.push(d.id);
+                    break;
+                }
             }
         }
         return ids;
+    }
+
+    function getAffectedCounts(paths: Set<string>): { recoverable: number; lost: number } {
+        let recoverable = 0;
+        let lost = 0;
+        for (const d of discrepancies) {
+            const path = d.path;
+            let isAffected = paths.has(path);
+            if (!isAffected) {
+                for (const selectedPath of paths) {
+                    if (path.startsWith(selectedPath + '/')) {
+                        isAffected = true;
+                        break;
+                    }
+                }
+            }
+            if (isAffected) {
+                if (d.has_versions) {
+                    recoverable++;
+                } else {
+                    lost++;
+                }
+            }
+        }
+        return { recoverable, lost };
     }
 
     function navigateTo(path: string) {
@@ -249,20 +263,32 @@
 
         <!-- Batch Actions Bar -->
         {#if selectedPaths.size > 0}
+            {@const { recoverable: recoverableCount, lost: lostCount } = getAffectedCounts(selectedPaths)}
             <div class="flex items-center gap-3 p-3 bg-bg-tertiary/50 rounded-lg border border-border-color">
-                <span class="text-sm text-text-secondary">
-                    {selectedPaths.size} file(s) selected
-                </span>
+                <div class="flex flex-col text-sm text-text-secondary">
+                    <span>{selectedPaths.size} item(s) selected</span>
+                    {#if recoverableCount > 0 && lostCount > 0}
+                        <span class="text-xs opacity-60">{recoverableCount} recoverable, {lostCount} lost forever</span>
+                    {:else if recoverableCount > 0}
+                        <span class="text-xs opacity-60">All {recoverableCount} file(s) can be recovered</span>
+                    {:else if lostCount > 0}
+                        <span class="text-xs opacity-60">All {lostCount} file(s) are lost forever</span>
+                    {/if}
+                </div>
                 <div class="flex gap-2 ml-auto">
-                    <Button size="sm" variant="outline" onclick={batchDismiss} disabled={batchLoading}>
-                        Dismiss Selected
-                    </Button>
-                    <Button size="sm" variant="outline" onclick={batchAddToCart} disabled={batchLoading}>
-                        <HardDriveDownload size={14} class="mr-1" />
-                        Add to Cart
-                    </Button>
-                    <Button size="sm" variant="destructive" onclick={batchDelete} disabled={batchLoading}>
-                        Delete Records
+                    <Button size="sm" variant="default" onclick={batchResolve} disabled={batchLoading}>
+                        {#if batchLoading}
+                            <RotateCw size={14} class="mr-1 animate-spin" /> Resolving...
+                        {:else if recoverableCount > 0 && lostCount > 0}
+                            <HardDriveDownload size={14} class="mr-1" />
+                            Recover {recoverableCount}, confirm {lostCount} lost
+                        {:else if recoverableCount > 0}
+                            <HardDriveDownload size={14} class="mr-1" />
+                            Add {recoverableCount} to restore queue
+                        {:else}
+                            <FileX size={14} class="mr-1" />
+                            Confirm {lostCount} as deleted
+                        {/if}
                     </Button>
                 </div>
             </div>
@@ -277,8 +303,56 @@
                 mode="discrepancies"
                 onNavigate={navigateTo}
                 onAddToCart={addToCart}
-                onDelete={deletePermanently}
             />
         </div>
     {/if}
 </div>
+
+<!-- Resolution Report Modal -->
+{#if showReport && reportData}
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onclick={() => showReport = false}>
+        <div class="bg-bg-secondary border border-border-color rounded-xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden" onclick={(e) => e.stopPropagation()}>
+            <div class="p-5 border-b border-border-color">
+                <h3 class="text-lg font-semibold">Resolution Report</h3>
+                <p class="text-sm text-text-secondary mt-1">Results of the batch discrepancy resolution</p>
+            </div>
+            <div class="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+                {#if reportData.recovered_count > 0}
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2 text-success-color">
+                            <HardDriveDownload size={16} />
+                            <span class="font-medium">{reportData.recovered_count} file(s) queued for recovery</span>
+                        </div>
+                        <ul class="text-sm text-text-secondary space-y-1 pl-6">
+                            {#each reportData.recovered_paths as path}
+                                <li class="truncate">{path}</li>
+                            {/each}
+                        </ul>
+                    </div>
+                {/if}
+                {#if reportData.lost_count > 0}
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2 text-error-color">
+                            <FileX size={16} />
+                            <span class="font-medium">{reportData.lost_count} file(s) confirmed as permanently lost</span>
+                        </div>
+                        <ul class="text-sm text-text-secondary space-y-1 pl-6">
+                            {#each reportData.lost_paths as path}
+                                <li class="truncate">{path}</li>
+                            {/each}
+                        </ul>
+                    </div>
+                {/if}
+            </div>
+            <div class="p-5 border-t border-border-color flex gap-3">
+                <Button variant="outline" class="flex-1" onclick={downloadReport}>
+                    <Download size={14} class="mr-2" />
+                    Download Report
+                </Button>
+                <Button class="flex-1" onclick={() => showReport = false}>
+                    Done
+                </Button>
+            </div>
+        </div>
+    </div>
+{/if}

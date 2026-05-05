@@ -29,6 +29,32 @@ export type BatchDiscrepancyAction = {
 };
 
 /**
+ * BatchResolveReport
+ */
+export type BatchResolveReport = {
+    /**
+     * Recovered Count
+     */
+    recovered_count: number;
+    /**
+     * Lost Count
+     */
+    lost_count: number;
+    /**
+     * Recovered Paths
+     */
+    recovered_paths: Array<string>;
+    /**
+     * Lost Paths
+     */
+    lost_paths: Array<string>;
+    /**
+     * Message
+     */
+    message: string;
+};
+
+/**
  * BatchTrackRequest
  */
 export type BatchTrackRequest = {
@@ -1536,6 +1562,31 @@ export type BatchDeleteDiscrepanciesResponses = {
      */
     200: unknown;
 };
+
+export type BatchResolveDiscrepanciesData = {
+    body: BatchDiscrepancyAction;
+    path?: never;
+    query?: never;
+    url: '/system/discrepancies/batch/resolve';
+};
+
+export type BatchResolveDiscrepanciesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BatchResolveDiscrepanciesError = BatchResolveDiscrepanciesErrors[keyof BatchResolveDiscrepanciesErrors];
+
+export type BatchResolveDiscrepanciesResponses = {
+    /**
+     * Successful Response
+     */
+    200: BatchResolveReport;
+};
+
+export type BatchResolveDiscrepanciesResponse = BatchResolveDiscrepanciesResponses[keyof BatchResolveDiscrepanciesResponses];
 
 export type ConfirmDiscrepancyData = {
     body?: never;
