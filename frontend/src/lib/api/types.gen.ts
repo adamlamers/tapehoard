@@ -460,6 +460,14 @@ export type ItemMetadataSchema = {
     versions?: Array<{
         [key: string]: unknown;
     }>;
+    /**
+     * Is Partially Archived
+     */
+    is_partially_archived?: boolean;
+    /**
+     * Archived Bytes
+     */
+    archived_bytes?: number;
 };
 
 /**

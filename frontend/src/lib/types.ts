@@ -11,6 +11,9 @@ export interface FileItem {
     sha256_hash?: string | null;
     vulnerable?: boolean;
     indeterminate?: boolean;
+    // Partial archive indicator
+    is_partially_archived?: boolean;
+    archived_bytes?: number;
     // Discrepancy fields
     discrepancy_id?: number;
     is_deleted?: boolean;

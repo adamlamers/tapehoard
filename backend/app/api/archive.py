@@ -121,7 +121,7 @@ def browse(path: str = "ROOT", db_session: Session = Depends(get_db)):
         dir_sql, {"prefix": query_path, "prefix_wildcard": f"{query_path}%"}
     ).fetchall()
 
-    # Find files (immediate children) with their media locations
+    # Find files (immediate children) with their media locations and archive coverage
     file_sql = text("""
         SELECT
             fs.id, fs.file_path, fs.size, fs.mtime,
@@ -130,7 +130,10 @@ def browse(path: str = "ROOT", db_session: Session = Depends(get_db)):
              FROM file_versions fv
              JOIN storage_media sm ON sm.id = fv.media_id
              WHERE fv.filesystem_state_id = fs.id) as media_list,
-            EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = fs.id) as is_selected
+            EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = fs.id) as is_selected,
+            COALESCE((SELECT SUM(fv.offset_end - fv.offset_start)
+                      FROM file_versions fv
+                      WHERE fv.filesystem_state_id = fs.id), 0) as archived_bytes
         FROM filesystem_state fs
         WHERE fs.file_path LIKE :prefix_wildcard
         AND fs.file_path != :prefix
@@ -175,6 +178,10 @@ def browse(path: str = "ROOT", db_session: Session = Depends(get_db)):
         if not f[4]:  # f[4] is has_version
             continue
 
+        archived_bytes = f[7] or 0
+        file_size = f[2] or 0
+        is_partially_archived = archived_bytes > 0 and archived_bytes < file_size
+
         results.append(
             {
                 "name": os.path.basename(f[1]),
@@ -185,6 +192,8 @@ def browse(path: str = "ROOT", db_session: Session = Depends(get_db)):
                 "vulnerable": False,
                 "selected": bool(f[6]),
                 "media": f[5].split(",") if f[5] else [],
+                "is_partially_archived": is_partially_archived,
+                "archived_bytes": archived_bytes,
             }
         )
 
@@ -215,7 +224,10 @@ def search(q: str, path: Optional[str] = None, db_session: Session = Depends(get
              FROM file_versions fv
              JOIN storage_media sm ON sm.id = fv.media_id
              WHERE fv.filesystem_state_id = fs.id) as media_list,
-            EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = fs.id) as is_selected
+            EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = fs.id) as is_selected,
+            COALESCE((SELECT SUM(fv.offset_end - fv.offset_start)
+                      FROM file_versions fv
+                      WHERE fv.filesystem_state_id = fs.id), 0) as archived_bytes
         FROM filesystem_fts fts
         JOIN filesystem_state fs ON fs.id = fts.rowid
         WHERE filesystem_fts MATCH :query
@@ -229,20 +241,28 @@ def search(q: str, path: Optional[str] = None, db_session: Session = Depends(get
     query_params = {"query": q, "path_prefix": path_prefix}
 
     rows = db_session.execute(search_sql, query_params).fetchall()
-    return [
-        {
-            "name": os.path.basename(r[1]),
-            "path": r[1],
-            "type": "file",
-            "size": r[2],
-            "mtime": datetime.fromtimestamp(r[3], tz=timezone.utc),
-            "vulnerable": False,
-            "selected": bool(r[6]),
-            "media": r[5].split(",") if r[5] else [],
-        }
-        for r in rows
-        if r[4]  # Only show if has_version is True
-    ]
+    results = []
+    for r in rows:
+        if not r[4]:  # Only show if has_version is True
+            continue
+        archived_bytes = r[7] or 0
+        file_size = r[2] or 0
+        is_partially_archived = archived_bytes > 0 and archived_bytes < file_size
+        results.append(
+            {
+                "name": os.path.basename(r[1]),
+                "path": r[1],
+                "type": "file",
+                "size": r[2],
+                "mtime": datetime.fromtimestamp(r[3], tz=timezone.utc),
+                "vulnerable": False,
+                "selected": bool(r[6]),
+                "media": r[5].split(",") if r[5] else [],
+                "is_partially_archived": is_partially_archived,
+                "archived_bytes": archived_bytes,
+            }
+        )
+    return results
 
 
 @router.get("/tree", response_model=List[TreeNodeSchema], operation_id="archive_tree")
@@ -323,6 +343,9 @@ def metadata(path: str, db_session: Session = Depends(get_db)):
                 }
             )
 
+        archived_bytes = sum((v.offset_end - v.offset_start) for v in item.versions)
+        is_partially_archived = archived_bytes > 0 and archived_bytes < item.size
+
         return ItemMetadataSchema(
             id=item.id,
             path=item.file_path,
@@ -333,6 +356,8 @@ def metadata(path: str, db_session: Session = Depends(get_db)):
             sha256_hash=item.sha256_hash,
             is_ignored=item.is_ignored,
             versions=versions,
+            is_partially_archived=is_partially_archived,
+            archived_bytes=archived_bytes,
         )
 
     # No exact match — check if this is a directory with archived children

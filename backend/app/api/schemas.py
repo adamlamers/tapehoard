@@ -25,6 +25,8 @@ class ItemMetadataSchema(BaseModel):
     child_count: Optional[int] = 0
     selected: bool = False
     versions: List[Dict[str, Any]] = []
+    is_partially_archived: bool = False
+    archived_bytes: int = 0
 
 
 class DiscrepancySchema(BaseModel):

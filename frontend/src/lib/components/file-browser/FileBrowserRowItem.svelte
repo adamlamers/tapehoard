@@ -10,11 +10,12 @@
                 MoreVertical,
                 ExternalLink,
                 CassetteTape,
-                ShieldCheck,
-                ShieldAlert,
-                Square,
-                EyeOff,
-                Trash2
+			ShieldCheck,
+			ShieldAlert,
+			Square,
+			EyeOff,
+			Trash2,
+			AlertTriangle
         } from "lucide-svelte";
         import { Checkbox } from "$lib/components/ui/checkbox";
         import { Button } from "$lib/components/ui/button";
@@ -205,18 +206,24 @@
                                 >
                                         {item.name}
                                 </span>
-                                {#if mode === "index"}
-                                        {#if item.media && item.media.length > 0}
-                                                <div class="flex gap-1 overflow-hidden shrink-0">
-                                                        {#each item.media as m}
-                                                                <span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[10px] px-1.5 py-0.5 rounded border border-blue-500/20 font-medium">
-                                                                        <CassetteTape size={10} />
-                                                                        {m}
-                                                                </span>
-                                                        {/each}
-                                                </div>
-                                        {/if}
-                                {/if}
+								{#if mode === "index"}
+										{#if item.media && item.media.length > 0}
+												<div class="flex gap-1 overflow-hidden shrink-0">
+													{#each item.media as m}
+															<span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[10px] px-1.5 py-0.5 rounded border border-blue-500/20 font-medium">
+																	<CassetteTape size={10} />
+																	{m}
+															</span>
+													{/each}
+												</div>
+										{/if}
+										{#if item.is_partially_archived}
+												<span class="inline-flex items-center gap-1 bg-orange-500/10 text-orange-400 text-[10px] px-1.5 py-0.5 rounded border border-orange-500/20 font-medium" title="Only {formatSize(item.archived_bytes)} of {formatSize(item.size)} archived">
+													<AlertTriangle size={10} />
+													Partial
+												</span>
+										{/if}
+								{/if}
                                 {#if mode === "discrepancies"}
                                         {#if item.is_deleted}
                                                 <span class="inline-flex items-center gap-1 bg-red-500/10 text-red-400 text-[10px] px-1.5 py-0.5 rounded border border-red-500/20 font-medium">
@@ -256,7 +263,7 @@
                 class="shrink-0 px-4 h-full flex items-center justify-end text-xs text-text-secondary mono text-right tabular-nums font-medium border-r border-border-color/10"
                 style="width: {colWidths.size}px"
         >
-			{formatSize(item.size)}
+			{formatSize(item.archived_bytes !== undefined ? item.archived_bytes : item.size)}
         </div>
 
         <!-- QUICK ACTIONS -->

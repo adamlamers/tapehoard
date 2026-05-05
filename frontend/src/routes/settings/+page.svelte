@@ -626,12 +626,12 @@
                             {#if showAddSecret}
                                 <div class="space-y-3 p-4 bg-bg-primary/30 rounded-lg border border-border-color">
                                     <div class="space-y-2">
-                                        <label class="text-xs font-medium text-text-secondary ml-1">Secret Name</label>
-                                        <Input bind:value={newSecretName} placeholder="e.g., aws-production-key" class="h-10 bg-bg-primary border-border-color text-sm" />
+                                        <label class="text-xs font-medium text-text-secondary ml-1" for="new-secret-name">Secret Name</label>
+                                        <Input id="new-secret-name" bind:value={newSecretName} placeholder="e.g., aws-production-key" class="h-10 bg-bg-primary border-border-color text-sm" />
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="text-xs font-medium text-text-secondary ml-1">Secret Value</label>
-                                        <Input bind:value={newSecretValue} type="password" placeholder="Enter secret value" class="h-10 bg-bg-primary border-border-color font-mono text-sm" />
+                                        <label class="text-xs font-medium text-text-secondary ml-1" for="new-secret-value">Secret Value</label>
+                                        <Input id="new-secret-value" bind:value={newSecretValue} type="password" placeholder="Enter secret value" class="h-10 bg-bg-primary border-border-color font-mono text-sm" />
                                     </div>
                                     <div class="flex gap-2">
                                         <Button variant="outline" class="flex-1 h-10" onclick={() => { showAddSecret = false; newSecretName = ''; newSecretValue = ''; }}>Cancel</Button>

@@ -12,7 +12,8 @@
         ListPlus,
         FolderTree,
         Clock,
-        ArrowRight
+        ArrowRight,
+        AlertTriangle
     } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import PageHeader from '$lib/components/ui/PageHeader.svelte';
@@ -89,7 +90,9 @@
                     media: f.media ?? [],
                     vulnerable: f.vulnerable,
                     selected: f.selected,
-                    indeterminate: f.indeterminate
+                    indeterminate: f.indeterminate,
+                    is_partially_archived: f.is_partially_archived ?? false,
+                    archived_bytes: f.archived_bytes ?? undefined
                 }));
             }
         } catch (error) {
@@ -116,7 +119,9 @@
                     media: f.media ?? [],
                     vulnerable: f.vulnerable,
                     selected: f.selected,
-                    indeterminate: f.indeterminate
+                    indeterminate: f.indeterminate,
+                    is_partially_archived: f.is_partially_archived ?? false,
+                    archived_bytes: f.archived_bytes ?? undefined
                 }));
             }
         } catch (error) {
@@ -315,9 +320,9 @@
                             <div class="grid grid-cols-2 gap-4">
                                 <div class="space-y-1">
                                     <span class="text-xs font-medium text-text-secondary opacity-60 block">
-                                        {selectedItemMetadata.type === 'directory' ? 'Aggregate Size' : 'File Size'}
+                                        {selectedItemMetadata.type === 'directory' ? 'Aggregate Size' : 'Archived Size'}
                                     </span>
-                                    <span class="text-xs font-semibold text-text-primary mono">{formatSize(selectedItemMetadata.size)}</span>
+                                    <span class="text-xs font-semibold text-text-primary mono">{formatSize(selectedItemMetadata.type === 'file' ? (selectedItemMetadata.archived_bytes || 0) : selectedItemMetadata.size)}</span>
                                 </div>
                                 <div class="space-y-1">
                                     <span class="text-xs font-medium text-text-secondary opacity-60 block">Last Indexed</span>
@@ -332,6 +337,18 @@
                             </div>
 
                             {#if selectedItemMetadata.type === 'file'}
+                                {#if selectedItemMetadata.is_partially_archived}
+                                    <div class="p-3 bg-orange-500/5 border border-orange-500/20 rounded-lg space-y-1">
+                                        <div class="flex items-center gap-2">
+                                            <AlertTriangle size={14} class="text-orange-400" />
+                                            <span class="text-xs font-semibold text-orange-400">Partially Archived</span>
+                                        </div>
+                                        <p class="text-5xs text-text-secondary opacity-60 leading-relaxed">
+                                            Only {formatSize(selectedItemMetadata.archived_bytes || 0)} of {formatSize(selectedItemMetadata.size)} has been written to archive media. The remaining {formatSize(selectedItemMetadata.size - (selectedItemMetadata.archived_bytes || 0))} was not archived because the target media became full.
+                                        </p>
+                                    </div>
+                                {/if}
+
                                 <!-- Hash -->
                                 <div class="space-y-2">
                                     <span class="text-xs font-medium text-text-secondary opacity-60 block">SHA-256 Fingerprint</span>
