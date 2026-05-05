@@ -548,7 +548,7 @@ class ArchiverService:
                                 JobManager.update_job(
                                     job_id,
                                     15.0 + (70.0 * (processed_bytes / safe_divisor)),
-                                    f"Archived chunk {chunk_index+1} via binary tar",
+                                    f"Archived chunk {chunk_index + 1} via binary tar",
                                 )
                             except Exception as e:
                                 logger.error(
@@ -618,7 +618,7 @@ class ArchiverService:
                     JobManager.update_job(
                         job_id,
                         15.0 + (70.0 * (processed_bytes / safe_divisor)),
-                        f"Streaming chunk {chunk_index+1}/{len(chunks)} to {media_record.media_type}...",
+                        f"Streaming chunk {chunk_index + 1}/{len(chunks)} to {media_record.media_type}...",
                     )
                     with open(staging_full_path, "rb") as final_stream:
                         archive_location_id = storage_provider.write_archive(
@@ -654,7 +654,7 @@ class ArchiverService:
                 try:
                     utilization_ratio = float(hardware_utilization)
                     logger.info(
-                        f"Hardware reported utilization: {utilization_ratio*100:.1f}%"
+                        f"Hardware reported utilization: {utilization_ratio * 100:.1f}%"
                     )
                 except (TypeError, ValueError):
                     utilization_ratio = (
@@ -671,7 +671,7 @@ class ArchiverService:
 
             if utilization_ratio >= 0.98 and media_record.status == "active":
                 logger.info(
-                    f"MEDIA SATURATED: {media_record.identifier} ({utilization_ratio*100:.1f}%)"
+                    f"MEDIA SATURATED: {media_record.identifier} ({utilization_ratio * 100:.1f}%)"
                 )
                 media_record.status = "full"
 
@@ -699,12 +699,12 @@ class ArchiverService:
             if JobManager.is_cancelled(job_id):
                 JobManager.add_job_log(
                     job_id,
-                    f"Backup cancelled. Utilization: {utilization_ratio*100:.1f}%",
+                    f"Backup cancelled. Utilization: {utilization_ratio * 100:.1f}%",
                 )
             else:
                 JobManager.add_job_log(
                     job_id,
-                    f"Backup complete. Utilization: {utilization_ratio*100:.1f}%",
+                    f"Backup complete. Utilization: {utilization_ratio * 100:.1f}%",
                 )
                 JobManager.complete_job(job_id)
                 from app.services.notifications import notification_manager

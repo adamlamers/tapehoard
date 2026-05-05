@@ -118,6 +118,69 @@ def get_job_stats(db_session: Session = Depends(get_db)):
     }
 
 
+# NOTE: /jobs/stream MUST be registered BEFORE /jobs/{job_id} routes
+# because FastAPI matches routes in definition order.
+@router.get("/jobs/stream", operation_id="stream_jobs")
+async def stream_jobs():
+    """Server-Sent Events (SSE) endpoint for real-time job status updates."""
+
+    async def event_generator():
+        while True:
+            with SessionLocal() as db_session:
+                active_jobs = (
+                    db_session.query(models.Job)
+                    .filter(models.Job.status.in_(["RUNNING", "PENDING"]))
+                    .all()
+                )
+                job_ids = [job.id for job in active_jobs]
+                if job_ids:
+                    placeholders = ", ".join([f":id{i}" for i in range(len(job_ids))])
+                    params = {f"id{i}": jid for i, jid in enumerate(job_ids)}
+                    subquery = text(f"""
+                        SELECT jl.job_id, jl.message
+                        FROM job_logs jl
+                        INNER JOIN (
+                            SELECT job_id, MAX(id) as max_id
+                            FROM job_logs
+                            WHERE job_id IN ({placeholders})
+                            GROUP BY job_id
+                        ) latest ON jl.id = latest.max_id
+                    """)
+                    latest_logs = {
+                        row[0]: row[1]
+                        for row in db_session.execute(subquery, params).fetchall()
+                    }
+                else:
+                    latest_logs = {}
+
+                serialized_data = []
+                for job in active_jobs:
+                    job_dict = {
+                        "id": job.id,
+                        "job_type": job.job_type,
+                        "status": job.status,
+                        "progress": job.progress,
+                        "current_task": job.current_task,
+                        "error_message": job.error_message,
+                        "started_at": job.started_at,
+                        "created_at": job.created_at,
+                        "latest_log": latest_logs.get(job.id),
+                    }
+                    for date_field in ["started_at", "created_at"]:
+                        from datetime import datetime
+
+                        val = job_dict[date_field]
+                        if isinstance(val, datetime):
+                            job_dict[date_field] = val.isoformat()
+                    serialized_data.append(job_dict)
+
+                yield f"data: {json.dumps(serialized_data)}\n\n"
+
+            await asyncio.sleep(2)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 @router.get("/jobs/{job_id}", response_model=JobSchema, operation_id="get_job")
 def get_job(job_id: int, db_session: Session = Depends(get_db)):
     """Retrieves detailed metadata for a specific job."""
@@ -211,64 +274,3 @@ def retry_job(
         "message": f"Retry initiated for {job_record.job_type} job",
         "new_job_id": new_job.id,
     }
-
-
-@router.get("/jobs/stream", operation_id="stream_jobs")
-async def stream_jobs():
-    """Server-Sent Events (SSE) endpoint for real-time job status updates."""
-
-    async def event_generator():
-        while True:
-            with SessionLocal() as db_session:
-                active_jobs = (
-                    db_session.query(models.Job)
-                    .filter(models.Job.status.in_(["RUNNING", "PENDING"]))
-                    .all()
-                )
-                job_ids = [job.id for job in active_jobs]
-                if job_ids:
-                    placeholders = ", ".join([f":id{i}" for i in range(len(job_ids))])
-                    params = {f"id{i}": jid for i, jid in enumerate(job_ids)}
-                    subquery = text(f"""
-                        SELECT jl.job_id, jl.message
-                        FROM job_logs jl
-                        INNER JOIN (
-                            SELECT job_id, MAX(id) as max_id
-                            FROM job_logs
-                            WHERE job_id IN ({placeholders})
-                            GROUP BY job_id
-                        ) latest ON jl.id = latest.max_id
-                    """)
-                    latest_logs = {
-                        row[0]: row[1]
-                        for row in db_session.execute(subquery, params).fetchall()
-                    }
-                else:
-                    latest_logs = {}
-
-                serialized_data = []
-                for job in active_jobs:
-                    job_dict = {
-                        "id": job.id,
-                        "job_type": job.job_type,
-                        "status": job.status,
-                        "progress": job.progress,
-                        "current_task": job.current_task,
-                        "error_message": job.error_message,
-                        "started_at": job.started_at,
-                        "created_at": job.created_at,
-                        "latest_log": latest_logs.get(job.id),
-                    }
-                    for date_field in ["started_at", "created_at"]:
-                        from datetime import datetime
-
-                        val = job_dict[date_field]
-                        if isinstance(val, datetime):
-                            job_dict[date_field] = val.isoformat()
-                    serialized_data.append(job_dict)
-
-                yield f"data: {json.dumps(serialized_data)}\n\n"
-
-            await asyncio.sleep(2)
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")

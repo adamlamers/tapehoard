@@ -331,11 +331,11 @@ class JobManager:
 
     @staticmethod
     def complete_job(job_id: int):
-        """Marks a job as successfully completed."""
+        """Marks a job as successfully completed if it is still active."""
         with SessionLocal() as db_session:
             try:
                 job_record = db_session.get(models.Job, job_id)
-                if job_record:
+                if job_record and job_record.status in ("PENDING", "RUNNING"):
                     job_record.status = "COMPLETED"
                     job_record.progress = 100.0
                     job_record.completed_at = datetime.now(timezone.utc)
@@ -346,11 +346,11 @@ class JobManager:
 
     @staticmethod
     def fail_job(job_id: int, error_message: str):
-        """Marks a job as failed and records the error message."""
+        """Marks a job as failed if it is still active."""
         with SessionLocal() as db_session:
             try:
                 job_record = db_session.get(models.Job, job_id)
-                if job_record:
+                if job_record and job_record.status in ("PENDING", "RUNNING"):
                     job_record.status = "FAILED"
                     job_record.error_message = error_message
                     job_record.completed_at = datetime.now(timezone.utc)

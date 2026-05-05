@@ -210,16 +210,4 @@ Pre-commit hooks are configured but may stash unstaged changes.
 | File | Contents |
 |------|----------|
 | `README.md` | Human-facing project overview |
-| `DOCS.md` | Feature documentation |
-| `E2E.md` | End-to-end testing notes |
-| `ENDPOINT_REFACTOR.md` | Batch plan for endpoint renaming (completed) |
-| `ISSUES.md` | Known issues and backlog |
-| `MEDIA_MANAGEMENT.md` | Media lifecycle documentation |
-| `NOTES.md` | Development notes |
-| `OPTIMIZATIONS.md` | Performance optimization notes |
-| `PLAN.md` | Project roadmap |
-| `UX.md` | UX conventions |
-| `GEMINI.md` | Gemini-specific context |
-| `REVIEW_2.md` | Code review notes |
-| `SOURCEMAP.md` | Frontend source map |
 | `AGENTS.md` | This file — agent development guide |
