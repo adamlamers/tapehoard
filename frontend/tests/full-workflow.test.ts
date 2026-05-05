@@ -44,6 +44,23 @@ test.describe('TapeHoard Golden Path', () => {
     await requestContext.post(`${API_URL}/system/settings`, {
         data: { key: 'restore_destinations', value: JSON.stringify([RESTORE_DEST]) }
     });
+
+    // Index-only principle: scan first so /system/browse can show files
+    const scanResp = await requestContext.post(`${API_URL}/system/scan`);
+    if (!scanResp.ok()) {
+        console.error('Failed to trigger initial scan');
+    }
+    // Wait for scan to complete
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+        const statusResp = await requestContext.get(`${API_URL}/system/scan/status`);
+        const status = await statusResp.json();
+        if (!status.is_running) {
+            break;
+        }
+        await new Promise(r => setTimeout(r, 500));
+    }
+
     await requestContext.dispose();
   });
 

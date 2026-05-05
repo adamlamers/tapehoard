@@ -50,6 +50,15 @@ All API routes live under `app/api/`. The `system` endpoints are split into a pa
 
 Each module defines its own `APIRouter` with `tags=["System"]` and is registered in `main.py` with `prefix="/system"`.
 
+### Index-Only Principle
+
+**Never rely on the live filesystem for data, except during a scan.** All read endpoints must operate exclusively on the database index. The filesystem is only accessed during:
+
+- **Scan operations** (`/system/scan`) — to discover files, compute hashes, and sync the index.
+- **Configuration endpoints** (`/system/ls`, `/system/browse` when path is outside roots) — to help users pick source roots during setup.
+
+Browsing the archive, searching, or checking protection status must use the index only. This guarantees consistent results even when files are temporarily inaccessible, and prevents I/O bottlenecks on network or tape-backed storage.
+
 ### Shared Helpers (`app/api/common.py`)
 
 Cross-cutting helpers and schemas that must not create circular imports:
