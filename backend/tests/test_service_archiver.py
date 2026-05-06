@@ -459,6 +459,82 @@ def test_run_restore_mocked(db_session, mocker, tmp_path):
     assert expected_file.read_bytes() == b"hello"
 
 
+def test_backup_checkpoints_per_chunk(db_session, mocker, tmp_path):
+    """Verifies that FileVersions are committed after each chunk so a mid-job
+    failure doesn't orphan already-written archives on tape."""
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    archiver = ArchiverService(staging_directory=str(staging))
+
+    # Capacity 10GB -> MAX_CHUNK_SIZE = 100MB
+    media = models.StorageMedia(
+        media_type="tape",
+        identifier="TAPE_CHK",
+        capacity=10 * 1024 * 1024 * 1024,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add(media)
+
+    # Create two tiny source files, but lie about their size to force chunking
+    files = []
+    for i in range(2):
+        source_file = tmp_path / f"chunk_{i}.bin"
+        source_file.write_bytes(b"0")
+        f = models.FilesystemState(
+            file_path=str(source_file),
+            size=60 * 1024 * 1024,  # 60MB
+            mtime=1,
+            sha256_hash=f"hash_{i}",
+        )
+        db_session.add(f)
+        files.append(f)
+    db_session.commit()
+
+    # Make the staging tar appear to be 60MB so bytes_used updates correctly
+    mocker.patch("os.path.getsize", return_value=60 * 1024 * 1024)
+
+    mock_provider = mocker.MagicMock()
+    mock_provider.capabilities = {"supports_random_access": False}
+    mock_provider.identify_media.return_value = "TAPE_CHK"
+    mock_provider.prepare_for_write.return_value = True
+    # First chunk succeeds, second chunk fails
+    mock_provider.write_archive.side_effect = ["ARCH_1", Exception("Tape write failed")]
+
+    mocker.patch.object(archiver, "_get_storage_provider", return_value=mock_provider)
+
+    from app.services.scanner import JobManager
+
+    job = JobManager.create_job(db_session, "BACKUP")
+
+    archiver.run_backup(db_session, media.id, job.id)
+
+    # Verify job failed
+    db_session.expire_all()
+    refreshed_job = db_session.get(models.Job, job.id)
+    assert refreshed_job.status == "FAILED"
+
+    # Verify first chunk was checkpointed
+    versions = (
+        db_session.query(models.FileVersion)
+        .filter_by(filesystem_state_id=files[0].id)
+        .all()
+    )
+    assert len(versions) == 1
+    assert versions[0].file_number == "ARCH_1"
+
+    # Verify second chunk was NOT checkpointed
+    versions_2 = (
+        db_session.query(models.FileVersion)
+        .filter_by(filesystem_state_id=files[1].id)
+        .all()
+    )
+    assert len(versions_2) == 0
+
+    # Verify media bytes_used reflects only first chunk
+    assert media.bytes_used == 60 * 1024 * 1024
+
+
 def test_cancelled_backup_job_status(db_session, mocker, tmp_path):
     """Verifies that a cancelled backup job never calls complete_job."""
     staging = tmp_path / "staging"

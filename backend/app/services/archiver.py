@@ -468,6 +468,19 @@ class ArchiverService:
                         remaining_to_write.append(item)
 
                 if not remaining_to_write:
+                    # Checkpoint: all files were duplicates; commit deduplication
+                    # records so they aren't lost if the job fails later.
+                    try:
+                        db_session.commit()
+                        JobManager.add_job_log(
+                            job_id,
+                            f"Checkpoint: chunk {chunk_num} deduplicated",
+                        )
+                    except StaleDataError:
+                        db_session.rollback()
+                        logger.warning(
+                            f"Checkpoint commit failed for deduplicated chunk {chunk_num}"
+                        )
                     continue
 
                 if storage_provider.capabilities.get("supports_random_access"):
@@ -532,6 +545,20 @@ class ArchiverService:
                                     offset_end=item["offset_end"],
                                 )
                             )
+
+                    # Checkpoint: commit after each successful chunk
+                    try:
+                        db_session.commit()
+                        JobManager.add_job_log(
+                            job_id,
+                            f"Checkpoint: chunk {chunk_num} committed",
+                        )
+                    except StaleDataError:
+                        db_session.rollback()
+                        logger.warning(
+                            f"Checkpoint commit failed for chunk {chunk_num}"
+                        )
+
                 else:
                     # Sequential Media (Tape): Hybrid Tar Generation
                     has_splits = any(item["is_split"] for item in remaining_to_write)
@@ -670,6 +697,19 @@ class ArchiverService:
 
                     if os.path.exists(staging_full_path):
                         os.remove(staging_full_path)
+
+                    # Checkpoint: commit after each successful archive
+                    try:
+                        db_session.commit()
+                        JobManager.add_job_log(
+                            job_id,
+                            f"Checkpoint: archive {chunk_num} committed",
+                        )
+                    except StaleDataError:
+                        db_session.rollback()
+                        logger.warning(
+                            f"Checkpoint commit failed for archive {chunk_num}"
+                        )
 
             # --- Saturated Media Logic ---
             # If utilized over 98%, mark as full and cede priority
