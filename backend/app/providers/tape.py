@@ -236,19 +236,28 @@ class LTOProvider(AbstractStorageProvider):
                     LTOProvider._lkg_state[self.device_path]["last_check"] = time.time()
                     return mam
 
-                # If we get "Device or resource busy", wait a bit and retry
+                # Log failure so we can diagnose why sg_read_attr isn't working
                 stderr_text = (
-                    (result.stderr or b"").decode().lower()
+                    (result.stderr or b"").decode()
                     if isinstance(result.stderr, bytes)
-                    else (result.stderr or "").lower()
+                    else (result.stderr or "")
                 )
-                if result.returncode != 0 and "busy" in stderr_text:
-                    time.sleep(0.2)
-                    continue
+                if result.returncode != 0:
+                    logger.warning(
+                        f"sg_read_attr returned code {result.returncode} for {self.device_path} (attempt {attempt + 1}/3): {stderr_text[:200]}"
+                    )
+                    if "busy" in stderr_text.lower():
+                        time.sleep(0.2)
+                        continue
 
+            except FileNotFoundError:
+                logger.error(
+                    f"'sg_read_attr' binary not found in PATH. Cannot read MAM for {self.device_path}."
+                )
+                break
             except Exception as e:
-                logger.debug(
-                    f"MAM read attempt {attempt} failed for {self.device_path}: {e}"
+                logger.warning(
+                    f"MAM read attempt {attempt + 1}/3 failed for {self.device_path}: {e}"
                 )
                 time.sleep(0.1)
 
@@ -301,6 +310,9 @@ class LTOProvider(AbstractStorageProvider):
         ):
             return LTOProvider._lkg_state[self.device_path]["online"]
 
+        is_online = False
+
+        # 1. Try mt status
         try:
             cmd = ["mt", "-f", self.device_path, "status"]
             self._log_command(cmd)
@@ -314,22 +326,36 @@ class LTOProvider(AbstractStorageProvider):
                 "Device or resource busy" in stderr
                 or "Device or resource busy" in stdout
             ):
-                LTOProvider._lkg_state[self.device_path]["online"] = True
-                return True
+                is_online = True
+            else:
+                is_online = (
+                    "ONLINE" in stdout or "READY" in stdout or result.returncode == 0
+                )
+        except FileNotFoundError:
+            logger.debug(f"'mt' binary not found for {self.device_path}")
+        except Exception as e:
+            logger.debug(f"mt status failed for {self.device_path}: {e}")
 
-            is_online = (
-                "ONLINE" in stdout or "READY" in stdout or result.returncode == 0
-            )
+        # 2. Fallback: try sg_turs (SCSI Test Unit Ready)
+        if not is_online:
+            try:
+                cmd = ["sg_turs", self.device_path]
+                self._log_command(cmd)
+                result = subprocess.run(cmd, capture_output=True, timeout=5)
+                if result.returncode == 0:
+                    is_online = True
+            except FileNotFoundError:
+                logger.debug(f"'sg_turs' binary not found for {self.device_path}")
+            except Exception as e:
+                logger.debug(f"sg_turs failed for {self.device_path}: {e}")
 
-            # If we transitioned from online -> offline, clear the LKG MAM (tape was likely ejected)
-            if LTOProvider._lkg_state[self.device_path]["online"] and not is_online:
-                LTOProvider._lkg_state[self.device_path]["mam"] = {}
+        # 3. If we transitioned from online -> offline, clear the LKG MAM (tape was likely ejected)
+        if LTOProvider._lkg_state[self.device_path]["online"] and not is_online:
+            LTOProvider._lkg_state[self.device_path]["mam"] = {}
 
-            LTOProvider._lkg_state[self.device_path]["online"] = is_online
-            LTOProvider._lkg_state[self.device_path]["last_check"] = now
-            return is_online
-        except Exception:
-            return LTOProvider._lkg_state[self.device_path]["online"]
+        LTOProvider._lkg_state[self.device_path]["online"] = is_online
+        LTOProvider._lkg_state[self.device_path]["last_check"] = now
+        return is_online
 
     def is_write_protected(self) -> bool:
         """Checks if the tape is write-protected (read-only)"""
