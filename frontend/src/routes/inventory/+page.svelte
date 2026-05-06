@@ -1095,7 +1095,7 @@
                             <label class="text-xs font-medium text-text-secondary ml-1" for="identifier">
                                 {newMedia.media_type === 'lto_tape' ? 'Barcode' : newMedia.media_type === 'local_hdd' ? 'Identifier / Serial' : 'Friendly Name'}
                             </label>
-                            <Input id="identifier" bind:value={newMedia.identifier} placeholder={newMedia.media_type === 'lto_tape' ? 'BUP-00001' : newMedia.media_type === 'local_hdd' ? 'Samsung-T7-001' : 'AWS-Production'} class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                            <Input id="identifier" bind:value={newMedia.identifier} placeholder={newMedia.media_type === 'lto_tape' ? 'TAPE01' : newMedia.media_type === 'local_hdd' ? 'Samsung-T7-001' : 'AWS-Production'} class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
                         </div>
 
                         {#if newMedia.media_type === 'lto_tape'}
@@ -1232,27 +1232,9 @@
                     <h3 class="text-xs font-semibold text-text-secondary uppercase tracking-wider">Configuration</h3>
 
                     {#if newMedia.media_type === 'lto_tape'}
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="flex items-center gap-3 h-10 px-1">
-                                <input id="compression" type="checkbox" bind:checked={newMedia.compression} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
-                                <label class="text-xs font-medium text-text-secondary cursor-pointer" for="compression">Hardware Compression</label>
-                            </div>
-                            <div class="flex items-center gap-3 h-10 px-1">
-                                <input id="worm" type="checkbox" bind:checked={newMedia.worm} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
-                                <label class="text-xs font-medium text-text-secondary cursor-pointer" for="worm">WORM (Write Once Read Many)</label>
-                            </div>
-                            <div class="flex items-center gap-3 h-10 px-1">
-                                <input id="write_protected" type="checkbox" bind:checked={newMedia.write_protected} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
-                                <label class="text-xs font-medium text-text-secondary cursor-pointer" for="write_protected">Write Protected (Physical)</label>
-                            </div>
-                            <div class="flex items-center gap-3 h-10 px-1">
-                                <input id="cleaning_cartridge" type="checkbox" bind:checked={newMedia.cleaning_cartridge} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
-                                <label class="text-xs font-medium text-text-secondary cursor-pointer" for="cleaning_cartridge">Cleaning Cartridge</label>
-                            </div>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-xs font-medium text-text-secondary ml-1" for="encryption_key_id">Encryption Key ID</label>
-                            <Input id="encryption_key_id" bind:value={newMedia.encryption_key_id} placeholder="Key reference in system keystore" class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                        <div class="flex items-center gap-3 h-10 px-1">
+                            <input id="compression" type="checkbox" bind:checked={newMedia.compression} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
+                            <label class="text-xs font-medium text-text-secondary cursor-pointer" for="compression">Hardware Compression</label>
                         </div>
                         <div class="space-y-2">
                             <label class="text-xs font-medium text-text-secondary ml-1" for="lto-encryption_secret_name">Encryption Secret</label>
@@ -1268,48 +1250,9 @@
                             <p class="text-[10px] text-text-secondary leading-tight opacity-60">Manage secrets in <a href="/settings" class="text-blue-500 hover:underline">Settings</a>.</p>
                         </div>
                     {:else if newMedia.media_type === 'local_hdd'}
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="flex items-center gap-3 h-10 px-1">
-                                <input id="is_ssd" type="checkbox" bind:checked={newMedia.is_ssd} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
-                                <label class="text-xs font-medium text-text-secondary cursor-pointer" for="is_ssd">SSD (Solid State Drive)</label>
-                            </div>
-                            <div class="flex items-center gap-3 h-10 px-1">
-                                <input id="encrypted" type="checkbox" bind:checked={newMedia.encrypted} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
-                                <label class="text-xs font-medium text-text-secondary cursor-pointer" for="encrypted">Drive Encrypted (BitLocker/LUKS)</label>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-6">
-                            <div class="space-y-2">
-                                <label class="text-xs font-medium text-text-secondary ml-1" for="filesystem_type">Filesystem Type</label>
-                                <div class="relative">
-                                    <select id="filesystem_type" bind:value={newMedia.filesystem_type} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
-                                        <option value="">Select...</option>
-                                        <option value="ext4">ext4</option>
-                                        <option value="NTFS">NTFS</option>
-                                        <option value="APFS">APFS</option>
-                                        <option value="exFAT">exFAT</option>
-                                    </select>
-                                    <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
-                                </div>
-                            </div>
-                            <div class="space-y-2">
-                                <label class="text-xs font-medium text-text-secondary ml-1" for="connection_interface">Connection Interface</label>
-                                <div class="relative">
-                                    <select id="connection_interface" bind:value={newMedia.connection_interface} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
-                                        <option value="">Select...</option>
-                                        <option value="USB-A">USB-A</option>
-                                        <option value="USB-C">USB-C</option>
-                                        <option value="Thunderbolt">Thunderbolt</option>
-                                        <option value="SATA">SATA</option>
-                                        <option value="NVMe">NVMe</option>
-                                    </select>
-                                    <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
-                                </div>
-                            </div>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-xs font-medium text-text-secondary ml-1" for="hdd_encryption_key_id">Encryption Key ID</label>
-                            <Input id="hdd_encryption_key_id" bind:value={newMedia.hdd_encryption_key_id} placeholder="Key reference in system keystore" class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                        <div class="flex items-center gap-3 h-10 px-1">
+                            <input id="is_ssd" type="checkbox" bind:checked={newMedia.is_ssd} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
+                            <label class="text-xs font-medium text-text-secondary cursor-pointer" for="is_ssd">SSD (Solid State Drive)</label>
                         </div>
                         <div class="space-y-2">
                             <label class="text-xs font-medium text-text-secondary ml-1" for="hdd-encryption_secret_name">Encryption Secret</label>
@@ -1435,23 +1378,9 @@
                     {#if editingMedia.media_type === 'lto_tape'}
                         <div class="space-y-4">
                             <h3 class="text-xs font-semibold text-text-secondary uppercase tracking-wider">LTO Configuration</h3>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div class="flex items-center gap-3 h-10 px-1">
-                                    <input id="edit-compression" type="checkbox" bind:checked={editingMedia.compression} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
-                                    <label class="text-xs font-medium text-text-secondary cursor-pointer" for="edit-compression">Hardware Compression</label>
-                                </div>
-                                <div class="flex items-center gap-3 h-10 px-1">
-                                    <input id="edit-worm" type="checkbox" bind:checked={editingMedia.worm} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
-                                    <label class="text-xs font-medium text-text-secondary cursor-pointer" for="edit-worm">WORM</label>
-                                </div>
-                                <div class="flex items-center gap-3 h-10 px-1">
-                                    <input id="edit-write_protected" type="checkbox" bind:checked={editingMedia.write_protected} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
-                                    <label class="text-xs font-medium text-text-secondary cursor-pointer" for="edit-write_protected">Write Protected</label>
-                                </div>
-                                <div class="flex items-center gap-3 h-10 px-1">
-                                    <input id="edit-cleaning_cartridge" type="checkbox" bind:checked={editingMedia.cleaning_cartridge} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
-                                    <label class="text-xs font-medium text-text-secondary cursor-pointer" for="edit-cleaning_cartridge">Cleaning Cartridge</label>
-                                </div>
+                            <div class="flex items-center gap-3 h-10 px-1">
+                                <input id="edit-compression" type="checkbox" bind:checked={editingMedia.compression} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
+                                <label class="text-xs font-medium text-text-secondary cursor-pointer" for="edit-compression">Hardware Compression</label>
                             </div>
                             <div class="space-y-2">
                                 <label class="text-xs font-medium text-text-secondary ml-1" for="edit-lto-encryption_secret_name">Encryption Secret</label>
@@ -1481,10 +1410,6 @@
                                 <div class="flex items-center gap-3 h-10 px-1">
                                     <input id="edit-is_ssd" type="checkbox" bind:checked={editingMedia.is_ssd} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
                                     <label class="text-xs font-medium text-text-secondary cursor-pointer" for="edit-is_ssd">SSD</label>
-                                </div>
-                                <div class="flex items-center gap-3 h-10 px-1">
-                                    <input id="edit-encrypted" type="checkbox" bind:checked={editingMedia.encrypted} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
-                                    <label class="text-xs font-medium text-text-secondary cursor-pointer" for="edit-encrypted">Encrypted</label>
                                 </div>
                             </div>
                             <div class="space-y-2">

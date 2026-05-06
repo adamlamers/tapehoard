@@ -10,7 +10,7 @@ from loguru import logger
 
 class LTOProvider(AbstractStorageProvider):
     provider_id = "lto_tape"
-    name = "LTO Tape Drive"
+    name = "LTO Tape"
     description = "Hardware Linear Tape-Open (LTO) drives."
     capabilities = {
         "supports_random_access": False,
