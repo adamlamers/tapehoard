@@ -4,6 +4,54 @@ import sys
 from loguru import logger
 
 
+def _get_ionice_setting() -> str:
+    """Reads the user's preferred I/O scheduling class from settings."""
+    try:
+        from app.db.database import SessionLocal
+        from app.db import models
+
+        with SessionLocal() as db_session:
+            record = (
+                db_session.query(models.SystemSetting)
+                .filter(models.SystemSetting.key == "ionice_level")
+                .first()
+            )
+            if record and record.value in ("idle", "best-effort", "realtime"):
+                return record.value
+    except Exception:
+        pass
+    return "idle"  # Default: be the most polite
+
+
+def set_process_priority(level: str):
+    """Adjusts CPU and I/O priority of the current process.
+
+    Args:
+        level: "background" for lowest priority (ionice idle + nice 19),
+               "normal" to reset (ionice best-effort + nice 0).
+    """
+    try:
+        import psutil
+
+        p = psutil.Process(os.getpid())
+        if level == "background":
+            ionice_level = _get_ionice_setting()
+            if hasattr(p, "ionice"):
+                if ionice_level == "idle":
+                    p.ionice(psutil.IOPRIO_CLASS_IDLE)  # type: ignore[attr-defined]
+                elif ionice_level == "realtime":
+                    p.ionice(psutil.IOPRIO_CLASS_RT)  # type: ignore[attr-defined]
+                else:
+                    p.ionice(psutil.IOPRIO_CLASS_BE)  # type: ignore[attr-defined]
+            p.nice(19)
+        else:
+            if hasattr(p, "ionice"):
+                p.ionice(psutil.IOPRIO_CLASS_BE)  # type: ignore[attr-defined]
+            p.nice(0)
+    except Exception as e:
+        logger.debug(f"Could not set process priority to '{level}': {e}")
+
+
 def get_path_uuid(path: str) -> str | None:
     """Attempts to retrieve a stable hardware/filesystem UUID for a given path."""
     if not os.path.exists(path):

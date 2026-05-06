@@ -169,23 +169,6 @@ class ScannerService:
                     return
                 time.sleep(0.1)
 
-    def _set_process_priority(self, level: str):
-        """Adjusts the CPU and I/O priority of the current process."""
-        try:
-            p = psutil.Process(os.getpid())
-            if level == "background":
-                if hasattr(p, "ionice"):
-                    p.ionice(
-                        psutil.IOPRIO_CLASS_IDLE  # ty: ignore[unresolved-attribute]
-                    )
-                p.nice(19)
-            else:
-                if hasattr(p, "ionice"):
-                    p.ionice(psutil.IOPRIO_CLASS_BE)  # ty: ignore[unresolved-attribute]
-                p.nice(0)
-        except Exception:
-            pass
-
     def compute_sha256(
         self, file_path: str, job_id: Optional[int] = None
     ) -> Optional[str]:
@@ -231,7 +214,9 @@ class ScannerService:
             JobManager.update_job(job_id, 0.0, "Starting system scan...")
             JobManager.add_job_log(job_id, "Starting system scan")
 
-        self._set_process_priority("normal")
+        from app.core.utils import set_process_priority
+
+        set_process_priority("normal")
         with self._metrics_lock:
             self.files_processed = 0
             self.files_new = 0
@@ -434,7 +419,9 @@ class ScannerService:
         with self._metrics_lock:
             self.is_hashing = True
 
-        self._set_process_priority("background")
+        from app.core.utils import set_process_priority
+
+        set_process_priority("background")
 
         try:
             with SessionLocal() as db_session:

@@ -307,6 +307,10 @@ class ArchiverService:
         )
         JobManager.add_job_log(job_id, f"Starting backup to {media_record.identifier}")
 
+        from app.core.utils import set_process_priority
+
+        set_process_priority("background")
+
         workload_batch = self.assemble_backup_batch(db_session, media_id)
         if not workload_batch:
             JobManager.add_job_log(job_id, "No files require backup")
@@ -744,6 +748,7 @@ class ArchiverService:
             logger.exception(f"Archival failed: {e}")
             JobManager.fail_job(job_id, str(e))
         finally:
+            set_process_priority("normal")
             # Clean up any residual staging files
             for chunk_file in os.listdir(self.staging_directory):
                 if chunk_file.startswith("backup_") and chunk_file.endswith(".tar"):

@@ -20,7 +20,8 @@
         Upload,
         Terminal,
         Globe,
-        Key
+        Key,
+        ChevronDown
     } from "lucide-svelte";
     import { Button } from "$lib/components/ui/button";
     import PageHeader from "$lib/components/ui/PageHeader.svelte";
@@ -51,6 +52,7 @@
     let scanSchedule = $state("");
     let archivalSchedule = $state("");
     let notificationUrls = $state<string[]>([]);
+    let ioniceLevel = $state("idle");
 
     // Secrets keystore
     let secretsList = $state<string[]>([]);
@@ -66,7 +68,8 @@
         globalExclusions,
         scanSchedule,
         archivalSchedule,
-        notificationUrls
+        notificationUrls,
+        ioniceLevel
     }));
 
     beforeNavigate((navigation: any) => {
@@ -155,6 +158,7 @@
                 if (data.schedule_scan) scanSchedule = data.schedule_scan;
                 if (data.schedule_archival) archivalSchedule = data.schedule_archival;
                 if (data.notification_urls) notificationUrls = JSON.parse(data.notification_urls);
+                if (data.ionice_level) ioniceLevel = data.ionice_level;
             }
 
             // Load secrets
@@ -169,7 +173,8 @@
                 globalExclusions,
                 scanSchedule,
                 archivalSchedule,
-                notificationUrls
+                notificationUrls,
+                ioniceLevel
             });
         } catch (error) {
             toast.error("Failed to load system configuration");
@@ -188,7 +193,8 @@
                 updateSettings({ body: { key: "global_exclusions", value: globalExclusions } }),
                 updateSettings({ body: { key: "schedule_scan", value: scanSchedule } }),
                 updateSettings({ body: { key: "schedule_archival", value: archivalSchedule } }),
-                updateSettings({ body: { key: "notification_urls", value: JSON.stringify(notificationUrls) } })
+                updateSettings({ body: { key: "notification_urls", value: JSON.stringify(notificationUrls) } }),
+                updateSettings({ body: { key: "ionice_level", value: ioniceLevel } })
             ]);
 
             // Snapshot saved state
@@ -199,7 +205,8 @@
                 globalExclusions,
                 scanSchedule,
                 archivalSchedule,
-                notificationUrls
+                notificationUrls,
+                ioniceLevel
             });
 
             toast.success("System configuration committed");
@@ -648,6 +655,24 @@
 
                 {:else if activeTab === 'system'}
                     <div class="animate-in slide-in-from-bottom-4 duration-500 space-y-6">
+                        <Card class="p-5 shadow-xl">
+                            <SectionHeader title="I/O scheduling" icon={Cpu} class="mb-6 px-0" />
+                            <div class="space-y-4">
+                                <div class="space-y-2">
+                                    <label class="text-xs font-medium text-text-secondary ml-1" for="ionice-level">Background job I/O priority</label>
+                                    <div class="relative">
+                                        <select id="ionice-level" bind:value={ioniceLevel} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
+                                            <option value="idle">Idle (only use I/O when system is free)</option>
+                                            <option value="best-effort">Best-effort (normal scheduling)</option>
+                                            <option value="realtime">Real-time (highest priority, requires root)</option>
+                                        </select>
+                                        <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+                                    </div>
+                                    <p class="text-[10px] text-text-secondary leading-tight opacity-60">Applies to scan and backup jobs. Idle is recommended for production systems.</p>
+                                </div>
+                            </div>
+                        </Card>
+
                         <Card class="p-5 shadow-xl">
                             <SectionHeader title="Index management" icon={Database} class="mb-6 px-0" />
                             <div class="grid grid-cols-2 gap-4">
