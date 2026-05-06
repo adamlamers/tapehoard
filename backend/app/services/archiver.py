@@ -375,21 +375,29 @@ class ArchiverService:
         self,
         media_record: models.StorageMedia,
         storage_provider: Any,
-    ) -> None:
-        """Syncs bytes_used to hardware-reported utilization when available."""
+    ) -> bool:
+        """Syncs bytes_used to hardware-reported utilization when available.
+
+        Returns True if bytes_used was updated from hardware, False if the
+        provider either lacks get_utilization, returned None, or raised.
+        """
         from unittest.mock import Mock
 
         if hasattr(storage_provider, "get_utilization"):
-            hw_util = storage_provider.get_utilization()
+            try:
+                hw_util = storage_provider.get_utilization()
+            except Exception:
+                return False
             # Skip mock objects (tests) and invalid values
             if hw_util is not None and not isinstance(hw_util, Mock):
                 try:
                     media_record.bytes_used = int(
                         float(hw_util) * media_record.capacity
                     )
-                    return
+                    return True
                 except (TypeError, ValueError):
                     pass
+        return False
 
     def run_backup(self, db_session: Session, media_id: int, job_id: int):
         """Orchestrates the archival of a data batch to a storage provider."""
@@ -702,11 +710,10 @@ class ArchiverService:
                         hw_util_after,
                         media_record.capacity,
                     )
-                    old_bytes_used = media_record.bytes_used
-                    self._update_bytes_used_from_hardware(
+                    hw_updated = self._update_bytes_used_from_hardware(
                         media_record, storage_provider
                     )
-                    if media_record.bytes_used == old_bytes_used:
+                    if not hw_updated:
                         # Hardware didn't report; fall back to uncompressed size
                         media_record.bytes_used += uncompressed_size
 
@@ -837,11 +844,10 @@ class ArchiverService:
                         hw_util_after,
                         media_record.capacity,
                     )
-                    old_bytes_used = media_record.bytes_used
-                    self._update_bytes_used_from_hardware(
+                    hw_updated = self._update_bytes_used_from_hardware(
                         media_record, storage_provider
                     )
-                    if media_record.bytes_used == old_bytes_used:
+                    if not hw_updated:
                         # Hardware didn't report; fall back to uncompressed size
                         media_record.bytes_used += uncompressed_size
 

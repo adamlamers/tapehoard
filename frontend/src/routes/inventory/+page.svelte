@@ -325,6 +325,9 @@
         pollInterval = setInterval(() => {
             pollHardware();
             loadStagingInfo();
+            // Refresh media list (DB-only, no hardware query) so bytes_used
+            // stays current after backup jobs complete.
+            loadMedia(true, false);
         }, POLL_SLOW);
     });
 

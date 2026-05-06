@@ -589,3 +589,100 @@ def test_cancelled_backup_job_status(db_session, mocker, tmp_path):
     db_session.expire_all()
     refreshed_job = db_session.get(models.Job, job_id)
     assert refreshed_job.status != "COMPLETED"
+
+
+def test_bytes_used_does_not_fallback_on_zero_utilization(db_session, mocker, tmp_path):
+    """Verifies that bytes_used is NOT inflated by the uncompressed-size fallback
+    when get_utilization() returns 0.0 (e.g. an empty tape or unchanged MAM)."""
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    archiver = ArchiverService(staging_directory=str(staging))
+
+    media = models.StorageMedia(
+        media_type="tape",
+        identifier="TAPE_ZERO",
+        capacity=10 * 1024 * 1024 * 1024,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add(media)
+
+    source_file = tmp_path / "source.txt"
+    source_file.write_bytes(b"hello world")
+
+    f1 = models.FilesystemState(
+        file_path=str(source_file),
+        size=source_file.stat().st_size,
+        mtime=1,
+        sha256_hash="hash1",
+    )
+    db_session.add(f1)
+    db_session.commit()
+
+    mock_provider = mocker.MagicMock()
+    mock_provider.capabilities = {"supports_random_access": False}
+    mock_provider.identify_media.return_value = "TAPE_ZERO"
+    mock_provider.prepare_for_write.return_value = True
+    mock_provider.write_archive.return_value = "ARCH_1"
+    # Hardware reports 0% utilization (empty tape)
+    mock_provider.get_utilization.return_value = 0.0
+
+    mocker.patch.object(archiver, "_get_storage_provider", return_value=mock_provider)
+
+    from app.services.scanner import JobManager
+
+    job = JobManager.create_job(db_session, "BACKUP")
+    archiver.run_backup(db_session, media.id, job.id)
+
+    # bytes_used should be exactly 0 because hardware reported 0.0 utilization.
+    # The old buggy code would have added uncompressed_size (11 bytes) as a
+    # fallback because bytes_used (0) == old_bytes_used (0).
+    assert media.bytes_used == 0
+
+
+def test_bytes_used_fallback_when_hardware_returns_none(db_session, mocker, tmp_path):
+    """Verifies that the uncompressed-size fallback IS used when
+    get_utilization() returns None (hardware truly unavailable)."""
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    archiver = ArchiverService(staging_directory=str(staging))
+
+    media = models.StorageMedia(
+        media_type="tape",
+        identifier="TAPE_NONE",
+        capacity=10 * 1024 * 1024 * 1024,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add(media)
+
+    source_file = tmp_path / "source.txt"
+    source_file.write_bytes(b"hello world")
+
+    f1 = models.FilesystemState(
+        file_path=str(source_file),
+        size=source_file.stat().st_size,
+        mtime=1,
+        sha256_hash="hash1",
+    )
+    db_session.add(f1)
+    db_session.commit()
+
+    mock_provider = mocker.MagicMock()
+    mock_provider.capabilities = {"supports_random_access": False}
+    mock_provider.identify_media.return_value = "TAPE_NONE"
+    mock_provider.prepare_for_write.return_value = True
+    mock_provider.write_archive.return_value = "ARCH_1"
+    # Hardware cannot report utilization
+    mock_provider.get_utilization.return_value = None
+
+    mocker.patch.object(archiver, "_get_storage_provider", return_value=mock_provider)
+
+    from app.services.scanner import JobManager
+
+    job = JobManager.create_job(db_session, "BACKUP")
+    archiver.run_backup(db_session, media.id, job.id)
+
+    # bytes_used should fall back to the actual staged tar size (tar overhead
+    # makes it larger than the raw 11-byte source file).
+    assert media.bytes_used > source_file.stat().st_size
