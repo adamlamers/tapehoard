@@ -274,12 +274,10 @@ def test_lto_weof_fails_after_timeout(mocker):
 
     mocker.patch("subprocess.run", side_effect=always_busy)
 
-    # Speed up time so the 60s timeout is reached quickly
+    # Speed up time so the 15-minute timeout is reached quickly
     start = time.time()
-    mocker.patch(
-        "time.time",
-        side_effect=[start, start, start + 10, start + 20, start + 65],
-    )
+    time_values = iter([start, start] + [start + i * 20 for i in range(1, 50)])
+    mocker.patch("time.time", side_effect=lambda: next(time_values))
 
     with pytest.raises(subprocess.CalledProcessError):
         provider.finalize_stream()

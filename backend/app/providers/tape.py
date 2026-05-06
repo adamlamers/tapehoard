@@ -406,6 +406,7 @@ class LTOProvider(AbstractStorageProvider):
         last_err = None
         start_time = time.time()
         attempt = 0
+        waiting_logged = False
 
         while True:
             try:
@@ -419,7 +420,13 @@ class LTOProvider(AbstractStorageProvider):
                 # Retry only on transient busy errors while within timeout
                 if "busy" in stderr.lower() and elapsed < timeout_seconds:
                     attempt += 1
-                    sleep_time = min(0.2 * (2**attempt), 8.0)  # cap at 8s
+                    sleep_time = min(0.2 * (2**attempt), 15.0)  # cap at 15s
+                    if not waiting_logged:
+                        logger.info(
+                            f"Waiting for tape drive to be available "
+                            f"(command: mt {command})..."
+                        )
+                        waiting_logged = True
                     logger.warning(
                         f"mt {command} busy (attempt {attempt}, "
                         f"elapsed {elapsed:.1f}s / {timeout_seconds:.0f}s), "
@@ -598,8 +605,8 @@ class LTOProvider(AbstractStorageProvider):
     def finalize_stream(self) -> str:
         """Writes a file mark after a streamed archive and returns the
         file number index."""
-        # Allow up to 60s for the drive buffer to flush before writing the file mark.
-        self._run_mt("weof", timeout_seconds=60)
+        # Allow up to 15 minutes for the drive buffer to flush before writing the file mark.
+        self._run_mt("weof", timeout_seconds=900)
         return self._get_current_file_number()
 
     def write_archive(self, media_id: str, stream: BinaryIO) -> str:
@@ -618,8 +625,8 @@ class LTOProvider(AbstractStorageProvider):
         proc.wait()
         # Write a file mark so each archive is a distinct tape file.
         # This is required for fsf-based seeks during restore.
-        # Allow up to 60s for the drive buffer to flush before writing the file mark.
-        self._run_mt("weof", timeout_seconds=60)
+        # Allow up to 15 minutes for the drive buffer to flush before writing the file mark.
+        self._run_mt("weof", timeout_seconds=900)
         return file_num
 
     def get_utilization(self) -> Optional[float]:
