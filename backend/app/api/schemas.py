@@ -62,7 +62,8 @@ class LtoTapeCreateSchema(MediaBaseSchema):
     """Schema for creating LTO Tape media."""
 
     media_type: Literal["lto_tape"] = "lto_tape"
-    generation: str  # LTO-5, LTO-6, LTO-7, LTO-8, LTO-9
+    generation: Optional[str] = None  # Auto-detected from hardware if omitted
+    capacity: Optional[int] = None  # Auto-detected from hardware MAM if omitted
     worm: bool = False
     write_protected: bool = False
     compression: bool = True
@@ -70,6 +71,8 @@ class LtoTapeCreateSchema(MediaBaseSchema):
     cleaning_cartridge: bool = False
     # Reference to encryption passphrase in the settings keystore
     encryption_secret_name: Optional[str] = None
+    # Device path for hardware auto-detection (e.g. /dev/nst0)
+    device_path: Optional[str] = None
 
 
 class OfflineHddCreateSchema(MediaBaseSchema):

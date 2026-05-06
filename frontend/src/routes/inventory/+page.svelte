@@ -81,6 +81,7 @@
         identifier: '',
         generation: 'LTO-6',
         capacity: 2500, // 2.5 TB in GB
+        _capacityFromHardware: false, // internal flag to prevent override
         location: 'Storage Shelf',
         location_building: '',
         location_room: '',
@@ -125,10 +126,10 @@
         }
     }
 
-    // LTO Generation change handler (auto-populate capacity)
+    // LTO Generation change handler (auto-populate capacity only if not from hardware)
     function handleGenerationChange(gen: string) {
         newMedia.generation = gen;
-        if (LTO_CAPACITY[gen]) {
+        if (LTO_CAPACITY[gen] && !newMedia._capacityFromHardware) {
             newMedia.capacity = LTO_CAPACITY[gen];
         }
     }
@@ -441,6 +442,9 @@
             payload.encryption_key_id = newMedia.encryption_key_id || undefined;
             payload.cleaning_cartridge = newMedia.cleaning_cartridge;
             payload.encryption_secret_name = newMedia.encryption_secret_name || undefined;
+            if (newMedia._devicePath) {
+                payload.device_path = newMedia._devicePath;
+            }
         } else if (newMedia.media_type === 'local_hdd') {
             payload.drive_model = newMedia.drive_model || undefined;
             payload.device_uuid = newMedia.device_uuid || undefined;
@@ -480,8 +484,8 @@
 
     function openEdit(media: MediaSchema) {
         editingMedia = JSON.parse(JSON.stringify(media)) as MediaSchema;
-        // Convert capacity from bytes to GB for editing
-        editingMedia.capacity = Math.round(editingMedia.capacity / (1000 * 1000 * 1000));
+        // Convert capacity from bytes to GB for editing, always floor
+        editingMedia.capacity = Math.floor(editingMedia.capacity / (1000 * 1000 * 1000));
         // Ensure all fields exist for type-specific editing
         if (editingMedia.media_type === 'lto_tape') {
             editingMedia.encryption_key_id = editingMedia.encryption_key_id || '';
@@ -807,12 +811,16 @@
                                                         newMedia.identifier = asset.hardware_info.tape.barcode;
                                                     }
                                                     if (asset.hardware_info?.tape?.max_capacity_mib) {
-                                                        // Convert MiB to GB (base-10)
-                                                        newMedia.capacity = Math.round(asset.hardware_info.tape.max_capacity_mib * 1024 * 1024 / (1000 * 1000 * 1000));
+                                                        // Convert MiB to GB (base-10), always FLOOR to avoid
+                                                        // over-reporting physical capacity.
+                                                        newMedia.capacity = Math.floor(asset.hardware_info.tape.max_capacity_mib * 1024 * 1024 / (1000 * 1000 * 1000));
+                                                        newMedia._capacityFromHardware = true;
                                                     }
                                                     if (asset.hardware_info?.tape?.generation_label) {
                                                         newMedia.generation = asset.hardware_info.tape.generation_label;
                                                     }
+                                                    // Pass device path so backend can verify against hardware
+                                                    newMedia._devicePath = asset.device_path || '';
                                                 }
                                                 showRegisterDialog = true;
                                             }}>Add media</Button>

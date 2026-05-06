@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 import psutil
 from fastapi import APIRouter, Depends, HTTPException
@@ -195,6 +195,55 @@ def reorder_media(
     return {"message": "Archival priority synchronized."}
 
 
+def _detect_lto_capacity_from_hardware(
+    db_session: Session, identifier: str, device_path: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Queries hardware MAM to get actual capacity and generation for a tape.
+
+    Returns a dict with 'capacity' (bytes), 'generation' (str), and 'device_path'
+    if the tape is found online, otherwise None.
+    """
+    from app.providers.tape import LTOProvider
+
+    paths_to_try = []
+    if device_path:
+        paths_to_try.append(device_path)
+    else:
+        # Look up configured drives
+        drive_record = (
+            db_session.query(models.SystemSetting)
+            .filter(models.SystemSetting.key == "tape_drives")
+            .first()
+        )
+        if drive_record:
+            try:
+                paths_to_try = json.loads(drive_record.value)
+            except Exception:
+                pass
+
+    for path in paths_to_try:
+        try:
+            provider = LTOProvider(config={"device_path": path})
+            if not provider.check_online(force=True):
+                continue
+            live = provider.get_live_info(force=True)
+            if live.get("identity") == identifier:
+                mam = live.get("tape", {})
+                max_mib = mam.get("max_capacity_mib")
+                if max_mib:
+                    capacity_bytes = int(max_mib * 1024 * 1024)
+                    generation = mam.get("generation_label")
+                    return {
+                        "capacity": capacity_bytes,
+                        "generation": generation,
+                        "device_path": path,
+                    }
+        except Exception as e:
+            logger.debug(f"Hardware capacity detection failed for {path}: {e}")
+
+    return None
+
+
 @router.post("/media", response_model=MediaSchema, operation_id="create_media")
 def create_media(
     request_data: MediaCreateSchema, db_session: Session = Depends(get_db)
@@ -208,11 +257,63 @@ def create_media(
     if existing_record:
         raise HTTPException(status_code=400, detail="Media identifier already exists.")
 
+    # Auto-detect LTO capacity/generation from hardware if not provided,
+    # or validate against hardware if device_path is given.
+    detected_info = None
+    if request_data.media_type == "lto_tape":
+        assert isinstance(request_data, schemas.LtoTapeCreateSchema)
+        needs_detection = (
+            request_data.capacity is None
+            or request_data.capacity == 0
+            or request_data.generation is None
+            or request_data.device_path is not None
+        )
+        if needs_detection:
+            detected_info = _detect_lto_capacity_from_hardware(
+                db_session,
+                request_data.identifier,
+                request_data.device_path,
+            )
+            if detected_info:
+                logger.info(
+                    f"Auto-detected LTO media {request_data.identifier}: "
+                    f"capacity={detected_info['capacity']} bytes, "
+                    f"generation={detected_info['generation']}"
+                )
+
+    capacity = request_data.capacity
+    if request_data.media_type == "lto_tape" and detected_info:
+        if capacity is None or capacity == 0:
+            capacity = detected_info["capacity"]
+        elif detected_info["capacity"] > 0:
+            if request_data.device_path:
+                # Hardware ground truth: when a device_path is explicitly provided,
+                # always trust the drive's MAM over any user input to avoid
+                # rounding-up errors that would exceed physical capacity.
+                if capacity != detected_info["capacity"]:
+                    logger.info(
+                        f"Overriding provided capacity with hardware-reported "
+                        f"capacity for {request_data.identifier} "
+                        f"({capacity} -> {detected_info['capacity']} bytes)"
+                    )
+                    capacity = detected_info["capacity"]
+            else:
+                # Manual entry safety net: only override if significantly off
+                provided_mib = capacity / (1024 * 1024)
+                detected_mib = detected_info["capacity"] / (1024 * 1024)
+                if abs(provided_mib - detected_mib) / detected_mib > 0.05:
+                    logger.warning(
+                        f"Provided capacity ({capacity} bytes) for {request_data.identifier} "
+                        f"differs from hardware-reported capacity ({detected_info['capacity']} bytes). "
+                        f"Using hardware value."
+                    )
+                    capacity = detected_info["capacity"]
+
     # Build base media record
     new_media = models.StorageMedia(
         identifier=request_data.identifier,
         media_type=request_data.media_type,
-        capacity=request_data.capacity,
+        capacity=capacity,
         location=request_data.location,
         location_building=request_data.location_building,
         location_room=request_data.location_room,
@@ -223,8 +324,13 @@ def create_media(
     # Type-specific fields
     if request_data.media_type == "lto_tape":
         assert isinstance(request_data, schemas.LtoTapeCreateSchema)
-        new_media.generation = request_data.generation
-        new_media.generation_tier = request_data.generation
+        generation = request_data.generation
+        if not generation and detected_info:
+            generation = detected_info.get("generation")
+        if not generation:
+            generation = "Unknown"
+        new_media.generation = generation
+        new_media.generation_tier = generation
         new_media.worm = request_data.worm
         new_media.write_protected = request_data.write_protected
         new_media.compression = request_data.compression

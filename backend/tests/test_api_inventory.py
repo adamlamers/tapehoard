@@ -341,6 +341,129 @@ def test_metadata_partial_archive(client, db_session):
 # ── Type-Specific Media Schemas ──
 
 
+def test_register_lto_tape_media_auto_detects_capacity(client, db_session, mocker):
+    """Verifies that LTO tape capacity and generation are auto-detected from hardware
+    when not provided in the request."""
+    # Configure a fake tape drive
+    db_session.add(models.SystemSetting(key="tape_drives", value='["/dev/nst0"]'))
+    db_session.commit()
+
+    # Mock LTOProvider to simulate hardware response
+    mock_provider = mocker.MagicMock()
+    mock_provider.check_online.return_value = True
+    mock_provider.get_live_info.return_value = {
+        "online": True,
+        "identity": "TAPE001",
+        "tape": {
+            "max_capacity_mib": 1350000,  # ~1415 GB
+            "generation_label": "LTO-5",
+            "barcode": "TAPE001",
+        },
+    }
+
+    mocker.patch("app.providers.tape.LTOProvider", return_value=mock_provider)
+
+    response = client.post(
+        "/inventory/media",
+        json={
+            "media_type": "lto_tape",
+            "identifier": "TAPE001",
+            "capacity": 0,  # Intentionally empty to trigger auto-detection
+            "generation": None,
+            "device_path": "/dev/nst0",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    # Capacity should be auto-detected from hardware (~1415 GB in bytes)
+    expected_capacity = 1350000 * 1024 * 1024
+    assert data["capacity"] == expected_capacity
+    assert data["generation"] == "LTO-5"
+
+
+def test_register_lto_tape_media_overrides_wrong_capacity(client, db_session, mocker):
+    """Verifies that provided capacity is overridden when it differs significantly
+    from the hardware-reported value."""
+    db_session.add(models.SystemSetting(key="tape_drives", value='["/dev/nst0"]'))
+    db_session.commit()
+
+    mock_provider = mocker.MagicMock()
+    mock_provider.check_online.return_value = True
+    mock_provider.get_live_info.return_value = {
+        "online": True,
+        "identity": "TAPE002",
+        "tape": {
+            "max_capacity_mib": 1350000,  # ~1415 GB actual
+            "generation_label": "LTO-5",
+        },
+    }
+
+    mocker.patch("app.providers.tape.LTOProvider", return_value=mock_provider)
+
+    # User provides generic LTO-5 default (1500 GB)
+    wrong_capacity = 1500 * 1000 * 1000 * 1000
+
+    response = client.post(
+        "/inventory/media",
+        json={
+            "media_type": "lto_tape",
+            "identifier": "TAPE002",
+            "capacity": wrong_capacity,
+            "generation": "LTO-5",
+            "device_path": "/dev/nst0",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    # Should be overridden to hardware-reported value
+    expected_capacity = 1350000 * 1024 * 1024
+    assert data["capacity"] == expected_capacity
+
+
+def test_register_lto_tape_media_keeps_manual_capacity_without_device_path(
+    client, db_session, mocker
+):
+    """Verifies that manual capacity is preserved when no device_path is given
+    and the difference from hardware is within the 5% threshold."""
+    db_session.add(models.SystemSetting(key="tape_drives", value='["/dev/nst0"]'))
+    db_session.commit()
+
+    mock_provider = mocker.MagicMock()
+    mock_provider.check_online.return_value = True
+    mock_provider.get_live_info.return_value = {
+        "online": True,
+        "identity": "TAPE003",
+        "tape": {
+            "max_capacity_mib": 1350000,  # ~1415 GB actual
+            "generation_label": "LTO-5",
+        },
+    }
+
+    mocker.patch("app.providers.tape.LTOProvider", return_value=mock_provider)
+
+    # User provides capacity that is only ~3% off from hardware (within 5% threshold)
+    # 1380 GB vs actual 1415 GB
+    manual_capacity = 1380 * 1000 * 1000 * 1000
+
+    response = client.post(
+        "/inventory/media",
+        json={
+            "media_type": "lto_tape",
+            "identifier": "TAPE003",
+            "capacity": manual_capacity,
+            "generation": "LTO-5",
+            # No device_path - manual entry
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    # Should keep the user's manual capacity since difference is < 5%
+    assert data["capacity"] == manual_capacity
+
+
 def test_register_lto_tape_media(client):
     """Tests registering an LTO tape with type-specific fields."""
     media_data = {

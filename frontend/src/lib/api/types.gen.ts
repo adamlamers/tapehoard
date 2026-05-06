@@ -505,7 +505,7 @@ export type LtoTapeCreateSchema = {
     /**
      * Capacity
      */
-    capacity: number;
+    capacity?: number | null;
     /**
      * Location
      */
@@ -529,7 +529,7 @@ export type LtoTapeCreateSchema = {
     /**
      * Generation
      */
-    generation: string;
+    generation?: string | null;
     /**
      * Worm
      */
@@ -554,6 +554,10 @@ export type LtoTapeCreateSchema = {
      * Encryption Secret Name
      */
     encryption_secret_name?: string | null;
+    /**
+     * Device Path
+     */
+    device_path?: string | null;
 };
 
 /**
