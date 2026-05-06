@@ -126,7 +126,7 @@ import { cancelJob as cancelJobApi, retryJob as retryJobApi } from '$lib/api';
 cd backend && uv run pytest tests/ -v
 ```
 
-- 77 tests covering API endpoints, providers, services
+- 230 tests covering API endpoints, providers, services
 - Uses pytest-mock for mocking filesystem/hardware
 - **Important:** Mocks that patch `get_source_roots` or `get_exclusion_spec` must target `app.api.common` (not `app.api.system`), since those helpers moved to `common.py`.
 
@@ -147,6 +147,78 @@ On macOS, `localhost` resolves to `::1` (IPv6) by default, but uvicorn may bind 
 **Fix:** Always use `127.0.0.1` instead of `localhost` for backend URLs:
 - `frontend/tests/helpers.ts`: `API_URL = 'http://127.0.0.1:8001'`
 - `frontend/playwright.config.ts`: `webServer.url = 'http://127.0.0.1:8001'`
+
+## Tape Archive Correctness
+
+### Buffer Flush Timeouts
+
+LTO tape drives have large internal buffers (hundreds of MB). After a `dd` or `tarfile` write finishes, the drive may still be flushing data to tape for **up to 15 minutes**. If `mt weof` is issued while the buffer is still draining, it fails with "Device or resource busy".
+
+**Fix:** `_run_mt` uses a `timeout_seconds` parameter (not `max_retries`) with exponential backoff capped at **15 seconds per attempt**. `finalize_stream` and `write_archive` both call `_run_mt("weof", timeout_seconds=900)` — allowing up to 15 minutes for the drive to become ready. The user can cancel the backup job if the drive never clears.
+
+An INFO log `"Waiting for tape drive to be available..."` is emitted once on the first busy error so the logs clearly show the job is intentionally paused.
+
+### `bytes_used` Fallback Trap
+
+The archiver syncs `bytes_used` to hardware-reported utilization via `_update_bytes_used_from_hardware()`. The old code checked success by comparing `bytes_used == old_bytes_used`, which is broken because it can't distinguish:
+
+1. Hardware reported `0.0` utilization (empty tape) → should **NOT** fallback
+2. Hardware returned `None` (unavailable) → **should** fallback to uncompressed size
+
+**Fix:** `_update_bytes_used_from_hardware()` now returns `bool`. The caller uses `if not hw_updated:` instead of `if bytes_used == old_bytes_used:`.
+
+### Restore Archive Sort Order
+
+Tape restores read archives in the order returned by `sorted(archive_groups.keys())`. With string sort, file numbers order as `"1", "10", "11", "12", "2"...` which causes the tape to seek back and forth (catastrophic shoe-shining).
+
+**Fix:** `run_restore` uses a `_archive_sort_key` helper that tries `int()` conversion first, falling back to string sort for non-numeric IDs (HDD paths, cloud keys). Tape file numbers now read linearly: `1, 2, 3, ..., 10, 11, 12`.
+
+### Streaming Path File Number Bug
+
+`finalize_stream` was calling `_get_current_file_number()` **after** `weof`. Since `weof` advances the tape to the next file, this returned the **next** file number instead of the current archive's number. Restores would seek past the archive to an empty file.
+
+**Fix:** Capture the file number **before** writing the file mark. Also ensure the Python stream is fully flushed/closed before `finalize_stream` is called.
+
+### File Stability Filter
+
+Files actively modified during a backup can be partially read and archived in an inconsistent state. The archiver now captures `job_start_time` at the beginning of `run_backup` and checks each file's actual filesystem `mtime` before writing.
+
+- `mtime > job_start_time` → skipped with log `"Skipped (actively modified after job start): /path/to/file"`
+- File missing between scan and backup → skipped with log `"Skipped (missing): /path/to/file"`
+
+This filter runs after deduplication but before all write paths (random access, streaming tar, staging tar, binary tar).
+
+### `prepare_for_write` Positioning
+
+`prepare_for_write` was calling `identify_media()` without `allow_intrusive=False`, which could rewind a partially-used tape back to BOT even though the archiver had already verified identity two lines above.
+
+**Fix:** `prepare_for_write` now passes `allow_intrusive=False` to avoid unnecessary wear. If the cache is stale, `eod` still recovers to the end of data.
+
+### LTO Capacity Auto-Detection
+
+During media registration, `_detect_lto_capacity_from_hardware()` queries MAM attribute `max_capacity_mib` to determine the actual physical capacity. This overrides generic LTO defaults (e.g., 1415 GB actual vs 1500 GB marketed). The backend always trusts hardware when `device_path` is provided.
+
+**Frontend:** The register dialog pre-fills capacity with `Math.floor(max_capacity_mib * 1024 * 1024 / 1e9)` to avoid rounding up past physical capacity.
+
+### Per-Chunk Checkpointing
+
+`run_backup` previously committed once at job end. If a long-running tape backup failed mid-way, all already-written archives were orphaned in the database.
+
+**Fix:** `db_session.commit()` is called after each deduplicated chunk, each random-access chunk, and each sequential tar archive. This ensures `FileVersion` records are persisted incrementally.
+
+### File Marks Between Archives
+
+Each archive written to tape must be followed by a file mark (`weof`) so that `fsf`-based seeks during restore work correctly. `write_archive` and `finalize_stream` both write a file mark. The tape layout after initialization is:
+
+```
+[File 0: Label][FM][File 1: Archive 1][FM][File 2: Archive 2][FM]...
+```
+
+### Frontend Polling for `bytes_used`
+
+The inventory page polls `discoverHardware()` every 3 seconds for live status, but `bytes_used` (which comes from the DB, not hardware MAM) only refreshes when `listMedia` is called. After a backup job completes, the hardware status card shows updated MAM utilization while the media table still shows stale `bytes_used`.
+
+**Fix:** The `POLL_SLOW` interval also calls `loadMedia(true, false)` (silent, no hardware refresh) to keep the DB-derived utilization current.
 
 ## Common Tasks
 
@@ -211,3 +283,47 @@ Pre-commit hooks are configured but may stash unstaged changes.
 |------|----------|
 | `README.md` | Human-facing project overview |
 | `AGENTS.md` | This file — agent development guide |
+
+## Critical Context for Tape Operations
+
+### `_run_mt` Retry Strategy
+
+Never use `max_retries` (count-based) for tape commands that follow large writes. Use `timeout_seconds` (time-based) instead, because the required wait depends on buffer size, not attempt count.
+
+- Exponential backoff: `0.2 * (2 ** attempt)` seconds
+- Cap per attempt: **15 seconds**
+- Total timeout for `weof` after writes: **900 seconds** (15 minutes)
+- Log pattern: one INFO `"Waiting for tape drive..."` then WARNING per retry
+
+### Streaming vs Staging Tape Writes
+
+The archiver supports two tape write paths, selected by the `tape_write_strategy` system setting:
+
+| Mode | How it works | When to use |
+|------|-------------|-------------|
+| `stage` (default) | Builds tar on disk, then `dd` to tape | Safe, works with any source disk speed |
+| `stream` | `tarfile` writes directly to `/dev/nst0` | Faster, but requires source disk that can sustain tape's minimum streaming speed |
+
+The streaming path uses `open("/dev/nst0", "wb", buffering=256*1024)` for LTO-optimal block size. The caller must close the stream before `finalize_stream()` is called.
+
+### Tape File Number Lifecycle
+
+- File 0: Label (written by `initialize_media`)
+- File 1+: Archives (written by `write_archive` or `finalize_stream`)
+- Each archive is followed by a file mark (`weof`)
+- `finalize_stream` captures the file number **before** `weof`
+- `write_archive` captures the file number **before** the `dd` write
+
+### Hardware Utilization Sync
+
+`bytes_used` on `StorageMedia` is DB-derived, not live hardware. It is updated:
+- During backup: via `_update_bytes_used_from_hardware()` after each chunk
+- Via frontend polling: `loadMedia(true, false)` on `POLL_SLOW` interval
+- Never during restore or idle periods (to avoid unnecessary MAM reads)
+
+### Testing Tape-Related Code
+
+When mocking `_run_mt` or `subprocess.run` in tests:
+- Simulate busy errors by raising `subprocess.CalledProcessError(1, cmd, stderr=b"...busy...")`
+- Mock `time.time` with an iterator when testing long timeouts, or tests will hang or run out of mock values
+- `test_provider_tape.py` has examples of both success (`busy_then_ok`) and timeout (`always_busy`) mocks
