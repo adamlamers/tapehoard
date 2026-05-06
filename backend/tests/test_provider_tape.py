@@ -1,3 +1,7 @@
+import subprocess
+
+import pytest
+
 from app.providers.tape import LTOProvider
 
 
@@ -213,3 +217,60 @@ def test_lto_multiple_archives_increment_file_number(mocker):
     assert loc1 == "1"
     assert loc2 == "2"
     assert loc3 == "3"
+
+
+def test_lto_weof_retries_on_busy(mocker):
+    """Verifies that weof retries on transient 'Device or resource busy' errors."""
+    device = "/dev/nst0"
+    provider = LTOProvider({"device_path": device})
+    mocker.patch("os.path.exists", return_value=True)
+    sleep_spy = mocker.patch("time.sleep")
+
+    call_count = 0
+
+    def busy_then_ok(cmd, **kwargs):
+        nonlocal call_count
+        m = mocker.MagicMock()
+        if "weof" in cmd:
+            call_count += 1
+            if call_count < 3:
+                m.returncode = 1
+                m.stderr = b"/dev/nst0: Device or resource busy\n"
+                raise subprocess.CalledProcessError(1, cmd, output=b"", stderr=m.stderr)
+            m.returncode = 0
+        elif "status" in cmd:
+            m.stdout = "File number=5"
+            m.returncode = 0
+        return m
+
+    mocker.patch("subprocess.run", side_effect=busy_then_ok)
+
+    # finalize_stream calls weof with max_retries=3
+    result = provider.finalize_stream()
+
+    # Should have retried twice, succeeded on the third attempt
+    assert call_count == 3
+    assert sleep_spy.call_count == 2  # sleeps between retries
+    assert result == "5"
+
+
+def test_lto_weof_fails_after_retries_exhausted(mocker):
+    """Verifies that weof still raises if busy errors persist beyond retries."""
+    device = "/dev/nst0"
+    provider = LTOProvider({"device_path": device})
+    mocker.patch("os.path.exists", return_value=True)
+    sleep_spy = mocker.patch("time.sleep")
+
+    def always_busy(cmd, **kwargs):
+        m = mocker.MagicMock()
+        m.returncode = 1
+        m.stderr = b"/dev/nst0: Device or resource busy\n"
+        raise subprocess.CalledProcessError(1, cmd, output=b"", stderr=m.stderr)
+
+    mocker.patch("subprocess.run", side_effect=always_busy)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        provider.finalize_stream()
+
+    # Should have tried 4 times (1 initial + 3 retries) and slept 3 times
+    assert sleep_spy.call_count == 3

@@ -393,15 +393,31 @@ class LTOProvider(AbstractStorageProvider):
         except Exception:
             return False
 
-    def _run_mt(self, command: str):
-        try:
-            cmd_parts = command.split()
-            full_cmd = ["mt", "-f", self.device_path] + cmd_parts
-            self._log_command(full_cmd)
-            subprocess.run(full_cmd, check=True, capture_output=True)
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Tape command 'mt {command}' failed: {e.stderr.decode()}")
-            raise
+    def _run_mt(self, command: str, max_retries: int = 0):
+        """Runs an mt command, retrying on transient "Device or resource busy" errors."""
+        cmd_parts = command.split()
+        full_cmd = ["mt", "-f", self.device_path] + cmd_parts
+        last_err = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                self._log_command(full_cmd)
+                subprocess.run(full_cmd, check=True, capture_output=True)
+                return
+            except subprocess.CalledProcessError as e:
+                stderr = (e.stderr or b"").decode()
+                last_err = e
+                # Retry only on transient busy errors
+                if "busy" in stderr.lower() and attempt < max_retries:
+                    sleep_time = 0.2 * (2**attempt)  # 0.2s, 0.4s, 0.8s...
+                    logger.warning(
+                        f"mt {command} busy on attempt {attempt + 1}/{max_retries + 1}, "
+                        f"retrying in {sleep_time:.1f}s..."
+                    )
+                    time.sleep(sleep_time)
+                    continue
+                logger.error(f"Tape command 'mt {command}' failed: {stderr}")
+                raise last_err
 
     def _setup_compression(self):
         """Configures hardware compression on the drive using mt"""
@@ -571,7 +587,7 @@ class LTOProvider(AbstractStorageProvider):
     def finalize_stream(self) -> str:
         """Writes a file mark after a streamed archive and returns the
         file number index."""
-        self._run_mt("weof")
+        self._run_mt("weof", max_retries=3)
         return self._get_current_file_number()
 
     def write_archive(self, media_id: str, stream: BinaryIO) -> str:
@@ -590,7 +606,7 @@ class LTOProvider(AbstractStorageProvider):
         proc.wait()
         # Write a file mark so each archive is a distinct tape file.
         # This is required for fsf-based seeks during restore.
-        self._run_mt("weof")
+        self._run_mt("weof", max_retries=3)
         return file_num
 
     def get_utilization(self) -> Optional[float]:
