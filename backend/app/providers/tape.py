@@ -70,7 +70,8 @@ class LTOProvider(AbstractStorageProvider):
                 "drive": {},
                 "mam": {},
                 "online": False,
-                "last_check": 0.0,
+                "last_online_check": 0.0,
+                "last_mam_check": 0.0,
             }
 
     def _log_command(self, cmd: List[str]):
@@ -116,7 +117,8 @@ class LTOProvider(AbstractStorageProvider):
         # Throttle MAM reads to once every 2 seconds unless forced
         now = time.time()
         if not force and (
-            now - LTOProvider._lkg_state[self.device_path].get("last_check", 0) < 2.0
+            now - LTOProvider._lkg_state[self.device_path].get("last_mam_check", 0)
+            < 2.0
         ):
             return LTOProvider._lkg_state[self.device_path]["mam"]
 
@@ -233,7 +235,9 @@ class LTOProvider(AbstractStorageProvider):
 
                     # SUCCESS! Update LKG MAM state
                     LTOProvider._lkg_state[self.device_path]["mam"] = mam
-                    LTOProvider._lkg_state[self.device_path]["last_check"] = time.time()
+                    LTOProvider._lkg_state[self.device_path]["last_mam_check"] = (
+                        time.time()
+                    )
                     return mam
 
                 # Log failure so we can diagnose why sg_read_attr isn't working
@@ -305,7 +309,8 @@ class LTOProvider(AbstractStorageProvider):
         now = time.time()
         if (
             not force
-            and now - LTOProvider._lkg_state[self.device_path].get("last_check", 0)
+            and now
+            - LTOProvider._lkg_state[self.device_path].get("last_online_check", 0)
             < 2.0
         ):
             return LTOProvider._lkg_state[self.device_path]["online"]
@@ -354,7 +359,7 @@ class LTOProvider(AbstractStorageProvider):
             LTOProvider._lkg_state[self.device_path]["mam"] = {}
 
         LTOProvider._lkg_state[self.device_path]["online"] = is_online
-        LTOProvider._lkg_state[self.device_path]["last_check"] = now
+        LTOProvider._lkg_state[self.device_path]["last_online_check"] = now
         return is_online
 
     def is_write_protected(self) -> bool:
