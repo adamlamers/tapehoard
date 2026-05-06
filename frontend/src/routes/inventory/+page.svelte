@@ -52,8 +52,10 @@
         ignoreHardware,
         listProviders,
         listSecrets,
+        getStagingInfo,
         type MediaSchema,
-        type StorageProviderSchema
+        type StorageProviderSchema,
+        type StagingInfoSchema
     } from '$lib/api';
     import { LTO_CAPACITY, PROVIDER_TEMPLATES, type LtoTapeCreateData, type OfflineHddCreateData, type CloudCreateData } from '$lib/types';
     import { dndzone } from 'svelte-dnd-action';
@@ -67,6 +69,7 @@
     let loading = $state(true);
     let showRegisterDialog = $state(false);
     let editingMedia = $state<MediaSchema | null>(null);
+    let stagingInfo = $state<StagingInfoSchema | null>(null);
 
     let activeMedia = $derived(mediaList.filter(m => m.status === 'active'));
     let fullMedia = $derived(mediaList.filter(m => m.status === 'full'));
@@ -295,10 +298,20 @@
         }
     }
 
+    async function loadStagingInfo() {
+        try {
+            const res = await getStagingInfo();
+            if (res.data) stagingInfo = res.data;
+        } catch (error) {
+            console.error("Failed to load staging info:", error);
+        }
+    }
+
     onMount(async () => {
         // Initial load (non-silent and forced refresh to show live hardware status immediately)
         loadMedia(false, true);
         loadSecrets();
+        loadStagingInfo();
 
         try {
             const res = await listProviders();
@@ -307,7 +320,10 @@
             console.error("Failed to load storage providers:", error);
         }
 
-        pollInterval = setInterval(pollHardware, POLL_SLOW);
+        pollInterval = setInterval(() => {
+            pollHardware();
+            loadStagingInfo();
+        }, POLL_SLOW);
     });
 
     onDestroy(() => {

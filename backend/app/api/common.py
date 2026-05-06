@@ -159,6 +159,13 @@ class DashboardStatsSchema(BaseModel):
     redundancy_ratio: float
 
 
+class StagingInfoSchema(BaseModel):
+    path: str
+    total_bytes: int
+    used_bytes: int
+    free_bytes: int
+
+
 class JobSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -1,7 +1,10 @@
+import shutil
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.api.common import DashboardStatsSchema
+from app.api.common import DashboardStatsSchema, StagingInfoSchema
+from app.core.config import settings
 from sqlalchemy import func, text
 from app.db import models
 
@@ -113,3 +116,37 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
         last_scan_time=last_scan.completed_at if last_scan else None,
         redundancy_ratio=round(redundancy_percentage, 1),
     )
+
+
+@router.get(
+    "/staging/info", response_model=StagingInfoSchema, operation_id="get_staging_info"
+)
+def get_staging_info():
+    """Returns disk usage information for the backup staging directory."""
+    path = settings.staging_directory
+    try:
+        usage = shutil.disk_usage(path)
+        return StagingInfoSchema(
+            path=path,
+            total_bytes=usage.total,
+            used_bytes=usage.used,
+            free_bytes=usage.free,
+        )
+    except OSError:
+        # Fallback: if the configured path doesn't exist yet, check its parent
+        parent = path if path == "/" else path.rsplit("/", 1)[0] or "/"
+        try:
+            usage = shutil.disk_usage(parent)
+            return StagingInfoSchema(
+                path=path,
+                total_bytes=usage.total,
+                used_bytes=usage.used,
+                free_bytes=usage.free,
+            )
+        except OSError:
+            return StagingInfoSchema(
+                path=path,
+                total_bytes=0,
+                used_bytes=0,
+                free_bytes=0,
+            )

@@ -1107,6 +1107,28 @@ export type SettingSchema = {
 };
 
 /**
+ * StagingInfoSchema
+ */
+export type StagingInfoSchema = {
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * Total Bytes
+     */
+    total_bytes: number;
+    /**
+     * Used Bytes
+     */
+    used_bytes: number;
+    /**
+     * Free Bytes
+     */
+    free_bytes: number;
+};
+
+/**
  * StorageProviderSchema
  */
 export type StorageProviderSchema = {
@@ -1338,6 +1360,22 @@ export type GetDashboardStatsResponses = {
 
 export type GetDashboardStatsResponse = GetDashboardStatsResponses[keyof GetDashboardStatsResponses];
 
+export type GetStagingInfoData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/staging/info';
+};
+
+export type GetStagingInfoResponses = {
+    /**
+     * Successful Response
+     */
+    200: StagingInfoSchema;
+};
+
+export type GetStagingInfoResponse = GetStagingInfoResponses[keyof GetStagingInfoResponses];
+
 export type ListJobsData = {
     body?: never;
     path?: never;
@@ -1396,6 +1434,20 @@ export type GetJobStatsData = {
 };
 
 export type GetJobStatsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type StreamJobsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/jobs/stream';
+};
+
+export type StreamJobsResponses = {
     /**
      * Successful Response
      */
@@ -1514,20 +1566,6 @@ export type RetryJobErrors = {
 export type RetryJobError = RetryJobErrors[keyof RetryJobErrors];
 
 export type RetryJobResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type StreamJobsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/system/jobs/stream';
-};
-
-export type StreamJobsResponses = {
     /**
      * Successful Response
      */

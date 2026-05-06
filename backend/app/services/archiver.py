@@ -374,6 +374,31 @@ class ArchiverService:
             if current_chunk:
                 chunks.append(current_chunk)
 
+            # --- Staging Space Validation ---
+            # Sequential media (tape) requires staging the full tarfile before writing.
+            # Ensure the staging directory has enough free space for the largest chunk.
+            if not storage_provider.capabilities.get("supports_random_access"):
+                largest_chunk_size = max(
+                    sum(i["offset_end"] - i["offset_start"] for i in chunk)
+                    for chunk in chunks
+                )
+                try:
+                    usage = shutil.disk_usage(self.staging_directory)
+                    # Require 110% of chunk size to leave headroom for tar overhead
+                    required = int(largest_chunk_size * 1.1)
+                    if usage.free < required:
+                        free_gb = usage.free / (1024**3)
+                        req_gb = required / (1024**3)
+                        JobManager.fail_job(
+                            job_id,
+                            f"Staging area at {self.staging_directory} has only {free_gb:.1f} GB free, "
+                            f"but the largest archive chunk requires {req_gb:.1f} GB. "
+                            f"Free up space or reduce the backup set.",
+                        )
+                        return
+                except OSError as e:
+                    logger.warning(f"Could not check staging disk usage: {e}")
+
             JobManager.add_job_log(job_id, f"Packed into {len(chunks)} archive(s)")
 
             for chunk_index, chunk_items in enumerate(chunks):
