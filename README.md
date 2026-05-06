@@ -14,13 +14,17 @@ It indexes your source filesystems, tracks what has been archived to which mediu
 
 ## Features
 
-- **Index-First Design** — All browsing, searching, and discrepancy checks run against the database. The live filesystem is only touched during scans.
-- **Any Storage You Own** — HDDs, USB drives, S3-compatible cloud, or LTO tape. All managed in one inventory. Auto-archival fills media in the order you define.
-- **LTO Tape Native** — Barcode discovery via MAM, hardware compression control, and direct SCSI streaming. No intermediary disk staging required for sequential writes.
-- **Redundancy-Aware** *(planned)* — Target N copies across active media. TapeHoard will distribute files until every byte has the redundancy you specify.
-- **Restore Queue** — Stage files for recovery from any combination of media. Get a minimum-media manifest so you only mount what you need.
-- **Discrepancy Detection** — Find files that have gone missing, changed without a new backup, or been excluded by policy.
-- **Encrypted at Rest** — Per-media encryption secrets managed through a built-in keystore. Compatible with LTO hardware encryption (`stenc`) and client-side cloud encryption.
+| Feature | Description |
+|---|---|
+| **Index-First Design** | Browse, search, and check discrepancies against the database. Live filesystem is only touched during scans. |
+| **Multi-Media Fleet** | Manage HDDs, USB drives, S3-compatible cloud, and LTO tape in one inventory. |
+| **Ordered Auto-Archival** | Drag media to set fill priority. Backups flow to the first available medium in your sequence. |
+| **LTO Tape Native** | Barcode discovery via MAM, hardware compression control, direct SCSI streaming to tape. |
+| **Restore Queue** | Stage files for recovery. Get a minimum-media manifest so you only mount what you need. |
+| **Discrepancy Detection** | Find missing files, changes without backup, or policy exclusions. |
+| **Encrypted at Rest** | Per-media encryption secrets in a built-in keystore. Compatible with LTO hardware encryption (`stenc`) and client-side cloud encryption. |
+| **Scheduled Scans** | Cron-like scheduling for automatic filesystem discovery and hashing. |
+| **Exclusion Policies** | Global gitignore-style patterns to skip caches, build artifacts, and temp files. |
 
 ## Screenshots
 
@@ -61,9 +65,9 @@ services:
 ### Requirements
 
 - **Linux host** (LTO tape support requires `mt`, `sg_read_attr`, and optionally `stenc` on the host or in the container)
-- **SYS_RAWIO capability** — Required for direct SCSI access to tape drives
-- **Device passthrough** — Map `/dev/nst0` (or your tape device) into the container
 - **Persistent volumes** — Database and staging must survive container restarts
+
+> **No tape drive?** Remove the `cap_add`, `devices`, and `SYS_RAWIO` lines from the compose file above. TapeHoard works great with just HDDs, USB drives, or cloud storage.
 
 ### Hardware-Specific Notes
 
@@ -85,7 +89,7 @@ services:
 
 1. Start the container: `docker compose up -d`
 2. Open `http://host:30265`
-3. Go to **Settings → Drives** and configure your tape drive path and source roots
+3. Go to **Settings → Drives** and configure your source roots (and tape drive path, if applicable)
 4. Trigger an initial scan from the dashboard
 5. Register media under **Physical Inventory**
 6. Run your first backup
