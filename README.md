@@ -2,15 +2,21 @@
 
 > Physical media archival for people who don't trust the cloud alone.
 
-TapeHoard is a self-hosted backup manager designed for offline-capable storage: LTO tapes, USB hard drives, and S3-compatible cloud. It indexes your source filesystems, tracks what has been archived to which medium, and gives you a searchable catalog—even when the media itself is sitting in a vault across town.
+**TapeHoard is not just for tapes.** It's a self-hosted backup manager for any offline-capable storage you already own:
+
+- **Offline HDDs / USB drives** — Any mountable filesystem (ext4, NTFS, APFS, exFAT)
+- **S3-compatible cloud** — Encrypted copies on Wasabi, Backblaze B2, MinIO, or any S3-compat provider
+- **LTO tape** — If you happen to own a tape drive like some of us do
+
+It indexes your source filesystems, tracks what has been archived to which medium, and gives you a searchable catalog—even when the media itself is sitting in a vault across town.
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
 ## Features
 
 - **Index-First Design** — All browsing, searching, and discrepancy checks run against the database. The live filesystem is only touched during scans.
+- **Any Storage You Own** — HDDs, USB drives, S3-compatible cloud, or LTO tape. All managed in one inventory. Auto-archival fills media in the order you define.
 - **LTO Tape Native** — Barcode discovery via MAM, hardware compression control, and direct SCSI streaming. No intermediary disk staging required for sequential writes.
-- **Multi-Media Fleet** — Manage tapes, HDDs, and cloud buckets in one inventory. Priority-based auto-archival fills media in your preferred order.
 - **Redundancy-Aware** *(planned)* — Target N copies across active media. TapeHoard will distribute files until every byte has the redundancy you specify.
 - **Restore Queue** — Stage files for recovery from any combination of media. Get a minimum-media manifest so you only mount what you need.
 - **Discrepancy Detection** — Find files that have gone missing, changed without a new backup, or been excluded by policy.
@@ -61,13 +67,19 @@ services:
 
 ### Hardware-Specific Notes
 
-**LTO Tape:**
-- The container must run as root or have access to the SCSI device node
-- Set `TAPEHOARD_TEST_MODE=true` to enable a mock LTO provider for development without hardware
-
-**USB / SATA HDDs:**
+**HDDs / USB Drives (Recommended for most users):**
 - Mount the drive filesystem into the container at `/source_data` or a restore destination
 - The HDD provider reads a `.tapehoard_id` file on the drive root to identify media
+- No special capabilities required — works on any Linux, macOS, or Docker host
+
+**S3-Compatible Cloud:**
+- Configure endpoint URL, bucket, region, and access credentials in settings
+- Optional client-side filename obfuscation and encryption
+
+**LTO Tape (For the dedicated):**
+- The container must run as root or have access to the SCSI device node
+- Requires `SYS_RAWIO` capability for direct SCSI access
+- Set `TAPEHOARD_TEST_MODE=true` to enable a mock LTO provider for development without hardware
 
 ### First Run
 
@@ -103,8 +115,8 @@ just db-migrate "add user table"   # Autogenerate a new migration
 
 ## Why TapeHoard?
 
-Most backup tools treat tape as a liability. TapeHoard treats it as a first-class citizen:
+Most backup tools are built for always-online replication. TapeHoard is built for media you can unplug:
 
-- **Air-gappable** — Pull the tape, store it offline. Your index stays searchable even when the media is in a vault.
+- **Air-gappable** — Pull the drive or tape, store it offline. Your index stays searchable even when the media is in a vault.
 - **Auditability** — Every file's SHA-256, every version's offset on every medium, tracked in SQLite.
-- **No vendor lock-in** — Standard tar archives on tape, standard files on disk. If TapeHoard disappears, your data doesn't.
+- **No vendor lock-in** — Standard tar archives on tape, standard files on disk, standard S3 objects in cloud. If TapeHoard disappears, your data doesn't.
