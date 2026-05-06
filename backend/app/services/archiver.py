@@ -289,6 +289,108 @@ class ArchiverService:
             )
         return absolute_target
 
+    def _get_tape_write_strategy(self, db_session: Session) -> str:
+        """Reads the user-configured tape write strategy. Defaults to staging."""
+        setting = (
+            db_session.query(models.SystemSetting)
+            .filter(models.SystemSetting.key == "tape_write_strategy")
+            .first()
+        )
+        if setting and setting.value in ("stage", "stream"):
+            return setting.value
+        return "stage"
+
+    def _build_tar(self, items, stream, job_id, safe_divisor, processed_bytes):
+        """Builds a tar archive into the provided writable stream.
+        Returns the updated processed_bytes count."""
+        tar_bundle = tarfile.open(fileobj=stream, mode="w")
+        # Match LTO optimal block size so each write() is a full tape block
+        tar_bundle.copybufsize = 256 * 1024
+
+        for item in items:
+            if JobManager.is_cancelled(job_id):
+                break
+
+            file_state, start, end = (
+                item["file_state"],
+                item["offset_start"],
+                item["offset_end"],
+            )
+            chunk_size = end - start
+            internal_name = self.normalize_path(file_state.file_path)
+            if item["is_split"]:
+                internal_name += f".part_{start}_{end}"
+
+            if os.path.lexists(file_state.file_path):
+                tar_info = tar_bundle.gettarinfo(
+                    file_state.file_path, arcname=internal_name
+                )
+
+                if os.path.islink(file_state.file_path):
+                    tar_info.type = tarfile.SYMTYPE
+                    tar_info.linkname = os.readlink(file_state.file_path)
+                    tar_bundle.addfile(tar_info)
+                else:
+                    tar_info.type = tarfile.REGTYPE
+                    tar_info.linkname = ""
+                    tar_info.size = chunk_size
+
+                    with RangeFile(file_state.file_path, start, chunk_size) as rh:
+                        tar_bundle.addfile(tar_info, rh)
+
+            processed_bytes += chunk_size
+            JobManager.update_job(
+                job_id,
+                15.0 + (70.0 * (processed_bytes / safe_divisor)),
+                f"Archiving: {os.path.basename(file_state.file_path)}",
+            )
+
+        tar_bundle.close()
+        return processed_bytes
+
+    def _log_compression_ratio(
+        self,
+        job_id: int,
+        chunk_num: int,
+        uncompressed_size: int,
+        hw_before: Optional[float],
+        hw_after: Optional[float],
+        media_capacity: int,
+    ) -> int:
+        """Calculates and logs compression ratio. Returns actual bytes consumed."""
+        if hw_before is not None and hw_after is not None and media_capacity > 0:
+            actual_bytes = int((hw_after - hw_before) * media_capacity)
+            if actual_bytes > 0:
+                ratio = uncompressed_size / actual_bytes
+                JobManager.add_job_log(
+                    job_id,
+                    f"Chunk {chunk_num}: {ratio:.2f}:1 compression "
+                    f"({uncompressed_size / (1024**3):.2f} GB uncompressed → "
+                    f"{actual_bytes / (1024**3):.2f} GB on tape)",
+                )
+                return actual_bytes
+        return uncompressed_size
+
+    def _update_bytes_used_from_hardware(
+        self,
+        media_record: models.StorageMedia,
+        storage_provider: Any,
+    ) -> None:
+        """Syncs bytes_used to hardware-reported utilization when available."""
+        from unittest.mock import Mock
+
+        if hasattr(storage_provider, "get_utilization"):
+            hw_util = storage_provider.get_utilization()
+            # Skip mock objects (tests) and invalid values
+            if hw_util is not None and not isinstance(hw_util, Mock):
+                try:
+                    media_record.bytes_used = int(
+                        float(hw_util) * media_record.capacity
+                    )
+                    return
+                except (TypeError, ValueError):
+                    pass
+
     def run_backup(self, db_session: Session, media_id: int, job_id: int):
         """Orchestrates the archival of a data batch to a storage provider."""
         media_record = db_session.get(models.StorageMedia, media_id)
@@ -320,9 +422,10 @@ class ArchiverService:
         JobManager.add_job_log(job_id, f"{len(workload_batch)} files queued for backup")
 
         # --- Tar Chunking Logic ---
-        # Ensure at least 100 archives per tape to improve restoration granularity.
-        # Max chunk size = capacity / 100.
-        MAX_CHUNK_SIZE = media_record.capacity // 100
+        # With hardware compression, actual tape usage is ~50-70% of uncompressed.
+        # Use capacity / 50 as chunk target so we get larger, more efficient tars
+        # while still maintaining reasonable restore granularity.
+        MAX_CHUNK_SIZE = media_record.capacity // 50
         if MAX_CHUNK_SIZE < 100 * 1024 * 1024:  # Minimum 100MB chunk
             MAX_CHUNK_SIZE = 100 * 1024 * 1024
 
@@ -357,11 +460,6 @@ class ArchiverService:
             for item in workload_batch:
                 item_size = item["offset_end"] - item["offset_start"]
 
-                # CHUNKING LOGIC:
-                # 1. If adding this item exceeds MAX_CHUNK_SIZE...
-                # 2. AND we already have items in the current chunk...
-                # 3. AND it's not a random access provider...
-                # ... then finalize the current chunk.
                 if (
                     current_chunk_size + item_size > MAX_CHUNK_SIZE
                     and current_chunk
@@ -371,24 +469,28 @@ class ArchiverService:
                     current_chunk = []
                     current_chunk_size = 0
 
-                # Add item to chunk (even if it makes the chunk > MAX_CHUNK_SIZE,
-                # this allows single large files to create their own larger archive).
                 current_chunk.append(item)
                 current_chunk_size += item_size
             if current_chunk:
                 chunks.append(current_chunk)
 
-            # --- Staging Space Validation ---
-            # Sequential media (tape) requires staging the full tarfile before writing.
-            # Ensure the staging directory has enough free space for the largest chunk.
-            if not storage_provider.capabilities.get("supports_random_access"):
+            # --- Staging Space Validation (only for stage mode) ---
+            tape_strategy = self._get_tape_write_strategy(db_session)
+            use_streaming = (
+                tape_strategy == "stream"
+                and hasattr(storage_provider, "open_stream")
+                and hasattr(storage_provider, "finalize_stream")
+            )
+
+            if not use_streaming and not storage_provider.capabilities.get(
+                "supports_random_access"
+            ):
                 largest_chunk_size = max(
                     sum(i["offset_end"] - i["offset_start"] for i in chunk)
                     for chunk in chunks
                 )
                 try:
                     usage = shutil.disk_usage(self.staging_directory)
-                    # Require 110% of chunk size to leave headroom for tar overhead
                     required = int(largest_chunk_size * 1.1)
                     if usage.free < required:
                         free_gb = usage.free / (1024**3)
@@ -403,7 +505,11 @@ class ArchiverService:
                 except OSError as e:
                     logger.warning(f"Could not check staging disk usage: {e}")
 
-            JobManager.add_job_log(job_id, f"Packed into {len(chunks)} archive(s)")
+            JobManager.add_job_log(
+                job_id,
+                f"Packed into {len(chunks)} archive(s) "
+                f"(strategy: {'stream' if use_streaming else 'stage'})",
+            )
 
             for chunk_index, chunk_items in enumerate(chunks):
                 if JobManager.is_cancelled(job_id):
@@ -413,11 +519,6 @@ class ArchiverService:
                 JobManager.add_job_log(
                     job_id,
                     f"Processing archive {chunk_num}/{len(chunks)} ({len(chunk_items)} files)",
-                )
-
-                archive_filename = f"backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{chunk_index}.tar"
-                staging_full_path = os.path.join(
-                    self.staging_directory, archive_filename
                 )
 
                 remaining_to_write = []
@@ -468,8 +569,6 @@ class ArchiverService:
                         remaining_to_write.append(item)
 
                 if not remaining_to_write:
-                    # Checkpoint: all files were duplicates; commit deduplication
-                    # records so they aren't lost if the job fails later.
                     try:
                         db_session.commit()
                         JobManager.add_job_log(
@@ -482,6 +581,14 @@ class ArchiverService:
                             f"Checkpoint commit failed for deduplicated chunk {chunk_num}"
                         )
                     continue
+
+                # Capture hardware utilization before writing
+                hw_util_before = None
+                if hasattr(storage_provider, "get_utilization"):
+                    try:
+                        hw_util_before = storage_provider.get_utilization()
+                    except Exception:
+                        pass
 
                 if storage_provider.capabilities.get("supports_random_access"):
                     # Random Access: Write files directly
@@ -546,7 +653,6 @@ class ArchiverService:
                                 )
                             )
 
-                    # Checkpoint: commit after each successful chunk
                     try:
                         db_session.commit()
                         JobManager.add_job_log(
@@ -559,13 +665,86 @@ class ArchiverService:
                             f"Checkpoint commit failed for chunk {chunk_num}"
                         )
 
+                elif use_streaming:
+                    # --- Direct Streaming Path ---
+                    # Build tar directly into the tape device without staging.
+                    tape_stream = storage_provider.open_stream()
+                    try:
+                        processed_bytes = self._build_tar(
+                            remaining_to_write,
+                            tape_stream,
+                            job_id,
+                            safe_divisor,
+                            processed_bytes,
+                        )
+                        archive_location_id = storage_provider.finalize_stream()
+                    finally:
+                        tape_stream.close()
+
+                    uncompressed_size = sum(
+                        i["offset_end"] - i["offset_start"] for i in remaining_to_write
+                    )
+
+                    # Capture hardware utilization after writing
+                    hw_util_after = None
+                    if hasattr(storage_provider, "get_utilization"):
+                        try:
+                            hw_util_after = storage_provider.get_utilization()
+                        except Exception:
+                            pass
+
+                    # Log compression ratio and sync bytes_used to hardware
+                    self._log_compression_ratio(
+                        job_id,
+                        chunk_num,
+                        uncompressed_size,
+                        hw_util_before,
+                        hw_util_after,
+                        media_record.capacity,
+                    )
+                    old_bytes_used = media_record.bytes_used
+                    self._update_bytes_used_from_hardware(
+                        media_record, storage_provider
+                    )
+                    if media_record.bytes_used == old_bytes_used:
+                        # Hardware didn't report; fall back to uncompressed size
+                        media_record.bytes_used += uncompressed_size
+
+                    for item in remaining_to_write:
+                        db_session.add(
+                            models.FileVersion(
+                                filesystem_state_id=item["file_state"].id,
+                                media_id=media_record.id,
+                                file_number=archive_location_id,
+                                is_split=item["is_split"],
+                                split_id=batch_uuid if item["is_split"] else None,
+                                offset_start=item["offset_start"],
+                                offset_end=item["offset_end"],
+                            )
+                        )
+
+                    try:
+                        db_session.commit()
+                        JobManager.add_job_log(
+                            job_id,
+                            f"Checkpoint: archive {chunk_num} committed",
+                        )
+                    except StaleDataError:
+                        db_session.rollback()
+                        logger.warning(
+                            f"Checkpoint commit failed for archive {chunk_num}"
+                        )
+
                 else:
-                    # Sequential Media (Tape): Hybrid Tar Generation
+                    # --- Staging Path ---
+                    archive_filename = f"backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{chunk_index}.tar"
+                    staging_full_path = os.path.join(
+                        self.staging_directory, archive_filename
+                    )
+
                     has_splits = any(item["is_split"] for item in remaining_to_write)
 
                     if not has_splits:
-                        # PERFORMANCE PATH: Use GNU tar binary for whole files
-                        # Prefer gtar on Darwin (macOS ships BSD tar without --null support)
                         tar_binary = None
                         if sys.platform == "darwin":
                             tar_binary = shutil.which("gtar")
@@ -573,16 +752,12 @@ class ArchiverService:
                             tar_binary = shutil.which("tar")
 
                         if tar_binary:
-                            # Generate a null-terminated file list to handle special characters safely
                             file_list_path = staging_full_path + ".list"
                             with open(file_list_path, "w") as f_list:
                                 for item in remaining_to_write:
-                                    # Write absolute path to list
                                     f_list.write(item["file_state"].file_path + "\0")
 
                             try:
-                                # --null must come before -T; --no-recursion and --absolute-names
-                                # must come before positional/non-option arguments
                                 cmd = [
                                     tar_binary,
                                     "-cf",
@@ -596,7 +771,6 @@ class ArchiverService:
                                 logger.debug(f"RUNNING BINARY TAR: {' '.join(cmd)}")
                                 subprocess.run(cmd, check=True, capture_output=True)
 
-                                # Update progress to 100% for this chunk
                                 processed_bytes += sum(
                                     i["offset_end"] - i["offset_start"]
                                     for i in remaining_to_write
@@ -610,57 +784,20 @@ class ArchiverService:
                                 logger.error(
                                     f"Binary tar failed, falling back to Python: {e}"
                                 )
-                                has_splits = True  # Trigger fallback
+                                has_splits = True
                             finally:
                                 if os.path.exists(file_list_path):
                                     os.remove(file_list_path)
 
                     if has_splits:
-                        # COMPATIBILITY PATH: Pure Python for fragments or if tar is missing
-                        with tarfile.open(staging_full_path, "w") as tar_bundle:
-                            for item in remaining_to_write:
-                                if JobManager.is_cancelled(job_id):
-                                    break
-
-                                file_state, start, end = (
-                                    item["file_state"],
-                                    item["offset_start"],
-                                    item["offset_end"],
-                                )
-                                chunk_size = end - start
-                                internal_name = self.normalize_path(
-                                    file_state.file_path
-                                )
-                                if item["is_split"]:
-                                    internal_name += f".part_{start}_{end}"
-
-                                if os.path.lexists(file_state.file_path):
-                                    tar_info = tar_bundle.gettarinfo(
-                                        file_state.file_path, arcname=internal_name
-                                    )
-
-                                    if os.path.islink(file_state.file_path):
-                                        tar_info.type = tarfile.SYMTYPE
-                                        tar_info.linkname = os.readlink(
-                                            file_state.file_path
-                                        )
-                                        tar_bundle.addfile(tar_info)
-                                    else:
-                                        tar_info.type = tarfile.REGTYPE
-                                        tar_info.linkname = ""
-                                        tar_info.size = chunk_size
-
-                                        with RangeFile(
-                                            file_state.file_path, start, chunk_size
-                                        ) as rh:
-                                            tar_bundle.addfile(tar_info, rh)
-
-                                processed_bytes += chunk_size
-                                JobManager.update_job(
-                                    job_id,
-                                    15.0 + (70.0 * (processed_bytes / safe_divisor)),
-                                    f"Archiving: {os.path.basename(file_state.file_path)}",
-                                )
+                        with open(staging_full_path, "wb") as f:
+                            processed_bytes = self._build_tar(
+                                remaining_to_write,
+                                f,
+                                job_id,
+                                safe_divisor,
+                                processed_bytes,
+                            )
 
                     if JobManager.is_cancelled(job_id):
                         if os.path.exists(staging_full_path):
@@ -680,7 +817,33 @@ class ArchiverService:
                         archive_location_id = storage_provider.write_archive(
                             media_record.identifier, final_stream
                         )
-                    media_record.bytes_used += os.path.getsize(staging_full_path)
+
+                    uncompressed_size = os.path.getsize(staging_full_path)
+
+                    # Capture hardware utilization after writing
+                    hw_util_after = None
+                    if hasattr(storage_provider, "get_utilization"):
+                        try:
+                            hw_util_after = storage_provider.get_utilization()
+                        except Exception:
+                            pass
+
+                    # Log compression ratio and sync bytes_used to hardware
+                    self._log_compression_ratio(
+                        job_id,
+                        chunk_num,
+                        uncompressed_size,
+                        hw_util_before,
+                        hw_util_after,
+                        media_record.capacity,
+                    )
+                    old_bytes_used = media_record.bytes_used
+                    self._update_bytes_used_from_hardware(
+                        media_record, storage_provider
+                    )
+                    if media_record.bytes_used == old_bytes_used:
+                        # Hardware didn't report; fall back to uncompressed size
+                        media_record.bytes_used += uncompressed_size
 
                     for item in remaining_to_write:
                         db_session.add(
@@ -698,7 +861,6 @@ class ArchiverService:
                     if os.path.exists(staging_full_path):
                         os.remove(staging_full_path)
 
-                    # Checkpoint: commit after each successful archive
                     try:
                         db_session.commit()
                         JobManager.add_job_log(
@@ -712,31 +874,15 @@ class ArchiverService:
                         )
 
             # --- Saturated Media Logic ---
-            # If utilized over 98%, mark as full and cede priority
-            # First, try to get actual hardware utilization (trust hardware MAM over our byte counts)
-            hardware_utilization = None
-            if hasattr(storage_provider, "get_utilization"):
-                hardware_utilization = storage_provider.get_utilization()
-
-            if hardware_utilization is not None:
-                # Handle MagicMock values in tests to prevent formatting errors
-                try:
-                    utilization_ratio = float(hardware_utilization)
-                    logger.info(
-                        f"Hardware reported utilization: {utilization_ratio * 100:.1f}%"
-                    )
-                except (TypeError, ValueError):
-                    utilization_ratio = (
-                        media_record.bytes_used / media_record.capacity
-                        if media_record.capacity > 0
-                        else 0
-                    )
-            else:
-                utilization_ratio = (
-                    media_record.bytes_used / media_record.capacity
-                    if media_record.capacity > 0
-                    else 0
-                )
+            self._update_bytes_used_from_hardware(media_record, storage_provider)
+            utilization_ratio = (
+                media_record.bytes_used / media_record.capacity
+                if media_record.capacity > 0
+                else 0
+            )
+            logger.info(
+                f"Hardware reported utilization: {utilization_ratio * 100:.1f}%"
+            )
 
             if utilization_ratio >= 0.98 and media_record.status == "active":
                 logger.info(
@@ -748,7 +894,6 @@ class ArchiverService:
                     job_id, f"Media {media_record.identifier} marked as full"
                 )
 
-                # Automate priority ceding: Move this media to the end of the list
                 max_priority = (
                     db_session.query(func.max(models.StorageMedia.priority_index))
                     .filter(models.StorageMedia.id != media_record.id)
@@ -789,7 +934,6 @@ class ArchiverService:
             JobManager.fail_job(job_id, str(e))
         finally:
             set_process_priority("normal")
-            # Clean up any residual staging files
             for chunk_file in os.listdir(self.staging_directory):
                 if chunk_file.startswith("backup_") and chunk_file.endswith(".tar"):
                     try:

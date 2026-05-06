@@ -466,7 +466,7 @@ def test_backup_checkpoints_per_chunk(db_session, mocker, tmp_path):
     staging.mkdir()
     archiver = ArchiverService(staging_directory=str(staging))
 
-    # Capacity 10GB -> MAX_CHUNK_SIZE = 100MB
+    # Capacity 10GB -> MAX_CHUNK_SIZE = 200MB (capacity // 50)
     media = models.StorageMedia(
         media_type="tape",
         identifier="TAPE_CHK",
@@ -476,14 +476,15 @@ def test_backup_checkpoints_per_chunk(db_session, mocker, tmp_path):
     )
     db_session.add(media)
 
-    # Create two tiny source files, but lie about their size to force chunking
+    # Create two source files, but lie about their size to force chunking.
+    # 2 x 120MB = 240MB > 200MB chunk limit, so they split into two chunks.
     files = []
     for i in range(2):
         source_file = tmp_path / f"chunk_{i}.bin"
         source_file.write_bytes(b"0")
         f = models.FilesystemState(
             file_path=str(source_file),
-            size=60 * 1024 * 1024,  # 60MB
+            size=120 * 1024 * 1024,  # 120MB
             mtime=1,
             sha256_hash=f"hash_{i}",
         )
@@ -491,8 +492,8 @@ def test_backup_checkpoints_per_chunk(db_session, mocker, tmp_path):
         files.append(f)
     db_session.commit()
 
-    # Make the staging tar appear to be 60MB so bytes_used updates correctly
-    mocker.patch("os.path.getsize", return_value=60 * 1024 * 1024)
+    # Make the staging tar appear to be 120MB so bytes_used updates correctly
+    mocker.patch("os.path.getsize", return_value=120 * 1024 * 1024)
 
     mock_provider = mocker.MagicMock()
     mock_provider.capabilities = {"supports_random_access": False}
@@ -532,7 +533,7 @@ def test_backup_checkpoints_per_chunk(db_session, mocker, tmp_path):
     assert len(versions_2) == 0
 
     # Verify media bytes_used reflects only first chunk
-    assert media.bytes_used == 60 * 1024 * 1024
+    assert media.bytes_used == 120 * 1024 * 1024
 
 
 def test_cancelled_backup_job_status(db_session, mocker, tmp_path):

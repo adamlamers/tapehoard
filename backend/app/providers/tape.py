@@ -559,6 +559,17 @@ class LTOProvider(AbstractStorageProvider):
             pass
         return "0"
 
+    def open_stream(self) -> BinaryIO:
+        """Opens the tape device for direct tar streaming with LTO-optimal
+        block buffering (256 KB). Caller must close the returned object."""
+        return open(self.device_path, "wb", buffering=256 * 1024)  # type: ignore[return-value]
+
+    def finalize_stream(self) -> str:
+        """Writes a file mark after a streamed archive and returns the
+        file number index."""
+        self._run_mt("weof")
+        return self._get_current_file_number()
+
     def write_archive(self, media_id: str, stream: BinaryIO) -> str:
         """Writes the stream to tape and returns the file number index"""
         file_num = self._get_current_file_number()
