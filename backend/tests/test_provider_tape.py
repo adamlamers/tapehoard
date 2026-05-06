@@ -1,4 +1,5 @@
 import subprocess
+import time
 
 import pytest
 
@@ -245,7 +246,7 @@ def test_lto_weof_retries_on_busy(mocker):
 
     mocker.patch("subprocess.run", side_effect=busy_then_ok)
 
-    # finalize_stream calls weof with max_retries=3
+    # finalize_stream calls weof with timeout_seconds=60
     result = provider.finalize_stream()
 
     # Should have retried twice, succeeded on the third attempt
@@ -254,14 +255,18 @@ def test_lto_weof_retries_on_busy(mocker):
     assert result == "5"
 
 
-def test_lto_weof_fails_after_retries_exhausted(mocker):
-    """Verifies that weof still raises if busy errors persist beyond retries."""
+def test_lto_weof_fails_after_timeout(mocker):
+    """Verifies that weof still raises if busy errors persist beyond the timeout."""
     device = "/dev/nst0"
     provider = LTOProvider({"device_path": device})
     mocker.patch("os.path.exists", return_value=True)
     sleep_spy = mocker.patch("time.sleep")
 
+    call_count = 0
+
     def always_busy(cmd, **kwargs):
+        nonlocal call_count
+        call_count += 1
         m = mocker.MagicMock()
         m.returncode = 1
         m.stderr = b"/dev/nst0: Device or resource busy\n"
@@ -269,8 +274,16 @@ def test_lto_weof_fails_after_retries_exhausted(mocker):
 
     mocker.patch("subprocess.run", side_effect=always_busy)
 
+    # Speed up time so the 60s timeout is reached quickly
+    start = time.time()
+    mocker.patch(
+        "time.time",
+        side_effect=[start, start, start + 10, start + 20, start + 65],
+    )
+
     with pytest.raises(subprocess.CalledProcessError):
         provider.finalize_stream()
 
-    # Should have tried 4 times (1 initial + 3 retries) and slept 3 times
-    assert sleep_spy.call_count == 3
+    # Should have retried until the timeout was exceeded
+    assert call_count >= 2
+    assert sleep_spy.call_count >= 1

@@ -300,6 +300,46 @@ class ArchiverService:
             return setting.value
         return "stage"
 
+    def _filter_unstable_files(
+        self,
+        items: List[Dict[str, Any]],
+        job_start_time: datetime,
+        job_id: int,
+    ) -> List[Dict[str, Any]]:
+        """Skips files whose mtime is after the backup job began.
+
+        This prevents archiving partially-modified files.  A log entry is
+        emitted for every skipped file.
+        """
+        stable_items = []
+        for item in items:
+            file_state = item["file_state"]
+            try:
+                actual_mtime = os.stat(file_state.file_path).st_mtime
+            except (OSError, FileNotFoundError):
+                # File disappeared between scan and backup; skip it
+                JobManager.add_job_log(
+                    job_id,
+                    f"Skipped (missing): {file_state.file_path}",
+                )
+                continue
+
+            # Compare with a small epsilon to avoid false positives from
+            # sub-second resolution differences.
+            if actual_mtime > job_start_time.timestamp() + 0.001:
+                JobManager.add_job_log(
+                    job_id,
+                    (
+                        f"Skipped (actively modified after job start): "
+                        f"{file_state.file_path}"
+                    ),
+                )
+                continue
+
+            stable_items.append(item)
+
+        return stable_items
+
     def _build_tar(self, items, stream, job_id, safe_divisor, processed_bytes):
         """Builds a tar archive into the provided writable stream.
         Returns the updated processed_bytes count."""
@@ -412,6 +452,7 @@ class ArchiverService:
         media_identifier_for_log = media_record.identifier
 
         JobManager.start_job(job_id)
+        job_start_time = datetime.now(timezone.utc)
         JobManager.update_job(
             job_id, 5.0, f"Calculating backup set for {media_record.identifier}..."
         )
@@ -575,6 +616,11 @@ class ArchiverService:
                         )
                     else:
                         remaining_to_write.append(item)
+
+                # Filter out files modified after the job started
+                remaining_to_write = self._filter_unstable_files(
+                    remaining_to_write, job_start_time, job_id
+                )
 
                 if not remaining_to_write:
                     try:

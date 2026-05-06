@@ -393,13 +393,21 @@ class LTOProvider(AbstractStorageProvider):
         except Exception:
             return False
 
-    def _run_mt(self, command: str, max_retries: int = 0):
-        """Runs an mt command, retrying on transient "Device or resource busy" errors."""
+    def _run_mt(self, command: str, timeout_seconds: float = 0):
+        """Runs an mt command, retrying on transient "Device or resource busy" errors.
+
+        Args:
+            command: The mt sub-command to execute (e.g. "weof", "rewind").
+            timeout_seconds: Maximum total time to keep retrying on busy errors.
+                             Default 0 means no retry (fail immediately).
+        """
         cmd_parts = command.split()
         full_cmd = ["mt", "-f", self.device_path] + cmd_parts
         last_err = None
+        start_time = time.time()
+        attempt = 0
 
-        for attempt in range(max_retries + 1):
+        while True:
             try:
                 self._log_command(full_cmd)
                 subprocess.run(full_cmd, check=True, capture_output=True)
@@ -407,11 +415,14 @@ class LTOProvider(AbstractStorageProvider):
             except subprocess.CalledProcessError as e:
                 stderr = (e.stderr or b"").decode()
                 last_err = e
-                # Retry only on transient busy errors
-                if "busy" in stderr.lower() and attempt < max_retries:
-                    sleep_time = 0.2 * (2**attempt)  # 0.2s, 0.4s, 0.8s...
+                elapsed = time.time() - start_time
+                # Retry only on transient busy errors while within timeout
+                if "busy" in stderr.lower() and elapsed < timeout_seconds:
+                    attempt += 1
+                    sleep_time = min(0.2 * (2**attempt), 8.0)  # cap at 8s
                     logger.warning(
-                        f"mt {command} busy on attempt {attempt + 1}/{max_retries + 1}, "
+                        f"mt {command} busy (attempt {attempt}, "
+                        f"elapsed {elapsed:.1f}s / {timeout_seconds:.0f}s), "
                         f"retrying in {sleep_time:.1f}s..."
                     )
                     time.sleep(sleep_time)
@@ -587,7 +598,8 @@ class LTOProvider(AbstractStorageProvider):
     def finalize_stream(self) -> str:
         """Writes a file mark after a streamed archive and returns the
         file number index."""
-        self._run_mt("weof", max_retries=3)
+        # Allow up to 60s for the drive buffer to flush before writing the file mark.
+        self._run_mt("weof", timeout_seconds=60)
         return self._get_current_file_number()
 
     def write_archive(self, media_id: str, stream: BinaryIO) -> str:
@@ -606,7 +618,8 @@ class LTOProvider(AbstractStorageProvider):
         proc.wait()
         # Write a file mark so each archive is a distinct tape file.
         # This is required for fsf-based seeks during restore.
-        self._run_mt("weof", max_retries=3)
+        # Allow up to 60s for the drive buffer to flush before writing the file mark.
+        self._run_mt("weof", timeout_seconds=60)
         return file_num
 
     def get_utilization(self) -> Optional[float]:

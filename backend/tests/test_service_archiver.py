@@ -1,5 +1,7 @@
+import os
 import tarfile
 import io
+import time
 import pytest
 from app.services.archiver import ArchiverService, RangeFile
 from app.db import models
@@ -764,3 +766,93 @@ def test_restore_sorts_tape_archives_numerically(db_session, mocker, tmp_path):
 
     assert read_order == expected_numeric
     assert read_order != expected_string
+
+
+def test_backup_skips_files_modified_after_job_start(db_session, mocker, tmp_path):
+    """Verifies that files modified after the backup job began are skipped
+    and logged, preventing partially-written files from being archived."""
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    archiver = ArchiverService(staging_directory=str(staging))
+
+    media = models.StorageMedia(
+        media_type="tape",
+        identifier="TAPE_STABLE",
+        capacity=10 * 1024 * 1024 * 1024,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add(media)
+
+    # Create two source files
+    stable_file = tmp_path / "stable.txt"
+    stable_file.write_bytes(b"stable content")
+    unstable_file = tmp_path / "unstable.txt"
+    unstable_file.write_bytes(b"old content")
+
+    f_stable = models.FilesystemState(
+        file_path=str(stable_file),
+        size=stable_file.stat().st_size,
+        mtime=1,
+        sha256_hash="hash_stable",
+    )
+    f_unstable = models.FilesystemState(
+        file_path=str(unstable_file),
+        size=unstable_file.stat().st_size,
+        mtime=1,
+        sha256_hash="hash_unstable",
+    )
+    db_session.add_all([f_stable, f_unstable])
+    db_session.commit()
+
+    mock_provider = mocker.MagicMock()
+    mock_provider.capabilities = {"supports_random_access": False}
+    mock_provider.identify_media.return_value = "TAPE_STABLE"
+    mock_provider.prepare_for_write.return_value = True
+    mock_provider.write_archive.return_value = "ARCH_1"
+
+    mocker.patch.object(archiver, "_get_storage_provider", return_value=mock_provider)
+
+    from app.services.scanner import JobManager
+
+    job = JobManager.create_job(db_session, "BACKUP")
+
+    # Simulate the unstable file being modified *after* the job starts by
+    # patching os.stat to report a future mtime for that specific file.
+    original_stat = os.stat
+
+    def fake_stat(path, *args, **kwargs):
+        if str(path) == str(unstable_file):
+            # Return a fake stat result with mtime far in the future
+            result = original_stat(path, *args, **kwargs)
+
+            # Use a namedtuple-like object to override st_mtime
+            class FakeStat:
+                def __init__(self, real):
+                    self._real = real
+
+                def __getattr__(self, name):
+                    return getattr(self._real, name)
+
+            fake = FakeStat(result)
+            fake.st_mtime = time.time() + 3600  # 1 hour in the future
+            return fake
+        return original_stat(path, *args, **kwargs)
+
+    mocker.patch("os.stat", side_effect=fake_stat)
+
+    archiver.run_backup(db_session, media.id, job.id)
+
+    # Only the stable file should have been written
+    assert mock_provider.write_archive.call_count == 1
+
+    # Verify job log contains the skip message
+    logs = db_session.query(models.JobLog).filter_by(job_id=job.id).all()
+    skip_messages = [log for log in logs if "actively modified" in log.message]
+    assert len(skip_messages) == 1
+    assert "unstable.txt" in skip_messages[0].message
+
+    # Verify only the stable file got a FileVersion record
+    versions = db_session.query(models.FileVersion).filter_by(media_id=media.id).all()
+    assert len(versions) == 1
+    assert versions[0].filesystem_state_id == f_stable.id
