@@ -243,6 +243,38 @@
         }
     }
 
+    async function pollHardware() {
+        try {
+            const res = await discoverHardware();
+            if (!res.data) return;
+
+            const prevPaths = new Set(discoveredAssets.map(a => a.device_path));
+            let hasNew = false;
+
+            discoveredAssets = (res.data as any[]).map(newAsset => {
+                if (!prevPaths.has(newAsset.device_path)) {
+                    hasNew = true;
+                }
+                const oldAsset = discoveredAssets.find(a => a.device_path === newAsset.device_path);
+                if (oldAsset && oldAsset.hardware_info && newAsset.hardware_info) {
+                     if (Object.keys(newAsset.hardware_info.tape || {}).length === 0 && Object.keys(oldAsset.hardware_info.tape || {}).length > 0) {
+                        newAsset.hardware_info.tape = oldAsset.hardware_info.tape;
+                    }
+                    if (Object.keys(newAsset.hardware_info.drive || {}).length === 0 && Object.keys(oldAsset.hardware_info.drive || {}).length > 0) {
+                        newAsset.hardware_info.drive = oldAsset.hardware_info.drive;
+                    }
+                }
+                return newAsset;
+            });
+
+            if (hasNew) {
+                loadMedia(true, true);
+            }
+        } catch (error) {
+            console.error("Hardware discovery failed:", error);
+        }
+    }
+
     let prevOnlineCount = $state(0);
 
     $effect(() => {
@@ -275,7 +307,7 @@
             console.error("Failed to load storage providers:", error);
         }
 
-        pollInterval = setInterval(() => loadMedia(true), POLL_SLOW);
+        pollInterval = setInterval(pollHardware, POLL_SLOW);
     });
 
     onDestroy(() => {
