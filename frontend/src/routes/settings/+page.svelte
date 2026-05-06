@@ -53,6 +53,7 @@
     let archivalSchedule = $state("");
     let notificationUrls = $state<string[]>([]);
     let ioniceLevel = $state("idle");
+    let tapeWriteStrategy = $state("stage");
 
     // Secrets keystore
     let secretsList = $state<string[]>([]);
@@ -69,7 +70,8 @@
         scanSchedule,
         archivalSchedule,
         notificationUrls,
-        ioniceLevel
+        ioniceLevel,
+        tapeWriteStrategy
     }));
 
     beforeNavigate((navigation: any) => {
@@ -159,6 +161,7 @@
                 if (data.schedule_archival) archivalSchedule = data.schedule_archival;
                 if (data.notification_urls) notificationUrls = JSON.parse(data.notification_urls);
                 if (data.ionice_level) ioniceLevel = data.ionice_level;
+                if (data.tape_write_strategy) tapeWriteStrategy = data.tape_write_strategy;
             }
 
             // Load secrets
@@ -174,7 +177,8 @@
                 scanSchedule,
                 archivalSchedule,
                 notificationUrls,
-                ioniceLevel
+                ioniceLevel,
+                tapeWriteStrategy
             });
         } catch (error) {
             toast.error("Failed to load system configuration");
@@ -194,7 +198,8 @@
                 updateSettings({ body: { key: "schedule_scan", value: scanSchedule } }),
                 updateSettings({ body: { key: "schedule_archival", value: archivalSchedule } }),
                 updateSettings({ body: { key: "notification_urls", value: JSON.stringify(notificationUrls) } }),
-                updateSettings({ body: { key: "ionice_level", value: ioniceLevel } })
+                updateSettings({ body: { key: "ionice_level", value: ioniceLevel } }),
+                updateSettings({ body: { key: "tape_write_strategy", value: tapeWriteStrategy } })
             ]);
 
             // Snapshot saved state
@@ -206,7 +211,8 @@
                 scanSchedule,
                 archivalSchedule,
                 notificationUrls,
-                ioniceLevel
+                ioniceLevel,
+                tapeWriteStrategy
             });
 
             toast.success("System configuration committed");
@@ -669,6 +675,17 @@
                                         <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
                                     </div>
                                     <p class="text-[10px] text-text-secondary leading-tight opacity-60">Applies to scan and backup jobs. Idle is recommended for production systems.</p>
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-xs font-medium text-text-secondary ml-1" for="tape-write-strategy">Tape write strategy</label>
+                                    <div class="relative">
+                                        <select id="tape-write-strategy" bind:value={tapeWriteStrategy} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
+                                            <option value="stage">Stage (build tar on disk, then stream to tape — safe, retryable)</option>
+                                            <option value="stream">Stream (build tar directly into tape drive — bypasses disk, faster)</option>
+                                        </select>
+                                        <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+                                    </div>
+                                    <p class="text-[10px] text-text-secondary leading-tight opacity-60">Stream mode requires a fast source disk that can sustain the tape drive's minimum streaming speed to avoid shoe-shining.</p>
                                 </div>
                             </div>
                         </Card>

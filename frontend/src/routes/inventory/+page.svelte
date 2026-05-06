@@ -82,6 +82,7 @@
         generation: 'LTO-6',
         capacity: 2500, // 2.5 TB in GB
         _capacityFromHardware: false, // internal flag to prevent override
+        _devicePath: '', // internal: device path for hardware verification
         location: 'Storage Shelf',
         location_building: '',
         location_room: '',
