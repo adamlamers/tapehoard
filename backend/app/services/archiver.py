@@ -1048,7 +1048,17 @@ class ArchiverService:
                     JobManager.fail_job(job_id, f"Load {media_record.identifier}")
                     return
 
-                for archive_id in sorted(archive_groups.keys()):
+                # Sort archive IDs numerically when possible (tape file numbers),
+                # falling back to string sort for non-numeric IDs (HDD paths, cloud keys).
+                # This ensures tape restores read linearly instead of seeking
+                # back and forth due to string ordering ("1", "10", "11", "2"...).
+                def _archive_sort_key(archive_id: str):
+                    try:
+                        return (0, int(archive_id))
+                    except ValueError:
+                        return (1, archive_id)
+
+                for archive_id in sorted(archive_groups.keys(), key=_archive_sort_key):
                     if JobManager.is_cancelled(job_id):
                         break
                     target_versions = archive_groups[archive_id]

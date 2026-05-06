@@ -686,3 +686,81 @@ def test_bytes_used_fallback_when_hardware_returns_none(db_session, mocker, tmp_
     # bytes_used should fall back to the actual staged tar size (tar overhead
     # makes it larger than the raw 11-byte source file).
     assert media.bytes_used > source_file.stat().st_size
+
+
+def test_restore_sorts_tape_archives_numerically(db_session, mocker, tmp_path):
+    """Verifies that tape restores read archives in numeric file-number order
+    to avoid back-and-forth seeking across tape files."""
+    archiver = ArchiverService()
+
+    media = models.StorageMedia(
+        media_type="tape",
+        identifier="TAPE_SORT",
+        capacity=10**12,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add(media)
+
+    # Create 12 files, each archived to a different tape file number
+    for i in range(12):
+        source = tmp_path / f"file_{i}.txt"
+        source.write_bytes(b"x")
+        f = models.FilesystemState(
+            file_path=str(source),
+            size=1,
+            mtime=1,
+            sha256_hash=f"hash_{i}",
+        )
+        db_session.add(f)
+        db_session.flush()
+        # Assign file numbers as strings: "1", "2", ..., "10", "11", "12"
+        db_session.add(
+            models.FileVersion(
+                filesystem_state_id=f.id,
+                media_id=media.id,
+                file_number=str(i + 1),
+            )
+        )
+        db_session.add(models.RestoreCart(filesystem_state_id=f.id))
+    db_session.commit()
+
+    read_order = []
+
+    def capture_read(media_id, location_id):
+        read_order.append(location_id)
+        # Return a minimal valid tar stream so tarfile.open doesn't crash.
+        # The tar member name must match the file path for the restore loop
+        # to find it (normalize_path strips leading slashes).
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as tf:
+            data = b"x"
+            # Find the matching file path from our fixture data
+            idx = int(location_id) - 1
+            name = str(tmp_path / f"file_{idx}.txt").lstrip("/")
+            info = tarfile.TarInfo(name=name)
+            info.size = len(data)
+            tf.addfile(info, io.BytesIO(data))
+        buf.seek(0)
+        return buf
+
+    mock_provider = mocker.MagicMock()
+    mock_provider.check_online.return_value = True
+    mock_provider.identify_media.return_value = "TAPE_SORT"
+    mock_provider.read_archive.side_effect = capture_read
+    mock_provider.capabilities = {}
+
+    mocker.patch.object(archiver, "_get_storage_provider", return_value=mock_provider)
+
+    from app.services.scanner import JobManager
+
+    job = JobManager.create_job(db_session, "RESTORE")
+    archiver.run_restore(db_session, str(tmp_path / "dest"), job.id)
+
+    # String sort would give: "1", "10", "11", "12", "2", "3"...
+    # Numeric sort should give: "1", "2", "3", ..., "10", "11", "12"
+    expected_numeric = [str(i) for i in range(1, 13)]
+    expected_string = sorted(expected_numeric)
+
+    assert read_order == expected_numeric
+    assert read_order != expected_string
