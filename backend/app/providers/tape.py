@@ -491,8 +491,6 @@ class LTOProvider(AbstractStorageProvider):
                 raise PermissionError("Tape is write-protected.")
 
             self._run_mt("rewind")
-            self._run_mt("weof")
-            self._run_mt("rewind")
 
             import tempfile
             import tarfile
@@ -518,6 +516,7 @@ class LTOProvider(AbstractStorageProvider):
                         if proc.returncode != 0:
                             raise RuntimeError(f"dd failed: {stderr.decode()}")
 
+            # File mark after the label so it is a distinct tape file.
             self._run_mt("weof")
             self._run_mt("rewind")
 
@@ -574,6 +573,9 @@ class LTOProvider(AbstractStorageProvider):
                 proc.stdin.write(chunk)
             proc.stdin.close()
         proc.wait()
+        # Write a file mark so each archive is a distinct tape file.
+        # This is required for fsf-based seeks during restore.
+        self._run_mt("weof")
         return file_num
 
     def get_utilization(self) -> Optional[float]:

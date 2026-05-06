@@ -120,3 +120,96 @@ def test_lto_mam_parsing_logic(mocker):
     assert "Clean Now" in mam["alerts"]
     # 1.5TB should be identified as LTO-5
     assert mam["generation_label"] == "LTO-5"
+
+
+def test_lto_write_archive_writes_file_mark(mocker):
+    """Verifies that write_archive writes a file mark after each archive."""
+    device = "/dev/nst0"
+    provider = LTOProvider({"device_path": device})
+    mocker.patch("os.path.exists", return_value=True)
+
+    mt_calls = []
+
+    def capture_mt(cmd, **kwargs):
+        m = mocker.MagicMock()
+        m.returncode = 0
+        if "status" in cmd:
+            # First call: at file 1; second call: at file 2
+            m.stdout = f"File number={len(mt_calls) + 1}"
+        elif "weof" in cmd:
+            mt_calls.append("weof")
+        return m
+
+    mocker.patch("subprocess.run", side_effect=capture_mt)
+    mocker.patch("subprocess.Popen")
+
+    import io
+
+    provider.write_archive("TAPE01", io.BytesIO(b"archive data"))
+
+    # Expectation: weof must be called after dd to delimit the archive
+    assert "weof" in mt_calls
+
+
+def test_lto_initialize_media_writes_single_file_mark(mocker):
+    """Verifies initialize_media writes exactly one file mark (after the label)."""
+    device = "/dev/nst0"
+    provider = LTOProvider({"device_path": device})
+    mocker.patch("os.path.exists", return_value=True)
+    mocker.patch.object(provider, "is_write_protected", return_value=False)
+
+    weof_count = 0
+
+    def capture_mt(cmd, **kwargs):
+        nonlocal weof_count
+        m = mocker.MagicMock()
+        m.returncode = 0
+        if "weof" in cmd:
+            weof_count += 1
+        return m
+
+    mocker.patch("subprocess.run", side_effect=capture_mt)
+
+    # Popen for dd must have stdin and communicate() returning a valid tuple
+    mock_proc = mocker.MagicMock()
+    mock_proc.communicate.return_value = (b"", b"")
+    mock_proc.returncode = 0
+    mocker.patch("subprocess.Popen", return_value=mock_proc)
+
+    provider.initialize_media("TAPE01")
+
+    # Expectation: exactly one weof (after the label), not before
+    assert weof_count == 1
+
+
+def test_lto_multiple_archives_increment_file_number(mocker):
+    """Verifies that writing multiple archives creates distinct tape files."""
+    device = "/dev/nst0"
+    provider = LTOProvider({"device_path": device})
+    mocker.patch("os.path.exists", return_value=True)
+
+    file_number = 1
+
+    def capture_mt(cmd, **kwargs):
+        nonlocal file_number
+        m = mocker.MagicMock()
+        m.returncode = 0
+        if "status" in cmd:
+            m.stdout = f"File number={file_number}"
+        elif "weof" in cmd:
+            file_number += 1
+        return m
+
+    mocker.patch("subprocess.run", side_effect=capture_mt)
+    mocker.patch("subprocess.Popen")
+
+    import io
+
+    loc1 = provider.write_archive("TAPE01", io.BytesIO(b"archive1"))
+    loc2 = provider.write_archive("TAPE01", io.BytesIO(b"archive2"))
+    loc3 = provider.write_archive("TAPE01", io.BytesIO(b"archive3"))
+
+    # Expectation: each archive gets a unique, incrementing file number
+    assert loc1 == "1"
+    assert loc2 == "2"
+    assert loc3 == "3"
