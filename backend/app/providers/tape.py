@@ -534,8 +534,12 @@ class LTOProvider(AbstractStorageProvider):
             return False
 
     def prepare_for_write(self, media_id: str) -> bool:
-        """Fast-forwards to the end of the data to prepare for appending"""
-        current_id = self.identify_media()
+        """Fast-forwards to the end of the data to prepare for appending.
+
+        Uses allow_intrusive=False because the caller (archiver) already
+        called identify_media() immediately before; the cache is fresh and
+        we must avoid rewinding a partially-used tape back to BOT."""
+        current_id = self.identify_media(allow_intrusive=False)
         if current_id != media_id:
             logger.error(f"Tape mismatch. Expected {media_id}, found {current_id}")
             return False
