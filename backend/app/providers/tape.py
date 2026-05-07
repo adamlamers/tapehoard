@@ -109,8 +109,15 @@ class LTOProvider(AbstractStorageProvider):
 
         return LTOProvider._lkg_state[self.device_path]["drive"]
 
-    def get_mam_info(self, force: bool = False) -> dict:
-        """Reads Media Auxiliary Memory (MAM) attributes using sg_read_attr --raw."""
+    def get_mam_info(self, force: bool = False, timeout_seconds: float = 0) -> dict:
+        """Reads Media Auxiliary Memory (MAM) attributes using sg_read_attr --raw.
+
+        Args:
+            force: Bypass the 2-second throttle.
+            timeout_seconds: If > 0, keep retrying on "busy" for up to this many
+                seconds (same strategy as _run_mt).  Default 0 means 3 quick
+                attempts then fall back to LKG.
+        """
         if not os.path.exists(self.device_path):
             return {}
 
@@ -122,8 +129,11 @@ class LTOProvider(AbstractStorageProvider):
         ):
             return LTOProvider._lkg_state[self.device_path]["mam"]
 
-        # Try up to 3 times with a small backoff if the drive is busy
-        for attempt in range(3):
+        start_time = time.time()
+        attempt = 0
+        waiting_logged = False
+
+        while True:
             try:
                 cmd = ["sg_read_attr", "--raw", self.device_path]
                 self._log_command(cmd)
@@ -132,7 +142,14 @@ class LTOProvider(AbstractStorageProvider):
                 if result.returncode == 0 and result.stdout:
                     data = result.stdout
                     if len(data) < 4:
-                        continue
+                        # Empty payload; treat as transient and retry if allowed
+                        elapsed = time.time() - start_time
+                        if timeout_seconds > 0 and elapsed < timeout_seconds:
+                            attempt += 1
+                            sleep_time = min(0.2 * (2**attempt), 15.0)
+                            time.sleep(sleep_time)
+                            continue
+                        break
 
                     available_len = struct.unpack(">I", data[:4])[0]
                     pos = 4
@@ -229,7 +246,7 @@ class LTOProvider(AbstractStorageProvider):
                         else:
                             mam["generation_label"] = "LTO-9"
 
-                    # 3. Barcode Fallback
+                    # Barcode Fallback
                     if not mam.get("barcode") and mam.get("serial"):
                         mam["barcode"] = mam["serial"]
 
@@ -248,11 +265,26 @@ class LTOProvider(AbstractStorageProvider):
                 )
                 if result.returncode != 0:
                     logger.warning(
-                        f"sg_read_attr returned code {result.returncode} for {self.device_path} (attempt {attempt + 1}/3): {stderr_text[:200]}"
+                        f"sg_read_attr returned code {result.returncode} for {self.device_path} (attempt {attempt + 1}): {stderr_text[:200]}"
                     )
                     if "busy" in stderr_text.lower():
-                        time.sleep(0.2)
-                        continue
+                        elapsed = time.time() - start_time
+                        if timeout_seconds > 0 and elapsed < timeout_seconds:
+                            attempt += 1
+                            sleep_time = min(0.2 * (2**attempt), 15.0)
+                            if not waiting_logged:
+                                logger.info(
+                                    f"Waiting for tape drive MAM to be available "
+                                    f"({self.device_path})..."
+                                )
+                                waiting_logged = True
+                            logger.warning(
+                                f"sg_read_attr busy (attempt {attempt}, "
+                                f"elapsed {elapsed:.1f}s / {timeout_seconds:.0f}s), "
+                                f"retrying in {sleep_time:.1f}s..."
+                            )
+                            time.sleep(sleep_time)
+                            continue
 
             except FileNotFoundError:
                 logger.error(
@@ -260,10 +292,16 @@ class LTOProvider(AbstractStorageProvider):
                 )
                 break
             except Exception as e:
-                logger.warning(
-                    f"MAM read attempt {attempt + 1}/3 failed for {self.device_path}: {e}"
-                )
-                time.sleep(0.1)
+                logger.warning(f"MAM read attempt failed for {self.device_path}: {e}")
+                elapsed = time.time() - start_time
+                if timeout_seconds > 0 and elapsed < timeout_seconds:
+                    attempt += 1
+                    sleep_time = min(0.2 * (2**attempt), 15.0)
+                    time.sleep(sleep_time)
+                    continue
+
+            # Non-busy error or timeout exceeded: stop retrying
+            break
 
         # Return LKG if direct read failed
         return LTOProvider._lkg_state[self.device_path]["mam"]
@@ -393,13 +431,19 @@ class LTOProvider(AbstractStorageProvider):
         except Exception:
             return False
 
-    def _run_mt(self, command: str, timeout_seconds: float = 0):
+    def _run_mt(
+        self,
+        command: str,
+        timeout_seconds: float = 0,
+        return_output: bool = False,
+    ) -> Optional[str]:
         """Runs an mt command, retrying on transient "Device or resource busy" errors.
 
         Args:
             command: The mt sub-command to execute (e.g. "weof", "rewind").
             timeout_seconds: Maximum total time to keep retrying on busy errors.
                              Default 0 means no retry (fail immediately).
+            return_output: If True, returns the command's stdout as str.
         """
         cmd_parts = command.split()
         full_cmd = ["mt", "-f", self.device_path] + cmd_parts
@@ -411,8 +455,12 @@ class LTOProvider(AbstractStorageProvider):
         while True:
             try:
                 self._log_command(full_cmd)
-                subprocess.run(full_cmd, check=True, capture_output=True)
-                return
+                result = subprocess.run(
+                    full_cmd, check=True, capture_output=True, text=True
+                )
+                if return_output:
+                    return result.stdout
+                return None
             except subprocess.CalledProcessError as e:
                 stderr = (e.stderr or b"").decode()
                 last_err = e
@@ -584,45 +632,155 @@ class LTOProvider(AbstractStorageProvider):
         self._run_mt("eod")
         return True
 
+    def _wait_for_drive_ready(self, timeout_seconds: float = 60) -> bool:
+        """Polls mt status until the drive is ready (no busy error).
+
+        Called proactively before critical commands like ``weof`` to avoid
+        hitting busy errors in the first place.  Uses the same exponential
+        backoff as ``_run_mt`` but returns a boolean instead of raising.
+        """
+        start_time = time.time()
+        attempt = 0
+        waiting_logged = False
+
+        while True:
+            try:
+                cmd = ["mt", "-f", self.device_path, "status"]
+                self._log_command(cmd)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+
+                stderr = result.stderr or ""
+                stdout = result.stdout or ""
+
+                if (
+                    "Device or resource busy" in stderr
+                    or "Device or resource busy" in stdout
+                ):
+                    elapsed = time.time() - start_time
+                    if elapsed >= timeout_seconds:
+                        return False
+                    attempt += 1
+                    sleep_time = min(0.2 * (2**attempt), 15.0)
+                    if not waiting_logged:
+                        logger.info(
+                            f"Waiting for tape drive buffer to drain "
+                            f"({self.device_path}) before next command..."
+                        )
+                        waiting_logged = True
+                    logger.warning(
+                        f"mt status busy (attempt {attempt}, "
+                        f"elapsed {elapsed:.1f}s / {timeout_seconds:.0f}s), "
+                        f"retrying in {sleep_time:.1f}s..."
+                    )
+                    time.sleep(sleep_time)
+                    continue
+
+                # mt status succeeded without busy -> drive is ready
+                return True
+
+            except Exception as e:
+                logger.debug(f"mt status polling failed: {e}")
+                return False
+
     def _get_current_file_number(self) -> str:
-        """Parses 'mt status' to get the current tape file position"""
+        """Parses 'mt status' to get the current tape file position.
+
+        Uses _run_mt so that transient "Device or resource busy" errors are
+        retried instead of returning a bogus "0".
+        """
         try:
-            cmd = ["mt", "-f", self.device_path, "status"]
-            self._log_command(cmd)
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            match = re.search(r"(?:File number=|file number )(\d+)", result.stdout)
-            if match:
-                return match.group(1)
+            stdout = self._run_mt("status", timeout_seconds=60, return_output=True)
+            if stdout:
+                match = re.search(r"(?:File number=|file number )(\d+)", stdout)
+                if match:
+                    return match.group(1)
         except Exception:
             pass
         return "0"
 
     def open_stream(self) -> BinaryIO:
         """Opens the tape device for direct tar streaming with LTO-optimal
-        block buffering (256 KB). Caller must close the returned object."""
-        return open(self.device_path, "wb", buffering=256 * 1024)  # type: ignore[return-value]
+        block buffering (256 KB). Retries on transient busy errors.
+        Caller must close the returned object.
+        """
+        start_time = time.time()
+        attempt = 0
+        waiting_logged = False
+        while True:
+            try:
+                return open(self.device_path, "wb", buffering=256 * 1024)  # type: ignore[return-value]
+            except OSError as e:
+                import errno
+
+                if e.errno == errno.EBUSY:
+                    elapsed = time.time() - start_time
+                    if elapsed < 60:
+                        attempt += 1
+                        sleep_time = min(0.2 * (2**attempt), 15.0)
+                        if not waiting_logged:
+                            logger.info(
+                                f"Waiting for tape drive {self.device_path} to be available for streaming..."
+                            )
+                            waiting_logged = True
+                        logger.warning(
+                            f"open_stream busy (attempt {attempt}, "
+                            f"elapsed {elapsed:.1f}s), retrying in {sleep_time:.1f}s..."
+                        )
+                        time.sleep(sleep_time)
+                        continue
+                raise
 
     def finalize_stream(self) -> str:
         """Writes a file mark after a streamed archive and returns the
         file number index."""
-        # Allow up to 15 minutes for the drive buffer to flush before writing the file mark.
+        # Capture the file number BEFORE writing the file mark, because weof
+        # advances the tape to the next file.
+        file_num = self._get_current_file_number()
+
+        # Proactively wait for the drive buffer to drain before issuing weof.
+        # This avoids hitting busy errors in the first place.
+        if not self._wait_for_drive_ready(timeout_seconds=60):
+            logger.warning(
+                "Drive buffer still busy after 60s, proceeding with weof anyway..."
+            )
+
+        # Allow up to 15 minutes for the drive buffer to flush.
         self._run_mt("weof", timeout_seconds=900)
-        return self._get_current_file_number()
+        return file_num
 
     def write_archive(self, media_id: str, stream: BinaryIO) -> str:
-        """Writes the stream to tape and returns the file number index"""
+        """Writes the stream to tape and returns the file number index."""
         file_num = self._get_current_file_number()
         cmd_dd = ["dd", f"of={self.device_path}", "bs=256k"]
         self._log_command(cmd_dd)
         proc = subprocess.Popen(cmd_dd, stdin=subprocess.PIPE)
-        if proc.stdin:
-            while True:
-                chunk = stream.read(1024 * 1024)
-                if not chunk:
-                    break
-                proc.stdin.write(chunk)
-            proc.stdin.close()
-        proc.wait()
+        try:
+            if proc.stdin:
+                while True:
+                    chunk = stream.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    proc.stdin.write(chunk)
+                proc.stdin.close()
+        except BrokenPipeError as e:
+            # dd exited early (likely because the device was busy or write failed)
+            proc.wait()
+            raise RuntimeError(
+                f"dd failed while writing archive to {self.device_path}: {e}"
+            ) from e
+
+        returncode = proc.wait()
+        if returncode != 0:
+            raise RuntimeError(
+                f"dd failed with return code {returncode} for {self.device_path}"
+            )
+
+        # Proactively wait for the drive buffer to drain before writing the file mark.
+        if not self._wait_for_drive_ready(timeout_seconds=60):
+            logger.warning(
+                "Drive buffer still busy after 60s, proceeding with weof anyway..."
+            )
+
         # Write a file mark so each archive is a distinct tape file.
         # This is required for fsf-based seeks during restore.
         # Allow up to 15 minutes for the drive buffer to flush before writing the file mark.
@@ -631,8 +789,10 @@ class LTOProvider(AbstractStorageProvider):
 
     def get_utilization(self) -> Optional[float]:
         """Calculates actual hardware utilization from MAM capacity attributes."""
-        # Force a fresh MAM read to get the most accurate current state after a write
-        mam = self.get_mam_info(force=True)
+        # Force a fresh MAM read to get the most accurate current state after a write.
+        # After large writes the drive buffer may still be flushing, so give sg_read_attr
+        # up to 60 seconds to become available (same retry strategy as _run_mt).
+        mam = self.get_mam_info(force=True, timeout_seconds=60)
         if "max_capacity_mib" in mam and "remaining_capacity_mib" in mam:
             max_cap = mam["max_capacity_mib"]
             rem_cap = mam["remaining_capacity_mib"]

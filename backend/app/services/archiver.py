@@ -386,6 +386,17 @@ class ArchiverService:
             )
 
         tar_bundle.close()
+
+        # Ensure all buffered data is pushed from Python/io through to the OS
+        # before the caller proceeds to finalize (e.g., write file marks).
+        try:
+            stream.flush()
+            if hasattr(stream, "fileno"):
+                os.fsync(stream.fileno())
+        except (OSError, ValueError):
+            # fsync may not be supported on all streams (e.g., pipes, tape on some OS)
+            pass
+
         return processed_bytes
 
     def _log_compression_ratio(

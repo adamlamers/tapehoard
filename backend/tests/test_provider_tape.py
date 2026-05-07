@@ -19,7 +19,10 @@ def test_lto_compression_control(mocker):
 
     # Expectation: mt compression 1
     mock_run.assert_called_with(
-        ["mt", "-f", "/dev/nst0", "compression", "1"], check=True, capture_output=True
+        ["mt", "-f", "/dev/nst0", "compression", "1"],
+        check=True,
+        capture_output=True,
+        text=True,
     )
 
     # CASE 2: Compression Disabled
@@ -29,7 +32,10 @@ def test_lto_compression_control(mocker):
 
     # Expectation: mt compression 0
     mock_run.assert_called_with(
-        ["mt", "-f", "/dev/nst0", "compression", "0"], check=True, capture_output=True
+        ["mt", "-f", "/dev/nst0", "compression", "0"],
+        check=True,
+        capture_output=True,
+        text=True,
     )
 
 
@@ -146,7 +152,11 @@ def test_lto_write_archive_writes_file_mark(mocker):
         return m
 
     mocker.patch("subprocess.run", side_effect=capture_mt)
-    mocker.patch("subprocess.Popen")
+
+    mock_proc = mocker.MagicMock()
+    mock_proc.stdin = mocker.MagicMock()
+    mock_proc.wait.return_value = 0
+    mocker.patch("subprocess.Popen", return_value=mock_proc)
 
     import io
 
@@ -206,7 +216,11 @@ def test_lto_multiple_archives_increment_file_number(mocker):
         return m
 
     mocker.patch("subprocess.run", side_effect=capture_mt)
-    mocker.patch("subprocess.Popen")
+
+    mock_proc = mocker.MagicMock()
+    mock_proc.stdin = mocker.MagicMock()
+    mock_proc.wait.return_value = 0
+    mocker.patch("subprocess.Popen", return_value=mock_proc)
 
     import io
 
@@ -276,7 +290,7 @@ def test_lto_weof_fails_after_timeout(mocker):
 
     # Speed up time so the 15-minute timeout is reached quickly
     start = time.time()
-    time_values = iter([start, start] + [start + i * 20 for i in range(1, 50)])
+    time_values = iter([start, start] + [start + i * 20 for i in range(1, 200)])
     mocker.patch("time.time", side_effect=lambda: next(time_values))
 
     with pytest.raises(subprocess.CalledProcessError):
