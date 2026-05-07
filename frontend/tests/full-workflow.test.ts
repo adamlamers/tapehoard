@@ -70,11 +70,11 @@ test.describe('TapeHoard Golden Path', () => {
 
     console.log('Step 1: Discovery & Tracking');
     await page.goto('/filesystem');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText(SOURCE_ROOT).first()).toBeVisible();
     await page.getByText(SOURCE_ROOT).first().click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await expect(page.getByText('test_file_1.txt')).toBeVisible();
     await expect(page.getByText('subfolder')).toBeVisible();
 
@@ -86,7 +86,7 @@ test.describe('TapeHoard Golden Path', () => {
 
     console.log('Step 2: Indexing');
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await page.getByRole('button', { name: /Start scan/i }).click();
     await expect(page.getByText(/Scan job initiated/i)).toBeVisible();
 
@@ -112,7 +112,7 @@ test.describe('TapeHoard Golden Path', () => {
     expect(registerResp.ok()).toBe(true);
 
     await page.goto('/inventory');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     // Use first() to handle multiple matches (e.g., in both Active and Discovered sections)
     await expect(page.getByText('TAPE001').first()).toBeVisible({ timeout: 10000 });
 
@@ -132,13 +132,13 @@ test.describe('TapeHoard Golden Path', () => {
 
     console.log('Step 6: Waiting for archival job');
     await page.goto('/jobs');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await expect(page.getByText('Backup', { exact: false }).first()).toBeVisible({ timeout: 60000 });
     await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 60000 });
 
     console.log('Step 7: Verify Protection');
     await page.goto('/index-browser');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     // Click on the item in the file list (not the tree)
     // Tree items have role="treeitem", file list rows have role="button"
     await page.getByRole('button', { name: SOURCE_ROOT }).first().dblclick();
@@ -154,9 +154,9 @@ test.describe('TapeHoard Golden Path', () => {
     await expect(page.getByText(/2 items in queue/i)).toBeVisible();
 
     await page.goto('/restores');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await page.getByRole("treeitem").getByText('/tmp/tapehoard_e2e_source').click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await page.getByText('subfolder').dblclick();
     await expect(page.getByText('test_file_2.txt')).toBeVisible();
 
@@ -166,7 +166,7 @@ test.describe('TapeHoard Golden Path', () => {
 
     console.log('Step 9: Waiting for restore job');
     await page.goto('/jobs');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await expect(page.getByText('Restore', { exact: false }).first()).toBeVisible({ timeout: 60000 });
     await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 60000 });
 

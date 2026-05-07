@@ -1,14 +1,15 @@
-import subprocess
 import os
+import subprocess
 import sys
+
 from loguru import logger
 
 
 def _get_ionice_setting() -> str:
     """Reads the user's preferred I/O scheduling class from settings."""
     try:
-        from app.db.database import SessionLocal
         from app.db import models
+        from app.db.database import SessionLocal
 
         with SessionLocal() as db_session:
             record = (
@@ -39,8 +40,8 @@ def set_process_priority(level: str):
             if hasattr(p, "ionice"):
                 if ionice_level == "idle":
                     p.ionice(
-                        psutil.IOPRIO_CLASS_IDLE
-                    )  # ty: ignore[unresolved-attribute]
+                        psutil.IOPRIO_CLASS_IDLE  # ty: ignore[unresolved-attribute]
+                    )
                 elif ionice_level == "realtime":
                     p.ionice(psutil.IOPRIO_CLASS_RT)  # ty: ignore[unresolved-attribute]
                 else:

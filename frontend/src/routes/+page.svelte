@@ -23,17 +23,15 @@
     import SectionHeader from '$lib/components/ui/SectionHeader.svelte';
     import StatCard from '$lib/components/ui/StatCard.svelte';
     import ProgressBar from '$lib/components/ui/ProgressBar.svelte';
-    import { getDashboardStats, getScanStatus, triggerScan, triggerIndexing, type DashboardStatsSchema, type ScanStatusSchema } from '$lib/api';
+    import { getDashboardStats, triggerScan, triggerIndexing, type DashboardStatsSchema } from '$lib/api';
+    import { scanStatus } from '$lib/stores/scanStatus';
     import { cn, formatLocalDate, formatLocalTime, formatSize } from '$lib/utils';
     import { toast } from 'svelte-sonner';
-    import { POLL_FAST } from '$lib/config';
 
     let stats = $state<DashboardStatsSchema | null>(null);
     let loading = $state(true);
     let scanning = $state(false);
     let indexing = $state(false);
-    let scanStatus = $state<ScanStatusSchema | null>(null);
-    let scanEventSource: EventSource | null = null;
 
     async function loadStats() {
         loading = true;
@@ -49,54 +47,15 @@
         }
     }
 
-    async function checkScanStatus() {
-        try {
-            const response = await getScanStatus();
-            if (response.data) {
-                const wasRunning = scanStatus?.is_running;
-                scanStatus = response.data;
-
-                // Auto-refresh stats when scan completes
-                if (wasRunning && !scanStatus.is_running) {
-                    await loadStats();
-                }
-            }
-        } catch (error) {
-            console.error("Failed to get scan status:", error);
+    // Auto-refresh stats when a scan finishes
+    let prevScanRunning = false;
+    $effect(() => {
+        const isRunning = $scanStatus?.is_running ?? false;
+        if (prevScanRunning && !isRunning) {
+            loadStats();
         }
-    }
-
-    function connectScanSse() {
-        if (scanEventSource) return;
-
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001';
-        scanEventSource = new EventSource(`${apiUrl}/system/scan/stream`);
-
-        scanEventSource.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                const wasRunning = scanStatus?.is_running ?? false;
-                scanStatus = data as ScanStatusSchema;
-
-                if (wasRunning && !scanStatus.is_running) {
-                    loadStats();
-                }
-            } catch (err) {
-                console.error('Scan SSE parse error:', err);
-            }
-        };
-
-        scanEventSource.onerror = (err) => {
-            console.error('Scan SSE connection error:', err);
-        };
-    }
-
-    function closeScanSse() {
-        if (scanEventSource) {
-            scanEventSource.close();
-            scanEventSource = null;
-        }
-    }
+        prevScanRunning = isRunning;
+    });
 
     async function startIndexing() {
         indexing = true;
@@ -124,11 +83,6 @@
 
     onMount(() => {
         loadStats();
-        checkScanStatus();
-        connectScanSse();
-        return () => {
-            closeScanSse();
-        };
     });
 
 </script>

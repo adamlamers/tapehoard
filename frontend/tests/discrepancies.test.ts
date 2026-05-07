@@ -305,7 +305,7 @@ test.describe('Discrepancies', () => {
 
     console.log('Step 2: Navigate to discrepancies page');
     await page.goto('/discrepancies');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByRole('heading', { name: 'Discrepancies' })).toBeVisible();
     await expect(page.getByText('Files missing from disk or confirmed deleted')).toBeVisible();
@@ -332,7 +332,7 @@ test.describe('Discrepancies', () => {
 
     console.log('Step 2: Navigate to discrepancies page');
     await page.goto('/discrepancies');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page.getByText('All clear')).toBeVisible();
     await expect(page.getByText('No discrepancies detected')).toBeVisible();

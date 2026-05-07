@@ -1,16 +1,38 @@
+from datetime import datetime
 from typing import List
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.db.database import get_db, SessionLocal
-from app.api.common import JobSchema, JobLogSchema
-from sqlalchemy import text
-from app.db import models
-from app.services.scanner import JobManager, scanner_manager
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.api.common import JobLogSchema, JobSchema
+from app.db import models
+from app.db.database import SessionLocal, get_db
+from app.services.scanner import JobManager, scanner_manager
 import json
 import asyncio
 
 router = APIRouter(tags=["System"])
+
+
+def _get_latest_logs(db_session: Session, job_ids: list[int]) -> dict[int, str]:
+    """Returns a mapping of job_id -> most recent log message for the given job IDs."""
+    if not job_ids:
+        return {}
+    placeholders = ", ".join([f":id{i}" for i in range(len(job_ids))])
+    params = {f"id{i}": jid for i, jid in enumerate(job_ids)}
+    subquery = text(f"""
+        SELECT jl.job_id, jl.message
+        FROM job_logs jl
+        INNER JOIN (
+            SELECT job_id, MAX(id) as max_id
+            FROM job_logs
+            WHERE job_id IN ({placeholders})
+            GROUP BY job_id
+        ) latest ON jl.id = latest.max_id
+    """)
+    return {row[0]: row[1] for row in db_session.execute(subquery, params).fetchall()}
 
 
 @router.get("/jobs", response_model=List[JobSchema], operation_id="list_jobs")
@@ -24,25 +46,7 @@ def list_jobs(limit: int = 10, offset: int = 0, db_session: Session = Depends(ge
         .all()
     )
 
-    job_ids = [job.id for job in jobs]
-    if job_ids:
-        placeholders = ", ".join([f":id{i}" for i in range(len(job_ids))])
-        params = {f"id{i}": jid for i, jid in enumerate(job_ids)}
-        subquery = text(f"""
-            SELECT jl.job_id, jl.message
-            FROM job_logs jl
-            INNER JOIN (
-                SELECT job_id, MAX(id) as max_id
-                FROM job_logs
-                WHERE job_id IN ({placeholders})
-                GROUP BY job_id
-            ) latest ON jl.id = latest.max_id
-        """)
-        latest_logs = {
-            row[0]: row[1] for row in db_session.execute(subquery, params).fetchall()
-        }
-    else:
-        latest_logs = {}
+    latest_logs = _get_latest_logs(db_session, [job.id for job in jobs])
 
     result = []
     for job in jobs:
@@ -121,37 +125,20 @@ def get_job_stats(db_session: Session = Depends(get_db)):
 # NOTE: /jobs/stream MUST be registered BEFORE /jobs/{job_id} routes
 # because FastAPI matches routes in definition order.
 @router.get("/jobs/stream", operation_id="stream_jobs")
-async def stream_jobs():
+async def stream_jobs(request: Request):
     """Server-Sent Events (SSE) endpoint for real-time job status updates."""
 
     async def event_generator():
-        while True:
+        while not await request.is_disconnected():
             with SessionLocal() as db_session:
                 active_jobs = (
                     db_session.query(models.Job)
                     .filter(models.Job.status.in_(["RUNNING", "PENDING"]))
                     .all()
                 )
-                job_ids = [job.id for job in active_jobs]
-                if job_ids:
-                    placeholders = ", ".join([f":id{i}" for i in range(len(job_ids))])
-                    params = {f"id{i}": jid for i, jid in enumerate(job_ids)}
-                    subquery = text(f"""
-                        SELECT jl.job_id, jl.message
-                        FROM job_logs jl
-                        INNER JOIN (
-                            SELECT job_id, MAX(id) as max_id
-                            FROM job_logs
-                            WHERE job_id IN ({placeholders})
-                            GROUP BY job_id
-                        ) latest ON jl.id = latest.max_id
-                    """)
-                    latest_logs = {
-                        row[0]: row[1]
-                        for row in db_session.execute(subquery, params).fetchall()
-                    }
-                else:
-                    latest_logs = {}
+                latest_logs = _get_latest_logs(
+                    db_session, [job.id for job in active_jobs]
+                )
 
                 serialized_data = []
                 for job in active_jobs:
@@ -167,8 +154,6 @@ async def stream_jobs():
                         "latest_log": latest_logs.get(job.id),
                     }
                     for date_field in ["started_at", "created_at"]:
-                        from datetime import datetime
-
                         val = job_dict[date_field]
                         if isinstance(val, datetime):
                             job_dict[date_field] = val.isoformat()
@@ -178,7 +163,11 @@ async def stream_jobs():
 
             await asyncio.sleep(2)
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/jobs/{job_id}", response_model=JobSchema, operation_id="get_job")

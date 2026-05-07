@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, onDestroy } from 'svelte';
+    import { onMount } from 'svelte';
     import { Save, FolderTree, Database, HardDrive, LayoutGrid, RotateCw, Activity, FileCheck, ArrowRight } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import PageHeader from '$lib/components/ui/PageHeader.svelte';
@@ -10,13 +10,11 @@
         filesystemBrowse,
         batchTrack,
         triggerScan,
-        getScanStatus,
         filesystemSearch,
-        type ScanStatusSchema
     } from '$lib/api';
+    import { scanStatus } from '$lib/stores/scanStatus';
     import { toast } from "svelte-sonner";
     import { cn, formatLocalTime } from "$lib/utils";
-    import { POLL_SLOW } from '$lib/config';
     import { page } from '$app/state';
 
     // Current directory state
@@ -28,9 +26,7 @@
     let searchLoading = $state(false);
     let committing = $state(false);
 
-    // Scanner Status (local for button state only)
-    let scanRunning = $state(false);
-    let scanEventSource: EventSource | null = null;
+    const scanRunning = $derived($scanStatus?.is_running ?? false);
     let searchTimeout: any;
 
     // Staging area for tracking changes: path -> desired tracked state
@@ -106,37 +102,15 @@
         }
     });
 
-    function connectScanSse() {
-        if (scanEventSource) return;
-
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001';
-        scanEventSource = new EventSource(`${apiUrl}/system/scan/stream`);
-
-        scanEventSource.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                const wasRunning = scanRunning;
-                scanRunning = data.is_running;
-
-                if (wasRunning && !scanRunning) {
-                    loadFiles(currentPath);
-                }
-            } catch (err) {
-                console.error('Scan SSE parse error:', err);
-            }
-        };
-
-        scanEventSource.onerror = (err) => {
-            console.error('Scan SSE connection error:', err);
-        };
-    }
-
-    function closeScanSse() {
-        if (scanEventSource) {
-            scanEventSource.close();
-            scanEventSource = null;
+    // Reload file list when a scan finishes
+    let prevScanRunning = false;
+    $effect(() => {
+        const isRunning = $scanStatus?.is_running ?? false;
+        if (prevScanRunning && !isRunning) {
+            loadFiles(currentPath);
         }
-    }
+        prevScanRunning = isRunning;
+    });
 
     async function startScan() {
         try {
@@ -154,11 +128,6 @@
         }
 
         await loadFiles(currentPath);
-        connectScanSse();
-    });
-
-    onDestroy(() => {
-        closeScanSse();
     });
 
     function handleNavigate(path: string) {

@@ -148,7 +148,7 @@ test.describe('Media Lifecycle', () => {
     await requestContext.patch(`${API_URL}/inventory/media/${retiredMedia.id}`, { data: { status: 'retired' } });
 
     await page.goto('/inventory');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const activeSection = page.getByTestId('active-media-section');
     const fullSection = page.getByTestId('full-media-section');

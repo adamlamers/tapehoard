@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 import psutil
 from loguru import logger
 from sqlalchemy.orm import Session
-from sqlalchemy.orm.exc import ObjectDeletedError, StaleDataError
+from sqlalchemy.orm.exc import ObjectDeletedError
 
 from app.db import models
 from app.db.database import SessionLocal
@@ -37,7 +37,7 @@ class JobManager:
                     job_record.status = "RUNNING"
                     job_record.started_at = datetime.now(timezone.utc)
                     db_session.commit()
-            except (StaleDataError, Exception) as e:
+            except Exception as e:
                 db_session.rollback()
                 logger.debug(f"JobManager.start_job failed for {job_id}: {e}")
 
@@ -51,7 +51,7 @@ class JobManager:
                     job_record.progress = progress
                     job_record.current_task = current_task
                     db_session.commit()
-            except (StaleDataError, Exception) as e:
+            except Exception as e:
                 db_session.rollback()
                 logger.debug(f"JobManager.update_job failed for {job_id}: {e}")
 
@@ -66,7 +66,7 @@ class JobManager:
                     job_record.progress = 100.0
                     job_record.completed_at = datetime.now(timezone.utc)
                     db_session.commit()
-            except (StaleDataError, Exception) as e:
+            except Exception as e:
                 db_session.rollback()
                 logger.debug(f"JobManager.complete_job failed for {job_id}: {e}")
 
@@ -81,7 +81,7 @@ class JobManager:
                     job_record.error_message = error_message
                     job_record.completed_at = datetime.now(timezone.utc)
                     db_session.commit()
-            except (StaleDataError, Exception) as e:
+            except Exception as e:
                 db_session.rollback()
                 logger.debug(f"JobManager.fail_job failed for {job_id}: {e}")
 
@@ -93,7 +93,7 @@ class JobManager:
                 log_entry = models.JobLog(job_id=job_id, message=message)
                 db_session.add(log_entry)
                 db_session.commit()
-            except (StaleDataError, Exception) as e:
+            except Exception as e:
                 db_session.rollback()
                 logger.debug(f"JobManager.add_job_log failed for {job_id}: {e}")
 
@@ -109,7 +109,7 @@ class JobManager:
                     job_record.error_message = "Cancelled by user"
                     job_record.completed_at = datetime.now(timezone.utc)
                     db_session.commit()
-            except (StaleDataError, Exception) as e:
+            except Exception as e:
                 db_session.rollback()
                 logger.debug(f"JobManager.cancel_job failed for {job_id}: {e}")
 
@@ -154,20 +154,21 @@ class ScannerService:
 
     def _monitor_iowait(self):
         """Polls system I/O pressure to enable dynamic back-off."""
-        while self.is_running or self.is_hashing:
-            try:
-                cpu_times = psutil.cpu_times_percent(interval=0.1)
-                iowait_value = getattr(cpu_times, "iowait", 0.0)
+        while True:
+            if self.is_running or self.is_hashing:
+                try:
+                    cpu_times = psutil.cpu_times_percent(interval=0.1)
+                    iowait_value = getattr(cpu_times, "iowait", 0.0)
+                    with self._metrics_lock:
+                        self.is_throttled = iowait_value > 5.0
+                        self._current_iowait = iowait_value
+                except Exception:
+                    pass
+                time.sleep(2)
+            else:
                 with self._metrics_lock:
-                    self.is_throttled = iowait_value > 5.0
-                    self._current_iowait = iowait_value
-            except Exception:
-                pass
-            # Use short sleep in a loop so we notice when the flags change
-            for _ in range(20):
-                if not (self.is_running or self.is_hashing):
-                    return
-                time.sleep(0.1)
+                    self.is_throttled = False
+                time.sleep(5)
 
     def compute_sha256(
         self, file_path: str, job_id: Optional[int] = None
@@ -516,7 +517,7 @@ class ScannerService:
                     # Commit batch
                     try:
                         db_session.commit()
-                    except (StaleDataError, Exception):
+                    except Exception:
                         db_session.rollback()
                         break
 

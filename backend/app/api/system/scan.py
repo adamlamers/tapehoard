@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from typing import Optional
 from datetime import datetime
@@ -65,11 +65,11 @@ def get_scan_status():
 
 
 @router.get("/scan/stream", operation_id="stream_scan_status")
-async def stream_scan_status():
+async def stream_scan_status(request: Request):
     """Server-Sent Events endpoint for real-time scan progress updates."""
 
     async def event_generator():
-        while True:
+        while not await request.is_disconnected():
             payload = {
                 "is_running": scanner_manager.is_running,
                 "files_processed": scanner_manager.files_processed,
@@ -90,7 +90,11 @@ async def stream_scan_status():
             yield f"data: {json.dumps(payload)}\n\n"
             await asyncio.sleep(1)
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 def _get_last_scan_time(db_session: Session) -> Optional[datetime]:
