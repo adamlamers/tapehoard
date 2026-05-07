@@ -849,7 +849,7 @@ class ArchiverService:
                             db_session.commit()
                             JobManager.add_job_log(
                                 job_id,
-                                f"Checkpoint: archive {chunk_num} committed",
+                                f"Checkpoint: archive {chunk_num} committed (tape file #{archive_location_id})",
                             )
                         except StaleDataError:
                             db_session.rollback()
@@ -1000,7 +1000,7 @@ class ArchiverService:
                             db_session.commit()
                             JobManager.add_job_log(
                                 job_id,
-                                f"Checkpoint: archive {chunk_num} committed",
+                                f"Checkpoint: archive {chunk_num} committed (tape file #{archive_location_id})",
                             )
                         except StaleDataError:
                             db_session.rollback()
