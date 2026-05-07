@@ -33,7 +33,7 @@
     let scanning = $state(false);
     let indexing = $state(false);
     let scanStatus = $state<ScanStatusSchema | null>(null);
-    let pollInterval: any;
+    let scanEventSource: EventSource | null = null;
 
     async function loadStats() {
         loading = true;
@@ -66,6 +66,38 @@
         }
     }
 
+    function connectScanSse() {
+        if (scanEventSource) return;
+
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001';
+        scanEventSource = new EventSource(`${apiUrl}/system/scan/stream`);
+
+        scanEventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                const wasRunning = scanStatus?.is_running ?? false;
+                scanStatus = data as ScanStatusSchema;
+
+                if (wasRunning && !scanStatus.is_running) {
+                    loadStats();
+                }
+            } catch (err) {
+                console.error('Scan SSE parse error:', err);
+            }
+        };
+
+        scanEventSource.onerror = (err) => {
+            console.error('Scan SSE connection error:', err);
+        };
+    }
+
+    function closeScanSse() {
+        if (scanEventSource) {
+            scanEventSource.close();
+            scanEventSource = null;
+        }
+    }
+
     async function startIndexing() {
         indexing = true;
         try {
@@ -93,9 +125,9 @@
     onMount(() => {
         loadStats();
         checkScanStatus();
-        pollInterval = setInterval(checkScanStatus, POLL_FAST);
+        connectScanSse();
         return () => {
-            if (pollInterval) clearInterval(pollInterval);
+            closeScanSse();
         };
     });
 
@@ -131,26 +163,6 @@
             </Button>
         {/snippet}
     </PageHeader>
-
-    {#if scanStatus?.is_running}
-        <div class="bg-blue-500/5 border border-blue-500/20 rounded-xl px-5 py-3 flex items-center gap-4">
-            <RotateCw size={16} class="text-blue-500 animate-spin" />
-            <div class="flex-1">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-text-primary">Scan in progress</span>
-                    <span class="text-xs text-text-secondary mono">
-                        {scanStatus.files_processed.toLocaleString()} / {scanStatus.total_files_found.toLocaleString()} files
-                    </span>
-                </div>
-                <div class="w-full bg-bg-primary h-1.5 rounded-full overflow-hidden mt-2">
-                    <div
-                        class="bg-blue-500 h-full transition-all duration-1000"
-                        style="width: {scanStatus.total_files_found ? Math.round((scanStatus.files_processed / scanStatus.total_files_found) * 100) : 0}%"
-                    ></div>
-                </div>
-            </div>
-        </div>
-    {/if}
 
     <div class="space-y-6">
         {#if loading && !stats}

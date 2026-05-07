@@ -6,7 +6,6 @@
     import Dialog from './ui/Dialog.svelte';
     import { getJob, getJobLogs, type AppApiCommonJobSchema } from '$lib/api';
     import { cn, formatLocalTime, formatLocalDateTime, parseUTCDate } from '$lib/utils';
-    import { POLL_FAST } from '$lib/config';
 
     let { jobId, onClear } = $props<{
         jobId: number;
@@ -16,7 +15,8 @@
     let job = $state<AppApiCommonJobSchema | null>(null);
     let logs = $state<{ id: number; message: string; timestamp: string }[]>([]);
     let loading = $state(true);
-    let pollInterval: any;
+    let eventSource: EventSource | null = null;
+    let latestLogMessage = $state<string | null>(null);
 
     async function loadJob() {
         loading = true;
@@ -34,24 +34,77 @@
         }
     }
 
-    async function pollJob() {
-        if (!job || (job.status !== 'RUNNING' && job.status !== 'PENDING')) return;
+    function connectSse() {
+        if (eventSource) return;
 
-        try {
-            const [jobRes, logsRes] = await Promise.all([
-                getJob({ path: { job_id: jobId } }),
-                getJobLogs({ path: { job_id: jobId } })
-            ]);
-            if (jobRes.data) {
-                const wasRunning = job.status === 'RUNNING' || job.status === 'PENDING';
-                job = jobRes.data;
-                if (!wasRunning && job.status !== 'RUNNING' && job.status !== 'PENDING') {
-                    // Job just finished, stop polling
-                    if (pollInterval) clearInterval(pollInterval);
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001';
+        eventSource = new EventSource(`${apiUrl}/system/jobs/stream`);
+
+        eventSource.onmessage = (event) => {
+            try {
+                const jobs = JSON.parse(event.data) as Array<{
+                    id: number;
+                    job_type: string;
+                    status: string;
+                    progress: number;
+                    current_task: string | null;
+                    error_message: string | null;
+                    latest_log: string | null;
+                    started_at: string | null;
+                    created_at: string | null;
+                }>;
+
+                const updated = jobs.find((j) => j.id === jobId);
+                if (!updated) return;
+
+                job = {
+                    ...job,
+                    ...updated,
+                    // Preserve fields not in SSE payload
+                    completed_at: (job as any)?.completed_at ?? null,
+                } as AppApiCommonJobSchema;
+
+                if (updated.latest_log && updated.latest_log !== latestLogMessage) {
+                    latestLogMessage = updated.latest_log;
+                    // Append to local log display so user sees new entries immediately
+                    logs = [
+                        ...logs,
+                        {
+                            id: Date.now(),
+                            message: updated.latest_log,
+                            timestamp: new Date().toISOString(),
+                        },
+                    ];
                 }
+
+                // Job finished — close SSE and refresh full logs one last time
+                if (updated.status !== 'RUNNING' && updated.status !== 'PENDING') {
+                    closeSse();
+                    refreshLogs();
+                }
+            } catch (err) {
+                console.error('SSE parse error:', err);
             }
+        };
+
+        eventSource.onerror = (err) => {
+            console.error('SSE connection error:', err);
+            // EventSource auto-reconnects; we only clean up on unmount
+        };
+    }
+
+    function closeSse() {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+    }
+
+    async function refreshLogs() {
+        try {
+            const logsRes = await getJobLogs({ path: { job_id: jobId } });
             if (logsRes.data) logs = logsRes.data;
-        } catch (error) {
+        } catch {
             // Silently fail
         }
     }
@@ -77,11 +130,17 @@
 
     onMount(() => {
         loadJob();
-        pollInterval = setInterval(pollJob, POLL_FAST);
+    });
+
+    // Start SSE once initial load is done and job is active
+    $effect(() => {
+        if (!loading && job && (job.status === 'RUNNING' || job.status === 'PENDING')) {
+            connectSse();
+        }
     });
 
     onDestroy(() => {
-        if (pollInterval) clearInterval(pollInterval);
+        closeSse();
     });
 </script>
 

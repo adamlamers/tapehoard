@@ -1,41 +1,39 @@
 # Agent Development Guide
 
-This file contains architectural context and conventions for AI agents (and humans) working on the TapeHoard codebase.
-
 ## Project Structure
 
 ```
 tapehoard/
 ├── backend/           # FastAPI + SQLAlchemy + SQLite
 │   ├── app/
-│   │   ├── api/       # API routers
+│   │   ├── api/
 │   │   │   ├── common.py          # Shared helpers & schemas
 │   │   │   ├── system/            # System endpoints (13 modules)
-│   │   │   ├── archive.py         # Archive file index endpoints
-│   │   │   ├── backups.py         # Backup job endpoints
-│   │   │   ├── inventory.py       # Media fleet endpoints
-│   │   │   ├── restores.py        # Restore queue endpoints
+│   │   │   ├── archive.py         # Archive file index
+│   │   │   ├── backups.py         # Backup jobs
+│   │   │   ├── inventory.py       # Media fleet
+│   │   │   ├── restores.py        # Restore queue
 │   │   │   └── schemas.py         # Shared Pydantic schemas
 │   │   ├── db/
-│   │   ├── services/  # Business logic (scanner, archiver, scheduler)
-│   │   └── main.py    # FastAPI app factory + router registration
-│   └── tests/         # Pytest suite (77 tests)
+│   │   ├── services/              # scanner, archiver, scheduler
+│   │   └── main.py                # App factory + router registration
+│   └── tests/                     # 230 pytest tests
 ├── frontend/          # SvelteKit + TypeScript
 │   ├── src/lib/api/   # Auto-generated OpenAPI SDK
-│   └── tests/         # Playwright E2E suite (34 tests)
-└── docs/              # Additional documentation
+│   └── tests/         # 34 Playwright tests
+└── docs/
 ```
 
-## Backend Architecture
+## Backend
 
 ### API Router Organization
 
-All API routes live under `app/api/`. The `system` endpoints are split into a package (`app/api/system/`) with focused submodules:
+System endpoints live in `app/api/system/` submodules and are registered in `main.py` with `prefix="/system"`.
 
 | Module | Endpoints |
 |--------|-----------|
-| `system/jobs.py` | `/system/jobs/*`, `/system/jobs/{id}/cancel`, `/system/jobs/{id}/retry`, `/system/jobs/stream` |
-| `system/scan.py` | `/system/scan`, `/system/index/hash`, `/system/scan/status` |
+| `system/jobs.py` | `/system/jobs/*`, cancel, retry, stream |
+| `system/scan.py` | `/system/scan`, `/system/scan/stream`, `/system/index/hash`, `/system/scan/status` |
 | `system/filesystem.py` | `/system/browse`, `/system/search` |
 | `system/tree.py` | `/system/tree` |
 | `system/dashboard.py` | `/system/dashboard/stats` |
@@ -48,214 +46,218 @@ All API routes live under `app/api/`. The `system` endpoints are split into a pa
 | `system/host.py` | `/system/ls` |
 | `system/test.py` | `/system/test/reset` |
 
-Each module defines its own `APIRouter` with `tags=["System"]` and is registered in `main.py` with `prefix="/system"`.
+Each module defines its own `APIRouter` with `tags=["System"]` and **no prefix** in the constructor; `main.py` applies `prefix="/system"`.
+
+Top-level domain routers (`archive`, `backups`, `inventory`, `restores`) define their own prefix (e.g., `APIRouter(prefix="/archive")`).
 
 ### Index-Only Principle
 
-**Never rely on the live filesystem for data, except during a scan.** All read endpoints must operate exclusively on the database index. The filesystem is only accessed during:
+**Never read the live filesystem except during scan.** All read endpoints must use the database index only.
 
-- **Scan operations** (`/system/scan`) — to discover files, compute hashes, and sync the index.
-- **Configuration endpoints** (`/system/ls`, `/system/browse` when path is outside roots) — to help users pick source roots during setup.
+Filesystem access is allowed only for:
+- **Scan** (`/system/scan`) — discover files, compute hashes, sync index
+- **Config helpers** (`/system/ls`, `/system/browse` for paths outside roots) — help users pick source roots
 
-Browsing the archive, searching, or checking protection status must use the index only. This guarantees consistent results even when files are temporarily inaccessible, and prevents I/O bottlenecks on network or tape-backed storage.
+Archive browse, search, and protection checks must use the index exclusively.
 
 ### Shared Helpers (`app/api/common.py`)
 
-Cross-cutting helpers and schemas that must not create circular imports:
-
+Available helpers (must not import any API module to avoid circular deps):
 - `get_source_roots(db_session)` → `List[str]`
 - `get_exclusion_spec(db_session)` → `Optional[pathspec.PathSpec]`
 - `get_ignored_status(path, tracking_map, exclusion_spec)` → `bool`
 - `_validate_path_within_roots(path, roots)` → `bool`
 - `_active_job_exists(db_session, job_type)` → `bool`
 - `_get_last_scan_time(db_session)` → `Optional[datetime]`
-- Shared Pydantic schemas: `DashboardStatsSchema`, `JobSchema`, `JobLogSchema`, `FileItemSchema`, `BrowseResponseSchema`, `ScanStatusSchema`, `SettingSchema`, `TestNotificationRequest`, `IgnoreHardwareRequest`, `BatchTrackRequest`
 
-**Rule:** `common.py` must NEVER import from any API module (no `app.api.system`, `app.api.archive`, etc.). Only models, database, and standard libraries.
+Shared schemas: `DashboardStatsSchema`, `JobSchema`, `JobLogSchema`, `FileItemSchema`, `BrowseResponseSchema`, `ScanStatusSchema`, `SettingSchema`, `TestNotificationRequest`, `IgnoreHardwareRequest`, `BatchTrackRequest`
 
 ### Endpoint Naming Convention
 
-All FastAPI route handlers must declare explicit `operation_id` to control the generated TypeScript SDK names.
+Always declare explicit `operation_id`. Never let FastAPI auto-generate it.
 
-| Pattern | Example Handler | `operation_id` | Generated TS |
-|---------|-----------------|----------------|--------------|
+| Pattern | Handler | `operation_id` | Generated TS |
+|---------|---------|----------------|--------------|
 | GET list | `list_jobs` | `list_jobs` | `listJobs` |
 | GET one | `get_job` | `get_job` | `getJob` |
 | POST create | `create_media` | `create_media` | `createMedia` |
 | POST action | `trigger_scan` | `trigger_scan` | `triggerScan` |
 | PATCH update | `update_media` | `update_media` | `updateMedia` |
 | DELETE | `delete_media` | `delete_media` | `deleteMedia` |
-| Batch actions | `batch_track` | `batch_track` | `batchTrack` |
+| Batch | `batch_track` | `batch_track` | `batchTrack` |
 
-**Never** let FastAPI auto-generate `operationId`. The old auto-generated names looked like `getDashboardStatsSystemDashboardStatsGet` — verbose and brittle.
+## Frontend
 
-### Router Prefix Rules
+### TypeScript SDK
 
-- Top-level domain routers (`archive`, `backups`, `inventory`, `restores`) define their own prefix in the router constructor (e.g., `APIRouter(prefix="/archive")`).
-- `system` submodules use **no prefix** in the router constructor; `main.py` applies `prefix="/system"` when calling `app.include_router()`.
-
-## Frontend Architecture
-
-### TypeScript SDK (`frontend/src/lib/api/`)
-
-Generated from the backend OpenAPI spec using `@hey-api/openapi-ts`:
-
+Regenerate after any backend endpoint/schema change:
 ```bash
 just generate-client
 ```
 
-This runs the full pipeline: exports the OpenAPI spec from the running FastAPI app and regenerates the TypeScript SDK in `frontend/src/lib/api/`. Use this **after any backend change** that adds, renames, or modifies endpoints or schemas.
+The generated SDK exports camelCase functions (e.g., `getDashboardStats`, `listJobs`). After renaming handlers or `operation_id`, regenerate the SDK and update all frontend imports.
 
-The generated SDK exports clean camelCase functions (e.g., `getDashboardStats`, `listJobs`, `triggerScan`).
+### Import Shadowing
 
-**Rule:** After renaming any backend handler or changing an `operation_id`, regenerate the SDK and update all frontend imports. The old verbose names will cause TypeScript errors.
-
-### Frontend Imports to Avoid Shadowing
-
-Some Svelte components define local functions with the same name as SDK imports (e.g., `cancelJob`, `retryJob` in `jobs/+page.svelte`). When this happens, alias the SDK import:
-
+If a Svelte component defines a local function with the same name as an SDK import, alias it:
 ```typescript
 import { cancelJob as cancelJobApi, retryJob as retryJobApi } from '$lib/api';
 ```
 
 ## Testing
 
-### Backend Tests
-
+### Backend
 ```bash
 cd backend && uv run pytest tests/ -v
 ```
+- 230 tests; uses pytest-mock for filesystem/hardware mocking
+- **Important:** Mocks patching `get_source_roots` or `get_exclusion_spec` must target `app.api.common` (not `app.api.system`)
 
-- 230 tests covering API endpoints, providers, services
-- Uses pytest-mock for mocking filesystem/hardware
-- **Important:** Mocks that patch `get_source_roots` or `get_exclusion_spec` must target `app.api.common` (not `app.api.system`), since those helpers moved to `common.py`.
-
-### Frontend E2E Tests
-
+### Frontend E2E
 ```bash
 cd frontend && npx playwright test
 ```
-
 - 34 Playwright tests using Chromium
-- Backend test server auto-starts via `playwright.config.ts` webServer config
-- Tests use `requestContext` for direct API calls + `page` for UI interactions
+- Backend test server auto-starts via `playwright.config.ts`
+- Tests use `requestContext` for API calls + `page` for UI
 
-### macOS IPv6 Gotcha
+### macOS IPv6
+On macOS, `localhost` resolves to `::1`, but uvicorn binds to IPv4, causing `ECONNREFUSED ::1:8001`.
 
-On macOS, `localhost` resolves to `::1` (IPv6) by default, but uvicorn may bind to IPv4 only. This causes `ECONNREFUSED ::1:8001` in Playwright tests.
-
-**Fix:** Always use `127.0.0.1` instead of `localhost` for backend URLs:
+**Fix:** Use `127.0.0.1` everywhere:
 - `frontend/tests/helpers.ts`: `API_URL = 'http://127.0.0.1:8001'`
 - `frontend/playwright.config.ts`: `webServer.url = 'http://127.0.0.1:8001'`
 
 ## Tape Archive Correctness
 
 ### Buffer Flush Timeouts
+LTO drives buffer hundreds of MB. After `dd` or `tarfile` write, the drive may flush for **up to 15 minutes**. Closing `/dev/nst0` blocks until flush completes.
 
-LTO tape drives have large internal buffers (hundreds of MB). After a `dd` or `tarfile` write finishes, the drive may still be flushing data to tape for **up to 15 minutes**. Closing `/dev/nst0` triggers the driver to write the file mark, but if the buffer is still draining, the close may block.
+**Fix:** Removed explicit `weof`. The Linux SCSI tape driver (`st`) writes the file mark automatically on close. The user can cancel the job if the drive never clears.
 
-**Old:** Explicit `weof` was used, which failed with "Device or resource busy" when the buffer was still flushing.
+Log pattern: one INFO `"Waiting for tape drive to be available..."` on first busy error, then WARNING per retry.
 
-**Fix:** Removed explicit `weof` — the Linux SCSI tape driver writes the file mark automatically when the device is closed after writing. The close operation blocks until the buffer is fully flushed, which is the correct behavior. The user can cancel the backup job if the drive never clears.
+### `bytes_used` Fallback
+`_update_bytes_used_from_hardware()` returns `bool`. The caller uses `if not hw_updated:` to decide whether to fallback to uncompressed size. Old code compared `bytes_used == old_bytes_used`, which falsely fell back when hardware reported `0.0` (empty tape).
 
-An INFO log `"Waiting for tape drive to be available..."` is emitted once on the first busy error so the logs clearly show the job is intentionally paused.
+### Restore Archive Sort
+Tape restores read archives in `sorted(archive_groups.keys())`. String sort orders as `"1", "10", "11", "2"...`, causing catastrophic shoe-shining.
 
-### `bytes_used` Fallback Trap
+**Fix:** `_archive_sort_key` tries `int()` first, falling back to string for non-numeric IDs (HDD paths, cloud keys).
 
-The archiver syncs `bytes_used` to hardware-reported utilization via `_update_bytes_used_from_hardware()`. The old code checked success by comparing `bytes_used == old_bytes_used`, which is broken because it can't distinguish:
+### Streaming File Number Bug
+`finalize_stream` used to call `_get_current_file_number()` **after** `weof`. Since `weof` advances to the next file, this returned the **next** file number. Restores would seek past the archive.
 
-1. Hardware reported `0.0` utilization (empty tape) → should **NOT** fallback
-2. Hardware returned `None` (unavailable) → **should** fallback to uncompressed size
-
-**Fix:** `_update_bytes_used_from_hardware()` now returns `bool`. The caller uses `if not hw_updated:` instead of `if bytes_used == old_bytes_used:`.
-
-### Restore Archive Sort Order
-
-Tape restores read archives in the order returned by `sorted(archive_groups.keys())`. With string sort, file numbers order as `"1", "10", "11", "12", "2"...` which causes the tape to seek back and forth (catastrophic shoe-shining).
-
-**Fix:** `run_restore` uses a `_archive_sort_key` helper that tries `int()` conversion first, falling back to string sort for non-numeric IDs (HDD paths, cloud keys). Tape file numbers now read linearly: `1, 2, 3, ..., 10, 11, 12`.
-
-### Streaming Path File Number Bug
-
-`finalize_stream` was calling `_get_current_file_number()` **after** `weof`. Since `weof` advances the tape to the next file, this returned the **next** file number instead of the current archive's number. Restores would seek past the archive to an empty file.
-
-**Fix:** Capture the file number **before** closing the stream (the driver writes the file mark automatically on close). Also ensure the Python stream is fully flushed/closed before `finalize_stream` is called.
+**Fix:** Capture file number **before** close. The driver writes the file mark automatically on close.
 
 ### File Stability Filter
+Archiver captures `job_start_time` and skips files where `mtime > job_start_time` or the file is missing. Runs after deduplication, before all write paths.
 
-Files actively modified during a backup can be partially read and archived in an inconsistent state. The archiver now captures `job_start_time` at the beginning of `run_backup` and checks each file's actual filesystem `mtime` before writing.
-
-- `mtime > job_start_time` → skipped with log `"Skipped (actively modified after job start): /path/to/file"`
-- File missing between scan and backup → skipped with log `"Skipped (missing): /path/to/file"`
-
-This filter runs after deduplication but before all write paths (random access, streaming tar, staging tar, binary tar).
+Logs:
+- `"Skipped (actively modified after job start): /path/to/file"`
+- `"Skipped (missing): /path/to/file"`
 
 ### `prepare_for_write` Positioning
+Old code called `identify_media()` without `allow_intrusive=False`, which could rewind a partially-used tape to BOT.
 
-`prepare_for_write` was calling `identify_media()` without `allow_intrusive=False`, which could rewind a partially-used tape back to BOT even though the archiver had already verified identity two lines above.
-
-**Fix:** `prepare_for_write` now passes `allow_intrusive=False` to avoid unnecessary wear. If the cache is stale, `eod` still recovers to the end of data.
+**Fix:** Pass `allow_intrusive=False`. If the cache is stale, `eod` recovers to EOD.
 
 ### LTO Capacity Auto-Detection
+Media registration queries MAM `max_capacity_mib` to override generic LTO defaults. Backend trusts hardware when `device_path` is provided.
 
-During media registration, `_detect_lto_capacity_from_hardware()` queries MAM attribute `max_capacity_mib` to determine the actual physical capacity. This overrides generic LTO defaults (e.g., 1415 GB actual vs 1500 GB marketed). The backend always trusts hardware when `device_path` is provided.
-
-**Frontend:** The register dialog pre-fills capacity with `Math.floor(max_capacity_mib * 1024 * 1024 / 1e9)` to avoid rounding up past physical capacity.
+Frontend pre-fills with `Math.floor(max_capacity_mib * 1024 * 1024 / 1e9)` to avoid rounding up past physical capacity.
 
 ### Per-Chunk Checkpointing
+Old code committed once at job end. Mid-failures orphaned already-written archives.
 
-`run_backup` previously committed once at job end. If a long-running tape backup failed mid-way, all already-written archives were orphaned in the database.
-
-**Fix:** `db_session.commit()` is called after each deduplicated chunk, each random-access chunk, and each sequential tar archive. This ensures `FileVersion` records are persisted incrementally.
+**Fix:** `db_session.commit()` after each deduplicated chunk, random-access chunk, and sequential tar archive.
 
 ### File Marks Between Archives
+The `st` driver **automatically writes a file mark when `/dev/nst0` is closed after writing**. Explicit `weof` creates double file marks, producing empty files and breaking restore seeks.
 
-The Linux SCSI tape driver (`st`) **automatically writes a file mark when `/dev/nst0` is closed after writing**. Explicit `weof` commands are redundant and create **double file marks**, which produces empty files between archives and breaks restore seeks.
+**Fix:** Removed all explicit `weof` from `initialize_media`, `write_archive`, and `finalize_stream`.
 
-**Old (buggy):** `write_archive` and `finalize_stream` both called explicit `weof` after `dd`/`close()`, creating two file marks per archive. 56 archives produced 113 files on tape instead of 57.
-
-**Fix:** Removed all explicit `weof` calls from `initialize_media`, `write_archive`, and `finalize_stream`. The driver writes the file mark automatically when the device is closed. The tape layout is:
-
+Tape layout:
 ```
 [File 0: Label][FM][File 1: Archive 1][FM][File 2: Archive 2][FM]...
 ```
 
 ### Frontend Polling for `bytes_used`
+`discoverHardware()` polls every 3s, but `bytes_used` is DB-derived and only updates on `listMedia`.
 
-The inventory page polls `discoverHardware()` every 3 seconds for live status, but `bytes_used` (which comes from the DB, not hardware MAM) only refreshes when `listMedia` is called. After a backup job completes, the hardware status card shows updated MAM utilization while the media table still shows stale `bytes_used`.
+**Fix:** The `POLL_SLOW` interval also calls `loadMedia(true, false)` (silent, no hardware refresh).
 
-**Fix:** The `POLL_SLOW` interval also calls `loadMedia(true, false)` (silent, no hardware refresh) to keep the DB-derived utilization current.
+### Empty Tar Detection
+If all files in a chunk are deleted between stability filter and `_build_tar`, the resulting tar has 0 members, producing an empty tape file.
+
+**Fix:** `_build_tar` tracks `members_added`. Logs WARNING when 0.
+
+### Capacity Sanity Check
+If `capacity` is stored in GB, `MAX_CHUNK_SIZE = capacity // 50` becomes ~20MB, creating thousands of tiny tape files.
+
+**Fix:** Abort if `MAX_CHUNK_SIZE < 1MB`:
+```
+Media capacity (1000000000) produces MAX_CHUNK_SIZE of 10485760 bytes.
+This looks like capacity is stored in GB instead of bytes.
+```
+Re-register media with capacity in bytes.
+
+### Checkpoint Logs
+Job logs include the tape file number for each committed archive:
+```
+Checkpoint: archive 3 committed (tape file #7)
+```
+
+### SSE Endpoints
+
+| Endpoint | Emits | Frontend Consumers |
+|----------|-------|-------------------|
+| `GET /system/jobs/stream` | Active jobs array every 2s | `JobDetailModal.svelte` |
+| `GET /system/scan/stream` | Scan metrics every 1s | `ScanStatusOverlay.svelte`, `+page.svelte`, `filesystem/+page.svelte` |
+
+Use native `EventSource` (not the SDK helper):
+```typescript
+const eventSource = new EventSource(`${apiUrl}/system/jobs/stream`);
+eventSource.onmessage = (event) => { const data = JSON.parse(event.data); };
+// Close on destroy to prevent leaks
+eventSource.close();
+```
+
+**SSE vs polling:**
+- **SSE:** Active modals, scan overlays — sub-second updates, single visible instance
+- **Polling:** Historical lists — survives navigation/refreshes without reconnection flash
+
+### Redundancy Ratio
+Based on **data volume**, not file count:
+```
+redundancy_ratio = (archived_size / eligible_size) * 100
+```
+- `archived_size` = sum of `FileVersion` byte ranges on active/full media
+- `eligible_size` = `total_size - ignored_size` from `filesystem_state`
 
 ## Common Tasks
 
-### Adding a New System Endpoint
+### Add a New System Endpoint
+1. Pick or create `app/api/system/<module>.py`
+2. Add handler with explicit `operation_id`
+3. Import shared helpers from `app.api.common` if needed
+4. Register router in `app/main.py` with `prefix="/system"`
+5. Regenerate TypeScript SDK (`just generate-client`)
+6. Update frontend imports
+7. Add backend tests in `backend/tests/test_api_system.py`
+8. Run `just lint`
 
-1. Choose the appropriate `app/api/system/<module>.py` file (or create a new one if it doesn't fit existing categories).
-2. Add the route handler with an explicit `operation_id`.
-3. Import shared helpers from `app.api.common` if needed.
-4. Register the new router in `app/main.py` with `prefix="/system"`.
-5. Regenerate the TypeScript SDK.
-6. Update frontend imports if using the new endpoint.
-7. Add backend tests in `backend/tests/test_api_system.py` (or a new test file if it's a new domain).
-8. Run `just lint` before finishing.
-
-### Regenerating the OpenAPI Spec / TypeScript SDK
-
-Use the convenience command:
-
+### Regenerate SDK
 ```bash
 just generate-client
 ```
-
-Or run the steps manually:
-
+Or manually:
 ```bash
 cd backend && uv run python -c "import json; from app.main import app; json.dump(app.openapi(), open('openapi.json', 'w'), indent=2)"
 cd ../frontend && npx @hey-api/openapi-ts -i ../backend/openapi.json -o src/lib/api
 ```
 
-### Verifying No Auto-Generated operationIds
-
+### Verify No Auto-Generated operationIds
 ```bash
 cd backend && uv run python -c "
 from app.main import app
@@ -272,15 +274,15 @@ print('Check complete')
 ## Lint & Format
 
 ```bash
-just lint       # Runs ruff (Python) + svelte-check (TypeScript/Svelte)
+just lint       # ruff (Python) + svelte-check (TS/Svelte)
 ```
 
 Pre-commit hooks are configured but may stash unstaged changes.
 
 ## Environment
 
-- **Backend:** Python 3.13, FastAPI, SQLAlchemy 2.x, SQLite, uv for package management
-- **Frontend:** SvelteKit, TypeScript, Tailwind CSS, shadcn-svelte components
+- **Backend:** Python 3.13, FastAPI, SQLAlchemy 2.x, SQLite, uv
+- **Frontend:** SvelteKit, TypeScript, Tailwind CSS, shadcn-svelte
 - **Test server:** `TAPEHOARD_TEST_MODE=true` enables `/system/test/reset` and mock providers
 
 ## Documentation Files
@@ -293,43 +295,39 @@ Pre-commit hooks are configured but may stash unstaged changes.
 ## Critical Context for Tape Operations
 
 ### `_run_mt` Retry Strategy
+Never use `max_retries` (count-based) for tape commands after large writes. Use `timeout_seconds` (time-based) instead.
 
-Never use `max_retries` (count-based) for tape commands that follow large writes. Use `timeout_seconds` (time-based) instead, because the required wait depends on buffer size, not attempt count.
-
-- Exponential backoff: `0.2 * (2 ** attempt)` seconds
-- Cap per attempt: **15 seconds**
-- Total timeout for tape commands after writes: **900 seconds** (15 minutes)
+- Backoff: `0.2 * (2 ** attempt)` seconds, capped at **15s**
+- Total timeout: **900 seconds** (15 minutes)
 - Log pattern: one INFO `"Waiting for tape drive..."` then WARNING per retry
 
-### Streaming vs Staging Tape Writes
+### Streaming vs Staging
+Selected by `tape_write_strategy` system setting:
 
-The archiver supports two tape write paths, selected by the `tape_write_strategy` system setting:
+| Mode | How | When |
+|------|-----|------|
+| `stage` (default) | Build tar on disk, then `dd` to tape | Safe, any disk speed |
+| `stream` | `tarfile` writes directly to `/dev/nst0` | Faster, requires disk sustaining tape streaming speed |
 
-| Mode | How it works | When to use |
-|------|-------------|-------------|
-| `stage` (default) | Builds tar on disk, then `dd` to tape | Safe, works with any source disk speed |
-| `stream` | `tarfile` writes directly to `/dev/nst0` | Faster, but requires source disk that can sustain tape's minimum streaming speed |
-
-The streaming path uses `open("/dev/nst0", "wb", buffering=256*1024)` for LTO-optimal block size. The caller must close the stream before `finalize_stream()` is called.
+Streaming uses `open("/dev/nst0", "wb", buffering=256*1024)`. The caller must close the stream before `finalize_stream()`.
 
 ### Tape File Number Lifecycle
+- File 0: Label
+- File 1+: Archives
+- Each archive followed by a file mark (driver writes on close)
+- **`finalize_stream`:** read file number **after** close, subtract 1
+- **`write_archive`:** read file number **after** `dd` exits, subtract 1
 
-- File 0: Label (written by `initialize_media`)
-- File 1+: Archives (written by `write_archive` or `finalize_stream`)
-- Each archive is followed by a file mark (written automatically when the device is closed)
-- `finalize_stream` reads the file number **after** close, subtracts 1
-- `write_archive` reads the file number **after** `dd` exits, subtracts 1
+**Critical:** Reading `mt status` while `/dev/nst0` is open returns stale data. Always close/wait for `dd` before `_get_current_file_number()`.
 
 ### Hardware Utilization Sync
+`bytes_used` is DB-derived, not live hardware. Updated:
+- During backup: `_update_bytes_used_from_hardware()` after each chunk
+- Frontend polling: `loadMedia(true, false)` on `POLL_SLOW`
+- Never during restore or idle
 
-`bytes_used` on `StorageMedia` is DB-derived, not live hardware. It is updated:
-- During backup: via `_update_bytes_used_from_hardware()` after each chunk
-- Via frontend polling: `loadMedia(true, false)` on `POLL_SLOW` interval
-- Never during restore or idle periods (to avoid unnecessary MAM reads)
-
-### Testing Tape-Related Code
-
-When mocking `_run_mt` or `subprocess.run` in tests:
-- Simulate busy errors by raising `subprocess.CalledProcessError(1, cmd, stderr=b"...busy...")`
-- Mock `time.time` with an iterator when testing long timeouts, or tests will hang or run out of mock values
-- `test_provider_tape.py` has examples of both success (`busy_then_ok`) and timeout (`always_busy`) mocks
+### Testing Tape Code
+When mocking `_run_mt` or `subprocess.run`:
+- Simulate busy: `subprocess.CalledProcessError(1, cmd, stderr=b"...busy...")`
+- Mock `time.time` with an iterator for long timeout tests
+- See `test_provider_tape.py` for `busy_then_ok` and `always_busy` examples

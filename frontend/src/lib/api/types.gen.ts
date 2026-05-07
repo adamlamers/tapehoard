@@ -1620,6 +1620,20 @@ export type GetScanStatusResponses = {
 
 export type GetScanStatusResponse = GetScanStatusResponses[keyof GetScanStatusResponses];
 
+export type StreamScanStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/system/scan/stream';
+};
+
+export type StreamScanStatusResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type FilesystemBrowseData = {
     body?: never;
     path?: never;

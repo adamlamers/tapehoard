@@ -3,20 +3,24 @@
     import { RotateCw, Activity, CheckCircle2 } from 'lucide-svelte';
     import { Card } from '$lib/components/ui/card';
     import { getScanStatus, type ScanStatusSchema } from '$lib/api';
-    import { POLL_FAST } from '$lib/config';
     import { toast } from 'svelte-sonner';
 
     let scanStatus = $state<ScanStatusSchema | null>(null);
-    let pollInterval: any;
+    let scanEventSource: EventSource | null = null;
     let showCompleted = $state(false);
     let completedTimeout: any;
 
-    async function updateScanStatus() {
-        try {
-            const response = await getScanStatus();
-            if (response.data) {
-                const wasRunning = scanStatus?.is_running;
-                scanStatus = response.data;
+    function connectScanSse() {
+        if (scanEventSource) return;
+
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001';
+        scanEventSource = new EventSource(`${apiUrl}/system/scan/stream`);
+
+        scanEventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                const wasRunning = scanStatus?.is_running ?? false;
+                scanStatus = data as ScanStatusSchema;
 
                 if (wasRunning && !scanStatus.is_running) {
                     toast.success("Filesystem scan completed");
@@ -24,27 +28,31 @@
                     if (completedTimeout) clearTimeout(completedTimeout);
                     completedTimeout = setTimeout(() => { showCompleted = false; }, 5000);
                 }
+            } catch (err) {
+                console.error('Scan SSE parse error:', err);
             }
-        } catch (error) {
-            console.error("Failed to get scan status:", error);
+        };
+
+        scanEventSource.onerror = (err) => {
+            console.error('Scan SSE connection error:', err);
+        };
+    }
+
+    function closeScanSse() {
+        if (scanEventSource) {
+            scanEventSource.close();
+            scanEventSource = null;
         }
     }
 
     onMount(() => {
-        updateScanStatus();
-        pollInterval = setInterval(updateScanStatus, POLL_FAST);
+        connectScanSse();
     });
 
     onDestroy(() => {
-        if (pollInterval) clearInterval(pollInterval);
+        closeScanSse();
         if (completedTimeout) clearTimeout(completedTimeout);
     });
-
-    const scanProgress = $derived(
-        scanStatus?.total_files_found
-        ? Math.round((scanStatus.files_processed / scanStatus.total_files_found) * 100)
-        : 0
-    );
 </script>
 
 {#if scanStatus?.is_running}
@@ -65,7 +73,7 @@
                             {/if}
                         </div>
                         <p class="text-xs text-text-secondary mt-0.5">
-                            {scanStatus.files_processed.toLocaleString()} of {scanStatus.total_files_found.toLocaleString()} files
+                            {scanStatus.files_processed.toLocaleString()} files scanned
                         </p>
                     </div>
                 </div>
@@ -75,8 +83,8 @@
             <div class="p-5 space-y-4">
                 <div class="w-full bg-bg-primary h-2 rounded-full overflow-hidden">
                     <div
-                        class="bg-blue-500 h-full transition-all duration-1000"
-                        style="width: {scanProgress}%"
+                        class="bg-blue-500 h-full transition-all duration-1000 animate-pulse"
+                        style="width: 100%"
                     ></div>
                 </div>
 

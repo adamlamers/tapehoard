@@ -30,7 +30,7 @@
 
     // Scanner Status (local for button state only)
     let scanRunning = $state(false);
-    let pollInterval: any;
+    let scanEventSource: EventSource | null = null;
     let searchTimeout: any;
 
     // Staging area for tracking changes: path -> desired tracked state
@@ -106,26 +106,41 @@
         }
     });
 
-    async function updateScanStatus() {
-        try {
-            const response = await getScanStatus();
-            if (response.data) {
+    function connectScanSse() {
+        if (scanEventSource) return;
+
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001';
+        scanEventSource = new EventSource(`${apiUrl}/system/scan/stream`);
+
+        scanEventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
                 const wasRunning = scanRunning;
-                scanRunning = response.data.is_running;
+                scanRunning = data.is_running;
 
                 if (wasRunning && !scanRunning) {
                     loadFiles(currentPath);
                 }
+            } catch (err) {
+                console.error('Scan SSE parse error:', err);
             }
-        } catch (error) {
-            console.error("Failed to get scan status:", error);
+        };
+
+        scanEventSource.onerror = (err) => {
+            console.error('Scan SSE connection error:', err);
+        };
+    }
+
+    function closeScanSse() {
+        if (scanEventSource) {
+            scanEventSource.close();
+            scanEventSource = null;
         }
     }
 
     async function startScan() {
         try {
             await triggerScan();
-            updateScanStatus();
         } catch (error: any) {
             toast.error(error.body?.detail || "Failed to start scan");
         }
@@ -139,12 +154,11 @@
         }
 
         await loadFiles(currentPath);
-        await updateScanStatus();
-        pollInterval = setInterval(updateScanStatus, POLL_SLOW);
+        connectScanSse();
     });
 
     onDestroy(() => {
-        if (pollInterval) clearInterval(pollInterval);
+        closeScanSse();
     });
 
     function handleNavigate(path: string) {
