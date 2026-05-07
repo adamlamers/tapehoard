@@ -1,8 +1,3 @@
-import subprocess
-import time
-
-import pytest
-
 from app.providers.tape import LTOProvider
 
 
@@ -133,22 +128,18 @@ def test_lto_mam_parsing_logic(mocker):
     assert mam["generation_label"] == "LTO-5"
 
 
-def test_lto_write_archive_writes_file_mark(mocker):
-    """Verifies that write_archive writes a file mark after each archive."""
+def test_lto_write_archive_returns_file_number(mocker):
+    """Verifies that write_archive returns the correct file number after dd closes."""
     device = "/dev/nst0"
     provider = LTOProvider({"device_path": device})
     mocker.patch("os.path.exists", return_value=True)
-
-    mt_calls = []
 
     def capture_mt(cmd, **kwargs):
         m = mocker.MagicMock()
         m.returncode = 0
         if "status" in cmd:
-            # First call: at file 1; second call: at file 2
-            m.stdout = f"File number={len(mt_calls) + 1}"
-        elif "weof" in cmd:
-            mt_calls.append("weof")
+            # After dd closes the driver has advanced to the next file
+            m.stdout = "File number=2"
         return m
 
     mocker.patch("subprocess.run", side_effect=capture_mt)
@@ -160,14 +151,15 @@ def test_lto_write_archive_writes_file_mark(mocker):
 
     import io
 
-    provider.write_archive("TAPE01", io.BytesIO(b"archive data"))
+    loc = provider.write_archive("TAPE01", io.BytesIO(b"archive data"))
 
-    # Expectation: weof must be called after dd to delimit the archive
-    assert "weof" in mt_calls
+    # After close driver is at file 2; subtract 1 to get archive file
+    assert loc == "1"
 
 
-def test_lto_initialize_media_writes_single_file_mark(mocker):
-    """Verifies initialize_media writes exactly one file mark (after the label)."""
+def test_lto_initialize_media_writes_no_explicit_weof(mocker):
+    """Verifies initialize_media does NOT call weof — the driver writes the
+    file mark automatically when dd closes the device."""
     device = "/dev/nst0"
     provider = LTOProvider({"device_path": device})
     mocker.patch("os.path.exists", return_value=True)
@@ -193,8 +185,8 @@ def test_lto_initialize_media_writes_single_file_mark(mocker):
 
     provider.initialize_media("TAPE01")
 
-    # Expectation: exactly one weof (after the label), not before
-    assert weof_count == 1
+    # Expectation: zero explicit weof calls (driver handles it on close)
+    assert weof_count == 0
 
 
 def test_lto_multiple_archives_increment_file_number(mocker):
@@ -203,15 +195,15 @@ def test_lto_multiple_archives_increment_file_number(mocker):
     provider = LTOProvider({"device_path": device})
     mocker.patch("os.path.exists", return_value=True)
 
-    file_number = 1
+    file_number = 2
 
     def capture_mt(cmd, **kwargs):
         nonlocal file_number
         m = mocker.MagicMock()
         m.returncode = 0
         if "status" in cmd:
+            # After each dd close the driver advances to the next file
             m.stdout = f"File number={file_number}"
-        elif "weof" in cmd:
             file_number += 1
         return m
 
@@ -229,73 +221,29 @@ def test_lto_multiple_archives_increment_file_number(mocker):
     loc3 = provider.write_archive("TAPE01", io.BytesIO(b"archive3"))
 
     # Expectation: each archive gets a unique, incrementing file number
+    # Driver reports next file (2,3,4); subtract 1 to get archive file
     assert loc1 == "1"
     assert loc2 == "2"
     assert loc3 == "3"
 
 
-def test_lto_weof_retries_on_busy(mocker):
-    """Verifies that weof retries on transient 'Device or resource busy' errors."""
+def test_lto_finalize_stream_returns_file_number(mocker):
+    """Verifies finalize_stream returns the correct file number after stream close."""
     device = "/dev/nst0"
     provider = LTOProvider({"device_path": device})
     mocker.patch("os.path.exists", return_value=True)
-    sleep_spy = mocker.patch("time.sleep")
 
-    call_count = 0
-
-    def busy_then_ok(cmd, **kwargs):
-        nonlocal call_count
+    def capture_mt(cmd, **kwargs):
         m = mocker.MagicMock()
-        if "weof" in cmd:
-            call_count += 1
-            if call_count < 3:
-                m.returncode = 1
-                m.stderr = "/dev/nst0: Device or resource busy\n"
-                raise subprocess.CalledProcessError(1, cmd, output="", stderr=m.stderr)
-            m.returncode = 0
-        elif "status" in cmd:
-            m.stdout = "File number=5"
-            m.returncode = 0
+        m.returncode = 0
+        if "status" in cmd:
+            # After close driver is at file 3
+            m.stdout = "File number=3"
         return m
 
-    mocker.patch("subprocess.run", side_effect=busy_then_ok)
+    mocker.patch("subprocess.run", side_effect=capture_mt)
 
-    # finalize_stream calls weof with timeout_seconds=60
     result = provider.finalize_stream()
 
-    # Should have retried twice, succeeded on the third attempt
-    assert call_count == 3
-    assert sleep_spy.call_count == 2  # sleeps between retries
-    assert result == "5"
-
-
-def test_lto_weof_fails_after_timeout(mocker):
-    """Verifies that weof still raises if busy errors persist beyond the timeout."""
-    device = "/dev/nst0"
-    provider = LTOProvider({"device_path": device})
-    mocker.patch("os.path.exists", return_value=True)
-    sleep_spy = mocker.patch("time.sleep")
-
-    call_count = 0
-
-    def always_busy(cmd, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        m = mocker.MagicMock()
-        m.returncode = 1
-        m.stderr = "/dev/nst0: Device or resource busy\n"
-        raise subprocess.CalledProcessError(1, cmd, output="", stderr=m.stderr)
-
-    mocker.patch("subprocess.run", side_effect=always_busy)
-
-    # Speed up time so the 15-minute timeout is reached quickly
-    start = time.time()
-    time_values = iter([start, start] + [start + i * 20 for i in range(1, 200)])
-    mocker.patch("time.time", side_effect=lambda: next(time_values))
-
-    with pytest.raises(subprocess.CalledProcessError):
-        provider.finalize_stream()
-
-    # Should have retried until the timeout was exceeded
-    assert call_count >= 2
-    assert sleep_spy.call_count >= 1
+    # Driver reports next file (3); subtract 1 to get archive file
+    assert result == "2"

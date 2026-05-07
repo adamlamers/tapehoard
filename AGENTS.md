@@ -152,9 +152,11 @@ On macOS, `localhost` resolves to `::1` (IPv6) by default, but uvicorn may bind 
 
 ### Buffer Flush Timeouts
 
-LTO tape drives have large internal buffers (hundreds of MB). After a `dd` or `tarfile` write finishes, the drive may still be flushing data to tape for **up to 15 minutes**. If `mt weof` is issued while the buffer is still draining, it fails with "Device or resource busy".
+LTO tape drives have large internal buffers (hundreds of MB). After a `dd` or `tarfile` write finishes, the drive may still be flushing data to tape for **up to 15 minutes**. Closing `/dev/nst0` triggers the driver to write the file mark, but if the buffer is still draining, the close may block.
 
-**Fix:** `_run_mt` uses a `timeout_seconds` parameter (not `max_retries`) with exponential backoff capped at **15 seconds per attempt**. `finalize_stream` and `write_archive` both call `_run_mt("weof", timeout_seconds=900)` — allowing up to 15 minutes for the drive to become ready. The user can cancel the backup job if the drive never clears.
+**Old:** Explicit `weof` was used, which failed with "Device or resource busy" when the buffer was still flushing.
+
+**Fix:** Removed explicit `weof` — the Linux SCSI tape driver writes the file mark automatically when the device is closed after writing. The close operation blocks until the buffer is fully flushed, which is the correct behavior. The user can cancel the backup job if the drive never clears.
 
 An INFO log `"Waiting for tape drive to be available..."` is emitted once on the first busy error so the logs clearly show the job is intentionally paused.
 
@@ -177,7 +179,7 @@ Tape restores read archives in the order returned by `sorted(archive_groups.keys
 
 `finalize_stream` was calling `_get_current_file_number()` **after** `weof`. Since `weof` advances the tape to the next file, this returned the **next** file number instead of the current archive's number. Restores would seek past the archive to an empty file.
 
-**Fix:** Capture the file number **before** writing the file mark. Also ensure the Python stream is fully flushed/closed before `finalize_stream` is called.
+**Fix:** Capture the file number **before** closing the stream (the driver writes the file mark automatically on close). Also ensure the Python stream is fully flushed/closed before `finalize_stream` is called.
 
 ### File Stability Filter
 
@@ -208,7 +210,11 @@ During media registration, `_detect_lto_capacity_from_hardware()` queries MAM at
 
 ### File Marks Between Archives
 
-Each archive written to tape must be followed by a file mark (`weof`) so that `fsf`-based seeks during restore work correctly. `write_archive` and `finalize_stream` both write a file mark. The tape layout after initialization is:
+The Linux SCSI tape driver (`st`) **automatically writes a file mark when `/dev/nst0` is closed after writing**. Explicit `weof` commands are redundant and create **double file marks**, which produces empty files between archives and breaks restore seeks.
+
+**Old (buggy):** `write_archive` and `finalize_stream` both called explicit `weof` after `dd`/`close()`, creating two file marks per archive. 56 archives produced 113 files on tape instead of 57.
+
+**Fix:** Removed all explicit `weof` calls from `initialize_media`, `write_archive`, and `finalize_stream`. The driver writes the file mark automatically when the device is closed. The tape layout is:
 
 ```
 [File 0: Label][FM][File 1: Archive 1][FM][File 2: Archive 2][FM]...
@@ -292,7 +298,7 @@ Never use `max_retries` (count-based) for tape commands that follow large writes
 
 - Exponential backoff: `0.2 * (2 ** attempt)` seconds
 - Cap per attempt: **15 seconds**
-- Total timeout for `weof` after writes: **900 seconds** (15 minutes)
+- Total timeout for tape commands after writes: **900 seconds** (15 minutes)
 - Log pattern: one INFO `"Waiting for tape drive..."` then WARNING per retry
 
 ### Streaming vs Staging Tape Writes
@@ -310,9 +316,9 @@ The streaming path uses `open("/dev/nst0", "wb", buffering=256*1024)` for LTO-op
 
 - File 0: Label (written by `initialize_media`)
 - File 1+: Archives (written by `write_archive` or `finalize_stream`)
-- Each archive is followed by a file mark (`weof`)
-- `finalize_stream` captures the file number **before** `weof`
-- `write_archive` captures the file number **before** the `dd` write
+- Each archive is followed by a file mark (written automatically when the device is closed)
+- `finalize_stream` reads the file number **after** close, subtracts 1
+- `write_archive` reads the file number **after** `dd` exits, subtracts 1
 
 ### Hardware Utilization Sync
 

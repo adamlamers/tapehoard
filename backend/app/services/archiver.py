@@ -352,6 +352,7 @@ class ArchiverService:
         # Match LTO optimal block size so each write() is a full tape block
         tar_bundle.copybufsize = 256 * 1024  # ty: ignore[unresolved-attribute]
 
+        members_added = 0
         for item in items:
             if JobManager.is_cancelled(job_id):
                 break
@@ -383,6 +384,10 @@ class ArchiverService:
                     with RangeFile(file_state.file_path, start, chunk_size) as rh:
                         tar_bundle.addfile(tar_info, rh)
 
+                members_added += 1
+            else:
+                logger.warning(f"File missing during backup: {file_state.file_path}")
+
             processed_bytes += chunk_size
             JobManager.update_job(
                 job_id,
@@ -391,6 +396,12 @@ class ArchiverService:
             )
 
         tar_bundle.close()
+
+        if members_added == 0:
+            logger.warning(
+                f"Tar archive has 0 members ({len(items)} items requested). "
+                f"All files may have been deleted between scan and backup."
+            )
 
         # Ensure all buffered data is pushed from Python/io through to the OS
         # before the caller proceeds to finalize (e.g., write file marks).
@@ -485,6 +496,30 @@ class ArchiverService:
         MAX_CHUNK_SIZE = media_record.capacity // 50
         if MAX_CHUNK_SIZE < 100 * 1024 * 1024:  # Minimum 100MB chunk
             MAX_CHUNK_SIZE = 100 * 1024 * 1024
+
+        # Sanity check: MAX_CHUNK_SIZE should be at least 1MB.
+        # If capacity is so small that MAX_CHUNK_SIZE < 1MB, the unit is probably
+        # wrong (GB stored as bytes) which would create a chunk per file.
+        if MAX_CHUNK_SIZE < 1024 * 1024:
+            logger.warning(
+                f"Media {media_record.identifier} capacity ({media_record.capacity}) "
+                f"produces MAX_CHUNK_SIZE of {MAX_CHUNK_SIZE} bytes. "
+                f"This looks like capacity is stored in GB instead of bytes. "
+                f"Aborting backup to avoid creating thousands of tiny archives."
+            )
+            JobManager.fail_job(
+                job_id,
+                f"Media capacity ({media_record.capacity}) produces chunks of "
+                f"{MAX_CHUNK_SIZE} bytes — expected bytes, got GB? "
+                f"Re-register media with correct capacity.",
+            )
+            return
+
+        JobManager.add_job_log(
+            job_id,
+            f"Chunk target: {MAX_CHUNK_SIZE / (1024 * 1024):.0f}MB "
+            f"(capacity {media_record.capacity / (1024 ** 3):.1f}GiB / 50)",
+        )
 
         storage_provider = self._get_storage_provider(media_record)
         if not storage_provider:

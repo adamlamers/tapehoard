@@ -616,8 +616,8 @@ class LTOProvider(AbstractStorageProvider):
                         if proc.returncode != 0:
                             raise RuntimeError(f"dd failed: {stderr.decode()}")
 
-            # File mark after the label so it is a distinct tape file.
-            self._run_mt("weof")
+            # Closing /dev/nst0 after writing automatically writes a file mark.
+            # Do NOT call weof — the driver already terminated the file.
             self._run_mt("rewind")
 
             # Update MAM 0x0806 (Barcode)
@@ -749,26 +749,25 @@ class LTOProvider(AbstractStorageProvider):
                 raise
 
     def finalize_stream(self) -> str:
-        """Writes a file mark after a streamed archive and returns the
-        file number index."""
-        # Capture the file number BEFORE writing the file mark, because weof
-        # advances the tape to the next file.
-        file_num = self._get_current_file_number()
+        """Returns the file number index of the just-written streamed archive.
 
-        # Proactively wait for the drive buffer to drain before issuing weof.
-        # This avoids hitting busy errors in the first place.
-        if not self._wait_for_drive_ready(timeout_seconds=60):
-            logger.warning(
-                "Drive buffer still busy after 60s, proceeding with weof anyway..."
-            )
-
-        # Allow up to 15 minutes for the drive buffer to flush.
-        self._run_mt("weof", timeout_seconds=900)
-        return file_num
+        The Linux SCSI tape driver automatically writes a file mark when
+        /dev/nst0 is closed after writing.  We read the file number *after*
+        the close (when the driver has advanced to the next file) and
+        subtract one to get the archive's file number.
+        """
+        # After the stream is closed the driver has advanced the tape to the
+        # next file.  _get_current_file_number() reports that position, so
+        # we subtract 1 to obtain the archive's actual file number.
+        next_file_num = self._get_current_file_number()
+        try:
+            archive_file_num = str(int(next_file_num) - 1)
+        except ValueError:
+            archive_file_num = next_file_num
+        return archive_file_num
 
     def write_archive(self, media_id: str, stream: BinaryIO) -> str:
         """Writes the stream to tape and returns the file number index."""
-        file_num = self._get_current_file_number()
         cmd_dd = ["dd", f"of={self.device_path}", "bs=256k"]
         self._log_command(cmd_dd)
         proc = subprocess.Popen(cmd_dd, stdin=subprocess.PIPE)
@@ -793,17 +792,15 @@ class LTOProvider(AbstractStorageProvider):
                 f"dd failed with return code {returncode} for {self.device_path}"
             )
 
-        # Proactively wait for the drive buffer to drain before writing the file mark.
-        if not self._wait_for_drive_ready(timeout_seconds=60):
-            logger.warning(
-                "Drive buffer still busy after 60s, proceeding with weof anyway..."
-            )
-
-        # Write a file mark so each archive is a distinct tape file.
-        # This is required for fsf-based seeks during restore.
-        # Allow up to 15 minutes for the drive buffer to flush before writing the file mark.
-        self._run_mt("weof", timeout_seconds=900)
-        return file_num
+        # After dd exits the driver has written a file mark and advanced to
+        # the next file.  _get_current_file_number() reports that position,
+        # so we subtract 1 to obtain the archive's actual file number.
+        next_file_num = self._get_current_file_number()
+        try:
+            archive_file_num = str(int(next_file_num) - 1)
+        except ValueError:
+            archive_file_num = next_file_num
+        return archive_file_num
 
     def get_utilization(self) -> Optional[float]:
         """Calculates actual hardware utilization from MAM capacity attributes."""
