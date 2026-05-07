@@ -462,7 +462,7 @@ class LTOProvider(AbstractStorageProvider):
                     return result.stdout
                 return None
             except subprocess.CalledProcessError as e:
-                stderr = (e.stderr or b"").decode()
+                stderr = e.stderr or ""
                 last_err = e
                 elapsed = time.time() - start_time
                 # Retry only on transient busy errors while within timeout

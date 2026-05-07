@@ -250,8 +250,8 @@ def test_lto_weof_retries_on_busy(mocker):
             call_count += 1
             if call_count < 3:
                 m.returncode = 1
-                m.stderr = b"/dev/nst0: Device or resource busy\n"
-                raise subprocess.CalledProcessError(1, cmd, output=b"", stderr=m.stderr)
+                m.stderr = "/dev/nst0: Device or resource busy\n"
+                raise subprocess.CalledProcessError(1, cmd, output="", stderr=m.stderr)
             m.returncode = 0
         elif "status" in cmd:
             m.stdout = "File number=5"
@@ -283,8 +283,8 @@ def test_lto_weof_fails_after_timeout(mocker):
         call_count += 1
         m = mocker.MagicMock()
         m.returncode = 1
-        m.stderr = b"/dev/nst0: Device or resource busy\n"
-        raise subprocess.CalledProcessError(1, cmd, output=b"", stderr=m.stderr)
+        m.stderr = "/dev/nst0: Device or resource busy\n"
+        raise subprocess.CalledProcessError(1, cmd, output="", stderr=m.stderr)
 
     mocker.patch("subprocess.run", side_effect=always_busy)
 
