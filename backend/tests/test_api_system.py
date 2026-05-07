@@ -1,6 +1,8 @@
 import json
 from datetime import datetime, timezone
 
+import pytest
+
 from app.db import models
 
 
@@ -31,6 +33,99 @@ def test_get_dashboard_stats_populated(client, db_session):
     data = response.json()
     assert data["unprotected_files_count"] == 1
     assert data["unprotected_data_size"] == 1024
+
+
+def test_get_dashboard_stats_redundancy_ratio(client, db_session):
+    """Verifies the redundancy ratio is coherent and based on data volume.
+
+    The ratio is computed as (archived_bytes / eligible_bytes) * 100.
+    It should be 0 when no versions exist, positive when versions exist,
+    and should not produce nonsensical negative or division-by-zero values.
+    """
+    # Create 3 eligible files with different sizes
+    file_sizes = [100, 200, 300]
+    for i, size in enumerate(file_sizes):
+        f = models.FilesystemState(
+            file_path=f"/source_data/file{i}.txt",
+            size=size,
+            mtime=datetime.now(timezone.utc).timestamp(),
+            is_ignored=False,
+        )
+        db_session.add(f)
+
+    # Create 1 ignored file (should not count toward denominator)
+    ignored = models.FilesystemState(
+        file_path="/source_data/ignored.txt",
+        size=50,
+        mtime=datetime.now(timezone.utc).timestamp(),
+        is_ignored=True,
+    )
+    db_session.add(ignored)
+    db_session.commit()
+
+    # No versions yet → ratio should be 0
+    response = client.get("/system/dashboard/stats")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["redundancy_ratio"] == 0.0
+
+    # Create an active tape and archive versions
+    tape = models.StorageMedia(
+        media_type="tape",
+        identifier="TAPE_REDUNDANCY",
+        capacity=10_000_000_000,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add(tape)
+    db_session.commit()
+
+    # Add 5 versions across the 3 files, each covering 100 bytes
+    files = (
+        db_session.query(models.FilesystemState)
+        .filter(models.FilesystemState.is_ignored == False)  # noqa: E712
+        .all()
+    )
+    for i in range(5):
+        db_session.add(
+            models.FileVersion(
+                filesystem_state_id=files[i % 3].id,
+                media_id=tape.id,
+                file_number=str(i),
+                offset_start=0,
+                offset_end=100,
+            )
+        )
+    db_session.commit()
+
+    response = client.get("/system/dashboard/stats")
+    assert response.status_code == 200
+    data = response.json()
+    # archived_size = 5 * 100 = 500
+    # eligible_size = 100 + 200 + 300 = 600
+    # ratio = 500 / 600 * 100 = 83.3
+    assert data["redundancy_ratio"] == pytest.approx(83.3, abs=0.1)
+    assert data["redundancy_ratio"] >= 0
+
+    # Mark tape as full (still counts toward versions)
+    tape.status = "full"
+    db_session.commit()
+
+    response = client.get("/system/dashboard/stats")
+    assert response.status_code == 200
+    data = response.json()
+    # Full media still counts, so ratio should stay the same
+    assert data["redundancy_ratio"] == pytest.approx(83.3, abs=0.1)
+
+    # Retire the tape (versions should no longer count)
+    tape.status = "retired"
+    db_session.commit()
+
+    response = client.get("/system/dashboard/stats")
+    assert response.status_code == 200
+    data = response.json()
+    # No active/full media → no counted versions → ratio 0
+    assert data["redundancy_ratio"] == 0.0
 
 
 def test_get_settings_empty(client):

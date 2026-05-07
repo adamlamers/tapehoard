@@ -350,7 +350,7 @@ class ArchiverService:
         Returns the updated processed_bytes count."""
         tar_bundle = tarfile.open(fileobj=stream, mode="w")
         # Match LTO optimal block size so each write() is a full tape block
-        tar_bundle.copybufsize = 256 * 1024
+        tar_bundle.copybufsize = 256 * 1024  # ty: ignore[unresolved-attribute]
 
         for item in items:
             if JobManager.is_cancelled(job_id):

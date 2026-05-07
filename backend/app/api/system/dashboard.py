@@ -1,12 +1,13 @@
 import shutil
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import text
 from sqlalchemy.orm import Session
-from app.db.database import get_db
+
 from app.api.common import DashboardStatsSchema, StagingInfoSchema
 from app.core.config import settings
-from sqlalchemy import func, text
 from app.db import models
+from app.db.database import get_db
 
 router = APIRouter(tags=["System"])
 
@@ -56,20 +57,25 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
 
     res = db_session.execute(aggregation_sql).fetchone()
     if res:
-        total_count, total_size = res[0] or 0, res[1] or 0
-        ignored_count, ignored_size = res[2] or 0, res[3] or 0
-        unprotected_count, unprotected_size = res[4] or 0, res[5] or 0
+        total_size = res[1] or 0
+        ignored_count = res[2] or 0
+        ignored_size = res[3] or 0
+        unprotected_count = res[4] or 0
+        unprotected_size = res[5] or 0
         hashed_count = res[6] or 0
         eligible_count = res[7] or 0
         archived_size = res[8] or 0
-        # missing_count = res[9] or 0
         active_discrepancies_count = res[10] or 0
     else:
-        total_count = total_size = ignored_count = ignored_size = unprotected_count = (
-            unprotected_size
-        ) = hashed_count = eligible_count = archived_size = (
-            active_discrepancies_count
-        ) = 0
+        total_size = 0
+        ignored_count = 0
+        ignored_size = 0
+        unprotected_count = 0
+        unprotected_size = 0
+        hashed_count = 0
+        eligible_count = 0
+        archived_size = 0
+        active_discrepancies_count = 0
 
     media_counts = {
         "LTO": db_session.query(models.StorageMedia)
@@ -90,17 +96,8 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
         .first()
     )
 
-    total_versions = (
-        db_session.query(func.count(models.FileVersion.id))
-        .join(
-            models.StorageMedia, models.StorageMedia.id == models.FileVersion.media_id
-        )
-        .filter(models.StorageMedia.status.in_(["active", "full"]))
-        .scalar()
-        or 0
-    )
-    eligible_redundancy_count = max(total_count - ignored_count, 1)
-    redundancy_percentage = (total_versions / eligible_redundancy_count) * 100
+    eligible_size = max(total_size - ignored_size, 1)
+    redundancy_percentage = (archived_size / eligible_size) * 100
 
     return DashboardStatsSchema(
         monitored_files_count=eligible_count,

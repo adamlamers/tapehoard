@@ -38,15 +38,17 @@ def set_process_priority(level: str):
             ionice_level = _get_ionice_setting()
             if hasattr(p, "ionice"):
                 if ionice_level == "idle":
-                    p.ionice(psutil.IOPRIO_CLASS_IDLE)  # type: ignore[attr-defined]
+                    p.ionice(
+                        psutil.IOPRIO_CLASS_IDLE
+                    )  # ty: ignore[unresolved-attribute]
                 elif ionice_level == "realtime":
-                    p.ionice(psutil.IOPRIO_CLASS_RT)  # type: ignore[attr-defined]
+                    p.ionice(psutil.IOPRIO_CLASS_RT)  # ty: ignore[unresolved-attribute]
                 else:
-                    p.ionice(psutil.IOPRIO_CLASS_BE)  # type: ignore[attr-defined]
+                    p.ionice(psutil.IOPRIO_CLASS_BE)  # ty: ignore[unresolved-attribute]
             p.nice(19)
         else:
             if hasattr(p, "ionice"):
-                p.ionice(psutil.IOPRIO_CLASS_BE)  # type: ignore[attr-defined]
+                p.ionice(psutil.IOPRIO_CLASS_BE)  # ty: ignore[unresolved-attribute]
             p.nice(0)
     except Exception as e:
         logger.debug(f"Could not set process priority to '{level}': {e}")

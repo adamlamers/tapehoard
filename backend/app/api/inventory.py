@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 import psutil
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,8 +9,8 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api.archive import get_source_roots
 from app.api import schemas
+from app.api.archive import get_source_roots
 from app.api.schemas import (
     MediaCreateSchema,
     MediaSchema,
@@ -84,10 +84,11 @@ def _media_to_schema(media: models.StorageMedia, config: Dict[str, Any]) -> Medi
 )
 def list_providers():
     """Returns a registry of all available storage providers and their configurations."""
+    import os
+
     from app.providers.cloud import CloudStorageProvider
     from app.providers.hdd import OfflineHDDProvider
     from app.providers.tape import LTOProvider
-    import os
 
     providers = [LTOProvider, OfflineHDDProvider, CloudStorageProvider]
 
@@ -286,7 +287,7 @@ def create_media(
         if capacity is None or capacity == 0:
             capacity = detected_info["capacity"]
         elif detected_info["capacity"] > 0:
-            if request_data.device_path:
+            if hasattr(request_data, "device_path") and request_data.device_path:
                 # Hardware ground truth: when a device_path is explicitly provided,
                 # always trust the drive's MAM over any user input to avoid
                 # rounding-up errors that would exceed physical capacity.

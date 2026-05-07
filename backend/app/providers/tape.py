@@ -832,6 +832,18 @@ class LTOProvider(AbstractStorageProvider):
                 self._run_mt(f"fsf {loc_int}")
         except ValueError:
             pass
+
+        # Diagnostics: verify tape position matches expectation.
+        # Old archives written before the file-number fix may have
+        # file_number off by one (captured after weof instead of before).
+        actual_file = self._get_current_file_number()
+        if actual_file != location_id:
+            logger.warning(
+                f"Tape position mismatch for {media_id}: "
+                f"requested file {location_id}, but tape is at file {actual_file}. "
+                f"This may indicate an archive written before the file-number fix."
+            )
+
         cmd_dd = ["dd", f"if={self.device_path}", "bs=256k"]
         self._log_command(cmd_dd)
         proc = subprocess.Popen(cmd_dd, stdout=subprocess.PIPE)

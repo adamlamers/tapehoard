@@ -830,8 +830,9 @@ def test_backup_skips_files_modified_after_job_start(db_session, mocker, tmp_pat
             class FakeStat:
                 def __init__(self, real):
                     self._real = real
+                    self.st_mtime: float = 0.0
 
-                def __getattr__(self, name):
+                def __getattr__(self, name):  # type: ignore[no-redef]
                     return getattr(self._real, name)
 
             fake = FakeStat(result)
