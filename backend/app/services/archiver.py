@@ -742,17 +742,22 @@ class ArchiverService:
                             safe_divisor,
                             processed_bytes,
                         )
+                    finally:
+                        # Close the stream before finalize so the tape driver
+                        # can finish flushing its internal buffer without an
+                        # open writer blocking subsequent mt commands.
+                        tape_stream.close()
+
+                    # Stream is closed; now write the file mark.
+                    try:
                         archive_location_id = storage_provider.finalize_stream()
                     except subprocess.CalledProcessError as e:
-                        # Surface tape command stderr so the failure is actionable
                         stderr = getattr(e, "stderr", "")
                         JobManager.fail_job(
                             job_id,
                             f"Tape command failed during finalize: {e} stderr={stderr!r}",
                         )
                         return
-                    finally:
-                        tape_stream.close()
 
                     uncompressed_size = sum(
                         i["offset_end"] - i["offset_start"] for i in remaining_to_write
