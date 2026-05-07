@@ -743,6 +743,14 @@ class ArchiverService:
                             processed_bytes,
                         )
                         archive_location_id = storage_provider.finalize_stream()
+                    except subprocess.CalledProcessError as e:
+                        # Surface tape command stderr so the failure is actionable
+                        stderr = getattr(e, "stderr", "")
+                        JobManager.fail_job(
+                            job_id,
+                            f"Tape command failed during finalize: {e} stderr={stderr!r}",
+                        )
+                        return
                     finally:
                         tape_stream.close()
 
@@ -878,9 +886,17 @@ class ArchiverService:
                         f"Streaming chunk {chunk_index + 1}/{len(chunks)} to {media_record.media_type}...",
                     )
                     with open(staging_full_path, "rb") as final_stream:
-                        archive_location_id = storage_provider.write_archive(
-                            media_record.identifier, final_stream
-                        )
+                        try:
+                            archive_location_id = storage_provider.write_archive(
+                                media_record.identifier, final_stream
+                            )
+                        except subprocess.CalledProcessError as e:
+                            stderr = getattr(e, "stderr", "")
+                            JobManager.fail_job(
+                                job_id,
+                                f"Tape command failed during write: {e} stderr={stderr!r}",
+                            )
+                            return
 
                     uncompressed_size = os.path.getsize(staging_full_path)
 

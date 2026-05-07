@@ -437,11 +437,14 @@ class LTOProvider(AbstractStorageProvider):
         timeout_seconds: float = 0,
         return_output: bool = False,
     ) -> Optional[str]:
-        """Runs an mt command, retrying on transient "Device or resource busy" errors.
+        """Runs an mt command, retrying on transient errors after large writes.
+
+        Retries on "busy", "i/o error", "not ready", and other SCSI transient
+        conditions that occur while the drive buffer is still flushing.
 
         Args:
             command: The mt sub-command to execute (e.g. "weof", "rewind").
-            timeout_seconds: Maximum total time to keep retrying on busy errors.
+            timeout_seconds: Maximum total time to keep retrying on transient errors.
                              Default 0 means no retry (fail immediately).
             return_output: If True, returns the command's stdout as str.
         """
@@ -451,6 +454,15 @@ class LTOProvider(AbstractStorageProvider):
         start_time = time.time()
         attempt = 0
         waiting_logged = False
+
+        # Transient error keywords that can occur while the buffer is flushing
+        TRANSIENT_ERRORS = (
+            "busy",
+            "i/o error",
+            "not ready",
+            "unit attention",
+            "aborted command",
+        )
 
         while True:
             try:
@@ -463,10 +475,13 @@ class LTOProvider(AbstractStorageProvider):
                 return None
             except subprocess.CalledProcessError as e:
                 stderr = e.stderr or ""
+                stdout = e.stdout or ""
                 last_err = e
                 elapsed = time.time() - start_time
-                # Retry only on transient busy errors while within timeout
-                if "busy" in stderr.lower() and elapsed < timeout_seconds:
+                stderr_lower = stderr.lower()
+                is_transient = any(k in stderr_lower for k in TRANSIENT_ERRORS)
+                # Retry on transient errors while within timeout
+                if is_transient and elapsed < timeout_seconds:
                     attempt += 1
                     sleep_time = min(0.2 * (2**attempt), 15.0)  # cap at 15s
                     if not waiting_logged:
@@ -476,13 +491,16 @@ class LTOProvider(AbstractStorageProvider):
                         )
                         waiting_logged = True
                     logger.warning(
-                        f"mt {command} busy (attempt {attempt}, "
+                        f"mt {command} transient error (attempt {attempt}, "
                         f"elapsed {elapsed:.1f}s / {timeout_seconds:.0f}s), "
                         f"retrying in {sleep_time:.1f}s..."
                     )
                     time.sleep(sleep_time)
                     continue
-                logger.error(f"Tape command 'mt {command}' failed: {stderr}")
+                logger.error(
+                    f"Tape command 'mt {command}' failed: rc={e.returncode} "
+                    f"stderr={stderr!r} stdout={stdout!r}"
+                )
                 raise last_err
 
     def _setup_compression(self):
