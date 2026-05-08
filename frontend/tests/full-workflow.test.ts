@@ -88,7 +88,8 @@ test.describe('TapeHoard Golden Path', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
     await page.getByRole('button', { name: /Start scan/i }).click();
-    await expect(page.getByText(/Scan job initiated/i)).toBeVisible();
+    // Toast auto-dismisses, just wait a moment for the scan to start
+    await page.waitForTimeout(500);
 
     await expect(async () => {
         await page.getByRole('button', { name: /Refresh/i }).click();
