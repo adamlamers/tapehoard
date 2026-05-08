@@ -254,3 +254,18 @@ class IgnoreHardwareRequest(BaseModel):
 class BatchTrackRequest(BaseModel):
     tracks: List[str] = []
     untracks: List[str] = []
+
+
+class TapeOperationRequest(BaseModel):
+    device_path: str
+
+
+class TapeFileNumberResponse(BaseModel):
+    device_path: str
+    file_number: int
+
+
+class TapeOperationResponse(BaseModel):
+    success: bool
+    message: str
+    device_path: str

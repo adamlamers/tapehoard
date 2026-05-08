@@ -28,7 +28,12 @@
         Edit3,
         Database,
         EyeOff,
-        ChevronDown
+        ChevronDown,
+        ArrowLeftToLine,
+        SkipBack,
+        RotateCcw,
+        AlertOctagon,
+        Upload
     } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import PageHeader from '$lib/components/ui/PageHeader.svelte';
@@ -54,6 +59,9 @@
         listProviders,
         listSecrets,
         getStagingInfo,
+        rewindTape,
+        ejectTape,
+        reinitializeTape,
         type MediaSchema,
         type StorageProviderSchema,
         type StagingInfoSchema
@@ -71,6 +79,11 @@
     let showRegisterDialog = $state(false);
     let editingMedia = $state<MediaSchema | null>(null);
     let stagingInfo = $state<StagingInfoSchema | null>(null);
+
+    // Tape operation state
+    let tapeOperationLoading = $state<string | null>(null);
+    let showReinitConfirmDialog = $state(false);
+    let reinitTargetDrive = $state<any>(null);
 
     let activeMedia = $derived(mediaList.filter(m => m.status === 'active'));
     let fullMedia = $derived(mediaList.filter(m => m.status === 'full'));
@@ -598,6 +611,65 @@
         }
     }
 
+    async function handleTapeRewind(devicePath: string) {
+        tapeOperationLoading = `rewind-${devicePath}`;
+        try {
+            await rewindTape({
+                body: { device_path: devicePath }
+            });
+            toast.success("Tape rewound to BOT");
+            // Refresh to get updated file number
+            await loadMedia(true, true);
+        } catch (error: any) {
+            const msg = error?.response?.data?.detail || error?.message || "Unknown error";
+            toast.error(`Rewind failed: ${msg}`);
+        } finally {
+            tapeOperationLoading = null;
+        }
+    }
+
+    async function handleTapeEject(devicePath: string) {
+        tapeOperationLoading = `eject-${devicePath}`;
+        try {
+            await ejectTape({
+                body: { device_path: devicePath }
+            });
+            toast.success("Tape ejected");
+            // Refresh to show tape as unloaded
+            await loadMedia(true, true);
+        } catch (error: any) {
+            const msg = error?.response?.data?.detail || error?.message || "Unknown error";
+            toast.error(`Eject failed: ${msg}`);
+        } finally {
+            tapeOperationLoading = null;
+        }
+    }
+
+    function openReinitConfirm(drive: any) {
+        reinitTargetDrive = drive;
+        showReinitConfirmDialog = true;
+    }
+
+    async function handleTapeReinitialize() {
+        if (!reinitTargetDrive) return;
+        const devicePath = reinitTargetDrive.device_path;
+        tapeOperationLoading = `reinit-${devicePath}`;
+        showReinitConfirmDialog = false;
+        try {
+            await reinitializeTape({
+                body: { device_path: devicePath }
+            });
+            toast.success("Tape erased. Use 'Initialize Media' to write a new label.");
+            await loadMedia(true, true);
+        } catch (error: any) {
+            const msg = error?.response?.data?.detail || error?.message || "Unknown error";
+            toast.error(`Re-initialize failed: ${msg}`);
+        } finally {
+            tapeOperationLoading = null;
+            reinitTargetDrive = null;
+        }
+    }
+
     async function handleDelete(mediaId: number) {
         if (!confirm("Remove this media from inventory? Data on the physical media will remain, but TapeHoard will lose its index association.")) return;
         try {
@@ -910,7 +982,7 @@
                                                 </div>
                                             </div>
 
-                                            <div class="grid grid-cols-2 gap-8 pt-2">
+                                            <div class="grid grid-cols-3 gap-4 pt-2">
                                                 <div>
                                                     <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Load count</span>
                                                     <span class="text-base font-bold text-text-primary mono flex items-center gap-2">
@@ -921,6 +993,61 @@
                                                 <div>
                                                     <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Current tape</span>
                                                     <span class="text-base font-bold text-text-primary mono">{drive.identifier || 'Unknown'}</span>
+                                                </div>
+                                                <div>
+                                                    <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">File number</span>
+                                                    <span class="text-base font-bold text-text-primary mono">{info.file_number ?? 'N/A'}</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Tape Operation Buttons -->
+                                            <div class="pt-4 border-t border-border-color/30">
+                                                <div class="flex gap-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        class="h-8 text-xs flex-1 border-border-color/60 text-text-secondary hover:bg-white/5"
+                                                        onclick={() => handleTapeRewind(drive.device_path)}
+                                                        disabled={!!tapeOperationLoading}
+                                                    >
+                                                        {#if tapeOperationLoading === `rewind-${drive.device_path}`}
+                                                            <RotateCw size={12} class="animate-spin mr-1.5" />
+                                                            Rewinding...
+                                                        {:else}
+                                                            <SkipBack size={12} class="mr-1.5" />
+                                                            Rewind
+                                                        {/if}
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        class="h-8 text-xs flex-1 border-border-color/60 text-text-secondary hover:bg-white/5"
+                                                        onclick={() => handleTapeEject(drive.device_path)}
+                                                        disabled={!!tapeOperationLoading}
+                                                    >
+                                                        {#if tapeOperationLoading === `eject-${drive.device_path}`}
+                                                            <RotateCw size={12} class="animate-spin mr-1.5" />
+                                                            Ejecting...
+                                                        {:else}
+                                                            <Upload size={12} class="mr-1.5" />
+                                                            Eject
+                                                        {/if}
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        class="h-8 text-xs flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50"
+                                                        onclick={() => openReinitConfirm(drive)}
+                                                        disabled={!!tapeOperationLoading}
+                                                    >
+                                                        {#if tapeOperationLoading === `reinit-${drive.device_path}`}
+                                                            <RotateCw size={12} class="animate-spin mr-1.5" />
+                                                            Erasing...
+                                                        {:else}
+                                                            <AlertOctagon size={12} class="mr-1.5" />
+                                                            Re-init
+                                                        {/if}
+                                                    </Button>
                                                 </div>
                                             </div>
                                         {:else}
@@ -1581,5 +1708,47 @@
                 </footer>
             </Card>
         {/if}
+    </Dialog>
+
+    <!-- Re-initialize Confirmation Dialog -->
+    <Dialog show={showReinitConfirmDialog} onClose={() => showReinitConfirmDialog = false} ariaLabelledBy="reinit-title">
+        <Card class="w-[500px] p-8 flex flex-col gap-6 shadow-2xl">
+            <header class="flex justify-between items-start">
+                <div>
+                    <h2 id="reinit-title" class="text-xl font-bold text-text-primary flex items-center gap-3 text-red-400">
+                        <AlertOctagon size={24} />
+                        Re-initialize Tape?
+                    </h2>
+                </div>
+                <Button variant="ghost" size="icon" class="hover:bg-white/5" onclick={() => showReinitConfirmDialog = false}>
+                    <X size={20} />
+                </Button>
+            </header>
+
+            <div class="space-y-4">
+                <div class="p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                    <p class="text-sm text-text-primary font-medium mb-2">This action will permanently erase all data on the tape:</p>
+                    <ul class="text-sm text-text-secondary space-y-1 list-disc list-inside">
+                        <li>All archives stored on this tape will be deleted from the database</li>
+                        <li>The tape will be physically erased (long operation)</li>
+                        <li>You will need to re-initialize the tape with a new label</li>
+                    </ul>
+                </div>
+
+                <div class="p-4 bg-bg-primary/50 border border-border-color rounded-xl">
+                    <p class="text-[10px] font-medium text-text-secondary opacity-50 mb-1">Target device</p>
+                    <p class="text-sm font-mono text-text-primary">{reinitTargetDrive?.device_path || 'Unknown'}</p>
+                    <p class="text-xs text-text-secondary mt-1">Tape: {reinitTargetDrive?.identifier || 'Unknown'}</p>
+                </div>
+            </div>
+
+            <footer class="flex gap-3 pt-4 border-t border-border-color">
+                <Button variant="outline" class="flex-1 h-10" onclick={() => showReinitConfirmDialog = false}>Cancel</Button>
+                <Button variant="default" class="flex-[2] h-10 bg-red-500 hover:bg-red-600 text-white" onclick={handleTapeReinitialize}>
+                    <AlertOctagon size={16} class="mr-2" />
+                    Yes, Erase Everything
+                </Button>
+            </footer>
+        </Card>
     </Dialog>
 </div>

@@ -1163,6 +1163,48 @@ export type StorageProviderSchema = {
 };
 
 /**
+ * TapeFileNumberResponse
+ */
+export type TapeFileNumberResponse = {
+    /**
+     * Device Path
+     */
+    device_path: string;
+    /**
+     * File Number
+     */
+    file_number: number;
+};
+
+/**
+ * TapeOperationRequest
+ */
+export type TapeOperationRequest = {
+    /**
+     * Device Path
+     */
+    device_path: string;
+};
+
+/**
+ * TapeOperationResponse
+ */
+export type TapeOperationResponse = {
+    /**
+     * Success
+     */
+    success: boolean;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Device Path
+     */
+    device_path: string;
+};
+
+/**
  * TestExclusionsRequest
  */
 export type TestExclusionsRequest = {
@@ -2025,6 +2067,111 @@ export type IgnoreHardwareResponses = {
      */
     200: unknown;
 };
+
+export type GetTapeFileNumberData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Device Path
+         */
+        device_path: string;
+    };
+    url: '/system/hardware/tape/file-number';
+};
+
+export type GetTapeFileNumberErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetTapeFileNumberError = GetTapeFileNumberErrors[keyof GetTapeFileNumberErrors];
+
+export type GetTapeFileNumberResponses = {
+    /**
+     * Successful Response
+     */
+    200: TapeFileNumberResponse;
+};
+
+export type GetTapeFileNumberResponse = GetTapeFileNumberResponses[keyof GetTapeFileNumberResponses];
+
+export type RewindTapeData = {
+    body: TapeOperationRequest;
+    path?: never;
+    query?: never;
+    url: '/system/hardware/tape/rewind';
+};
+
+export type RewindTapeErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RewindTapeError = RewindTapeErrors[keyof RewindTapeErrors];
+
+export type RewindTapeResponses = {
+    /**
+     * Successful Response
+     */
+    200: TapeOperationResponse;
+};
+
+export type RewindTapeResponse = RewindTapeResponses[keyof RewindTapeResponses];
+
+export type EjectTapeData = {
+    body: TapeOperationRequest;
+    path?: never;
+    query?: never;
+    url: '/system/hardware/tape/eject';
+};
+
+export type EjectTapeErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type EjectTapeError = EjectTapeErrors[keyof EjectTapeErrors];
+
+export type EjectTapeResponses = {
+    /**
+     * Successful Response
+     */
+    200: TapeOperationResponse;
+};
+
+export type EjectTapeResponse = EjectTapeResponses[keyof EjectTapeResponses];
+
+export type ReinitializeTapeData = {
+    body: TapeOperationRequest;
+    path?: never;
+    query?: never;
+    url: '/system/hardware/tape/reinitialize';
+};
+
+export type ReinitializeTapeErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReinitializeTapeError = ReinitializeTapeErrors[keyof ReinitializeTapeErrors];
+
+export type ReinitializeTapeResponses = {
+    /**
+     * Successful Response
+     */
+    200: TapeOperationResponse;
+};
+
+export type ReinitializeTapeResponse = ReinitializeTapeResponses[keyof ReinitializeTapeResponses];
 
 export type ExportDatabaseData = {
     body?: never;

@@ -1,7 +1,12 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.api.common import IgnoreHardwareRequest
+from app.api.common import (
+    IgnoreHardwareRequest,
+    TapeOperationRequest,
+    TapeFileNumberResponse,
+    TapeOperationResponse,
+)
 from app.db import models
 import json
 import os
@@ -64,6 +69,15 @@ def discover_hardware(db_session: Session = Depends(get_db)):
                             is not None
                         )
 
+                    # Get current file number if tape is loaded
+                    file_number = None
+                    if state["tape"]:
+                        try:
+                            file_number_str = tape_provider._get_current_file_number()
+                            file_number = int(file_number_str)
+                        except Exception:
+                            pass
+
                     discovered_nodes.append(
                         {
                             "type": "tape",
@@ -74,6 +88,7 @@ def discover_hardware(db_session: Session = Depends(get_db)):
                             "hardware_info": {
                                 "drive": state["drive"],
                                 "tape": state["tape"],
+                                "file_number": file_number,
                             },
                         }
                     )
@@ -187,3 +202,205 @@ def ignore_hardware(
         db_session.commit()
 
     return {"message": "Hardware node ignored."}
+
+
+def _get_tape_provider(device_path: str, db_session: Session):
+    """Helper to get LTOProvider for a device path, validating it exists."""
+    drive_record = (
+        db_session.query(models.SystemSetting)
+        .filter(models.SystemSetting.key == "tape_drives")
+        .first()
+    )
+    if not drive_record:
+        raise HTTPException(status_code=400, detail="No tape drives configured")
+
+    try:
+        configured_paths = json.loads(drive_record.value)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Invalid tape drive configuration")
+
+    if device_path not in configured_paths:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Device {device_path} is not a configured tape drive",
+        )
+
+    from app.providers.tape import LTOProvider
+
+    return LTOProvider(config={"device_path": device_path})
+
+
+@router.get(
+    "/hardware/tape/file-number",
+    operation_id="get_tape_file_number",
+    response_model=TapeFileNumberResponse,
+)
+def get_tape_file_number(device_path: str, db_session: Session = Depends(get_db)):
+    """Get the current file number position for a tape drive."""
+    provider = _get_tape_provider(device_path, db_session)
+
+    try:
+        file_number_str = provider._get_current_file_number()
+        file_number = int(file_number_str)
+    except Exception as e:
+        logger.error(f"Failed to get file number for {device_path}: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get file number: {str(e)}"
+        )
+
+    return TapeFileNumberResponse(device_path=device_path, file_number=file_number)
+
+
+@router.post(
+    "/hardware/tape/rewind",
+    operation_id="rewind_tape",
+    response_model=TapeOperationResponse,
+)
+def rewind_tape(request: TapeOperationRequest, db_session: Session = Depends(get_db)):
+    """Rewind a tape to the beginning (BOT)."""
+    provider = _get_tape_provider(request.device_path, db_session)
+
+    # Check if any backup/restore job is active
+    active_job = (
+        db_session.query(models.Job)
+        .filter(
+            models.Job.status.in_(["PENDING", "RUNNING"]),
+            models.Job.is_cancelled.is_(False),
+        )
+        .first()
+    )
+    if active_job:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot perform tape operation while a job is active",
+        )
+
+    try:
+        provider._run_mt("rewind", timeout_seconds=60)
+        return TapeOperationResponse(
+            success=True,
+            message="Tape rewound to beginning of tape (BOT)",
+            device_path=request.device_path,
+        )
+    except Exception as e:
+        logger.error(f"Failed to rewind tape {request.device_path}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to rewind tape: {str(e)}")
+
+
+@router.post(
+    "/hardware/tape/eject",
+    operation_id="eject_tape",
+    response_model=TapeOperationResponse,
+)
+def eject_tape(request: TapeOperationRequest, db_session: Session = Depends(get_db)):
+    """Eject (unload/offline) a tape from the drive."""
+    provider = _get_tape_provider(request.device_path, db_session)
+
+    # Check if any backup/restore job is active
+    active_job = (
+        db_session.query(models.Job)
+        .filter(
+            models.Job.status.in_(["PENDING", "RUNNING"]),
+            models.Job.is_cancelled.is_(False),
+        )
+        .first()
+    )
+    if active_job:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot perform tape operation while a job is active",
+        )
+
+    try:
+        provider._run_mt("offline", timeout_seconds=60)
+        return TapeOperationResponse(
+            success=True,
+            message="Tape ejected from drive",
+            device_path=request.device_path,
+        )
+    except Exception as e:
+        logger.error(f"Failed to eject tape {request.device_path}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to eject tape: {str(e)}")
+
+
+@router.post(
+    "/hardware/tape/reinitialize",
+    operation_id="reinitialize_tape",
+    response_model=TapeOperationResponse,
+)
+def reinitialize_tape(
+    request: TapeOperationRequest, db_session: Session = Depends(get_db)
+):
+    """
+    Re-initialize a tape by erasing all data and removing associated archives.
+    WARNING: This will permanently delete all data on the tape and remove all
+    archive records from the database.
+    """
+    provider = _get_tape_provider(request.device_path, db_session)
+
+    # Check if any backup/restore job is active
+    active_job = (
+        db_session.query(models.Job)
+        .filter(
+            models.Job.status.in_(["PENDING", "RUNNING"]),
+            models.Job.is_cancelled.is_(False),
+        )
+        .first()
+    )
+    if active_job:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot perform tape operation while a job is active",
+        )
+
+    # Check if tape is write-protected
+    if provider.is_write_protected():
+        raise HTTPException(status_code=409, detail="Tape is write-protected")
+
+        # Get tape identity before erasing (for file version deletion)
+        mam_info = provider.get_mam_info()
+        tape_identifier = mam_info.get("barcode") or mam_info.get("serial")
+        versions_deleted = 0
+
+        try:
+            # Find and delete file versions for this tape
+            if tape_identifier:
+                media_record = (
+                    db_session.query(models.StorageMedia)
+                    .filter(models.StorageMedia.identifier == tape_identifier)
+                    .first()
+                )
+                if media_record:
+                    # Delete all file versions associated with this media
+                    versions = (
+                        db_session.query(models.FileVersion)
+                        .filter(models.FileVersion.media_id == media_record.id)
+                        .all()
+                    )
+                    versions_deleted = len(versions)
+                    for version in versions:
+                        db_session.delete(version)
+                    logger.info(
+                        f"Deleted {versions_deleted} file versions for media {tape_identifier} "
+                        f"(id={media_record.id}) during reinitialization"
+                    )
+
+            # Erase the tape (this may take a while for full erase)
+            provider._run_mt("erase", timeout_seconds=300)
+            db_session.commit()
+            logger.info(f"Tape {request.device_path} erased for reinitialization")
+
+            msg = "Tape erased successfully"
+            if versions_deleted > 0:
+                msg += f" and {versions_deleted} file version(s) removed from database"
+            msg += ". Use 'Initialize Media' to write a new label."
+
+            return TapeOperationResponse(
+                success=True, message=msg, device_path=request.device_path
+            )
+        except Exception as e:
+            db_session.rollback()
+            logger.error(f"Failed to reinitialize tape {request.device_path}: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to reinitialize tape: {str(e)}"
+            )
