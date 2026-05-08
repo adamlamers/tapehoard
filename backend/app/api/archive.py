@@ -212,8 +212,8 @@ def browse(path: str = "ROOT", db_session: Session = Depends(get_db)):
 
 @router.get("/search", operation_id="archive_search")
 def search(q: str, path: Optional[str] = None, db_session: Session = Depends(get_db)):
-    """Performs FTS5 search across the indexed file paths, optionally scoped by path."""
-    if len(q) < 2:
+    """Performs FTS5 search across archived files, optionally scoped by path."""
+    if not q or len(q) < 3:
         return []
 
     search_sql = text(

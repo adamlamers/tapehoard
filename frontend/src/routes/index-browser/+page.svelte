@@ -289,6 +289,13 @@
                 onNavigate={(path) => currentPath = path}
                 onToggleTrack={handleToggleCart}
                 onSelect={fetchMetadata}
+                onOpenLocation={(item) => {
+                    // Navigate to parent directory of the file
+                    const parts = item.path.split('/').filter(Boolean);
+                    parts.pop(); // Remove the file/directory name
+                    const parentPath = parts.length === 0 ? 'ROOT' : '/' + parts.join('/');
+                    currentPath = parentPath;
+                }}
             />        </div>
 
         <!-- Metadata Sidebar -->

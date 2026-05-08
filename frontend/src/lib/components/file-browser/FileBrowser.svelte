@@ -1,15 +1,16 @@
 <script lang="ts">
-        import {
-                ChevronLeft,
-                ChevronRight,
-                ChevronUp,
-                RotateCw,
-                Search,
-                Folder,
-                ArrowUpDown,
-                CheckSquare,
-                Square
-        } from "lucide-svelte";
+	import {
+		ChevronLeft,
+		ChevronRight,
+		ChevronUp,
+		RotateCw,
+		Search,
+		Folder,
+		ArrowUpDown,
+		CheckSquare,
+		Square,
+		X
+	} from "lucide-svelte";
         import { onMount } from 'svelte';
         import { Button } from "$lib/components/ui/button";
         import { Checkbox } from "$lib/components/ui/checkbox";
@@ -38,6 +39,7 @@
                 onSelect = (item: FileItem) => {},
                 onAddToCart = (item: FileItem) => {},
                 onDelete = (item: FileItem) => {},
+                onOpenLocation = (item: FileItem) => {},
                 mode = "host",
                 isSearching = false,
                 pendingChanges = new Map<string, boolean>()
@@ -51,6 +53,7 @@
                 onSelect?: (item: FileItem) => void;
                 onAddToCart?: (item: FileItem) => void;
                 onDelete?: (item: FileItem) => void;
+                onOpenLocation?: (item: FileItem) => void;
                 mode?: "host" | "index" | "cart" | "live" | "discrepancies";
                 isSearching?: boolean;
                 pendingChanges?: Map<string, boolean>;
@@ -557,13 +560,23 @@
                                                 class="absolute left-3 top-3 text-text-secondary group-focus-within:text-action-color transition-colors"
                                         ></Search>
                                 {/if}
-                                <Input
-                                        id="browser-search"
-                                        type="text"
-                                        placeholder="Search folder"
-                                        bind:value={searchQuery}
-                                        class="h-9 bg-bg-primary/50 pl-10 text-[13px] placeholder:text-text-secondary/50 border-border-color/40 focus-visible:ring-action-color/40 transition-all rounded-md"
-                                />
+							<Input
+									id="browser-search"
+									type="text"
+									placeholder={mode === "index" ? "Search archives" : "Search folder"}
+									bind:value={searchQuery}
+									class="h-9 bg-bg-primary/50 pl-10 pr-8 text-[13px] placeholder:text-text-secondary/50 border-border-color/40 focus-visible:ring-action-color/40 transition-all rounded-md"
+							/>
+							{#if searchQuery}
+								<button
+										class="absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary p-1 rounded-md hover:bg-white/5 transition-colors"
+										onclick={() => searchQuery = ''}
+										title="Clear search"
+										type="button"
+								>
+									<X size={14} />
+								</button>
+							{/if}
                         </div>
                 </div>
         </div>
