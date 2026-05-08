@@ -16,6 +16,7 @@
         GripVertical,
         Cpu,
         AlertCircle,
+        AlertTriangle,
         ShieldAlert,
         Library,
         Minus,
@@ -840,41 +841,41 @@
 
         <!-- INVENTORY SECTION -->
         <section class="space-y-12">
-            <!-- Hardware Status -->
-            {#if mediaList.some(m => m.is_online && (m.media_type === 'lto_tape' || m.media_type === 'tape'))}
+            <!-- Hardware Status - Shows one card per tape device -->
+            {#if discoveredAssets.some(a => a.type === 'tape')}
                 <div class="space-y-4">
                     <SectionHeader title="Live hardware status" icon={Cpu} iconColor="text-blue-500" />
 
                     <div class="grid grid-cols-1 gap-6">
-                        {#each mediaList.filter(m => m.is_online && (m.media_type === 'lto_tape' || m.media_type === 'tape')) as media}
-                            {#if media.live_info}
-                                {@const info = media.live_info as any}
-                                <Card class="bg-bg-secondary border-blue-500/30 shadow-2xl relative overflow-hidden">
-                                    <div class="p-6 flex flex-col lg:flex-row gap-8">
-                                        <!-- Drive Info -->
-                                        <div class="flex-1 space-y-4">
-                                            <div>
-                                                <div class="text-[10px] font-medium text-text-secondary opacity-50 mb-2 flex items-center gap-2">
-                                                    <Cpu size={12} /> Physical tape drive
-                                                </div>
-                                                <div class="flex items-center gap-4">
-                                                    <div class="flex items-baseline gap-2">
-                                                        <h3 class="text-2xl font-bold text-text-primary tracking-tight">{info.drive?.vendor || 'Unknown'}</h3>
-                                                        <span class="text-lg font-medium text-text-secondary opacity-40">{info.drive?.model || 'Generic LTO'}</span>
-                                                    </div>
-                                                    <StatusBadge variant="blue">
-                                                        <div class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse"></div>
-                                                        Online
-                                                    </StatusBadge>
-                                                </div>
-                                                <div class="mt-2 flex items-center gap-4 text-xs font-mono text-text-secondary/60">
-                                                    <span>FIRMWARE: <span class="text-text-primary">{info.drive?.firmware || 'N/A'}</span></span>
-                                                    <span class="h-3 w-px bg-border-color"></span>
-                                                    <span>DEVICE: <span class="text-text-primary">{media.config?.device_path || '/dev/nst0'}</span></span>
-                                                </div>
+                        {#each discoveredAssets.filter(a => a.type === 'tape') as drive}
+                            {@const info = drive.hardware_info}
+                            <Card class="bg-bg-secondary border-blue-500/30 shadow-2xl relative overflow-hidden">
+                                <div class="p-6 flex flex-col lg:flex-row gap-8">
+                                    <!-- Drive Info -->
+                                    <div class="flex-1 space-y-4">
+                                        <div>
+                                            <div class="text-[10px] font-medium text-text-secondary opacity-50 mb-2 flex items-center gap-2">
+                                                <Cpu size={12} /> Physical tape drive
                                             </div>
+                                            <div class="flex items-center gap-4">
+                                                <div class="flex items-baseline gap-2">
+                                                    <h3 class="text-2xl font-bold text-text-primary tracking-tight">{info?.drive?.vendor || 'Unknown'}</h3>
+                                                    <span class="text-lg font-medium text-text-secondary opacity-40">{info?.drive?.model || 'Generic LTO'}</span>
+                                                </div>
+                                                <StatusBadge variant="blue">
+                                                    <div class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse"></div>
+                                                    Online
+                                                </StatusBadge>
+                                            </div>
+                                            <div class="mt-2 flex items-center gap-4 text-xs font-mono text-text-secondary/60">
+                                                <span>FIRMWARE: <span class="text-text-primary">{info?.drive?.firmware || 'N/A'}</span></span>
+                                                <span class="h-3 w-px bg-border-color"></span>
+                                                <span>DEVICE: <span class="text-text-primary">{drive.device_path || '/dev/nst0'}</span></span>
+                                            </div>
+                                        </div>
 
-                                            <!-- Live Performance / Health Dashboard -->
+                                        <!-- Live Performance / Health Dashboard -->
+                                        {#if info?.tape}
                                             <div class="grid grid-cols-2 gap-4 pt-4 border-t border-border-color/30">
                                                 <div class="bg-bg-primary/50 p-3 rounded-xl border border-border-color/50">
                                                     <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-2">Session performance</span>
@@ -911,20 +912,29 @@
 
                                             <div class="grid grid-cols-2 gap-8 pt-2">
                                                 <div>
-                                                    <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Assigned ID</span>
-                                                    <span class="text-base font-bold text-text-primary mono">{media.identifier}</span>
-                                                </div>
-                                                <div>
                                                     <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Load count</span>
                                                     <span class="text-base font-bold text-text-primary mono flex items-center gap-2">
                                                         <RotateCw size={14} class="text-blue-500 opacity-50" />
                                                         {info.tape?.load_count || '0'}
                                                     </span>
                                                 </div>
+                                                <div>
+                                                    <span class="text-[10px] font-medium text-text-secondary opacity-40 block mb-0.5">Current tape</span>
+                                                    <span class="text-base font-bold text-text-primary mono">{drive.identifier || 'Unknown'}</span>
+                                                </div>
                                             </div>
-                                        </div>
+                                        {:else}
+                                            <div class="pt-4 border-t border-border-color/30">
+                                                <div class="flex items-center gap-2 text-xs text-text-secondary opacity-60">
+                                                    <AlertTriangle size={14} />
+                                                    No tape loaded in drive
+                                                </div>
+                                            </div>
+                                        {/if}
+                                    </div>
 
-                                        <!-- Media/MAM Info -->
+                                    <!-- Media/MAM Info (only if tape is loaded) -->
+                                    {#if info?.tape}
                                         <div class="flex-1 bg-bg-primary/30 rounded-xl p-5 border border-border-color/50 relative">
                                             <div class="text-[10px] font-medium text-text-secondary opacity-50 mb-5 flex items-center justify-between">
                                                 <div class="flex items-center gap-2"><Database size={12} /> Medium metadata (MAM)</div>
@@ -978,9 +988,9 @@
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </Card>
-                            {/if}
+                                    {/if}
+                                </div>
+                            </Card>
                         {/each}
                     </div>
                 </div>
