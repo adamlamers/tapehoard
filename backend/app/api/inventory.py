@@ -170,6 +170,11 @@ def list_media(refresh: bool = False, db_session: Session = Depends(get_db)):
             except Exception:
                 pass
 
+        # For tape media, "online" means the specific tape is loaded in the drive,
+        # not just that the drive has any tape loaded. Use hardware_identified to verify.
+        if media.media_type == "lto_tape":
+            is_online = is_online and hardware_identified
+
         schema = _media_to_schema(media, final_config)
         schema.is_online = is_online
         schema.is_identified = hardware_identified

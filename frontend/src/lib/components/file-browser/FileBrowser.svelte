@@ -11,14 +11,14 @@
 		Square,
 		X
 	} from "lucide-svelte";
-        import { onMount } from 'svelte';
-        import { Button } from "$lib/components/ui/button";
-        import { Checkbox } from "$lib/components/ui/checkbox";
-        import { ScrollArea } from "$lib/components/ui/scroll-area";
-        import { Input } from "$lib/components/ui/input";
-        import FileBrowserTreeItem from "./FileBrowserTreeItem.svelte";
-        import FileBrowserRowItem from "./FileBrowserRowItem.svelte";
-        import type { FileItem, TreeNode, Breadcrumb } from "$lib/types";
+	import { onMount } from 'svelte';
+	import { Button } from "$lib/components/ui/button";
+	import { Checkbox } from "$lib/components/ui/checkbox";
+	import { ScrollArea } from "$lib/components/ui/scroll-area";
+	import { Input } from "$lib/components/ui/input";
+	import FileBrowserTreeItem from "./FileBrowserTreeItem.svelte";
+	import FileBrowserRowItem from "./FileBrowserRowItem.svelte";
+	import type { FileItem, TreeNode, Breadcrumb } from "$lib/types";
         import { cn, naturalSortCompare } from "$lib/utils";
         import {
             filesystemTree,
