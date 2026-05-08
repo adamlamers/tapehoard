@@ -1313,27 +1313,43 @@ class ArchiverService:
                             )
                         continue
 
-                    tar_mode = (
-                        "r|*"
-                        if media_record.media_type
-                        in ["tape", "lto_tape", "cloud", "s3_compat"]
-                        else "r:*"
-                    )
+                    # For tape, we open the device directly (not via dd pipe) so we can
+                    # seek through the tar efficiently and stop early once all files are found.
+                    # Use buffered read mode for better performance.
+                    tar_mode = "r:*"
 
-                    with tarfile.open(fileobj=bitstream, mode=tar_mode) as tar_bundle:
-                        normalized_map = {}
-                        for v in target_versions:
-                            name = self.normalize_path(v.file_state.file_path)
-                            if v.is_split:
-                                name += f".part_{v.offset_start}_{v.offset_end}"
-                            normalized_map[name] = v
+                    normalized_map = {}
+                    for v in target_versions:
+                        name = self.normalize_path(v.file_state.file_path)
+                        if v.is_split:
+                            name += f".part_{v.offset_start}_{v.offset_end}"
+                        normalized_map[name] = v
 
-                        found_count = 0
-                        for member in tar_bundle:
-                            if JobManager.is_cancelled(job_id):
-                                break
-                            clean_name = self.normalize_path(member.name)
-                            if clean_name in normalized_map:
+                    # Track which files we still need to find
+                    remaining_files = set(normalized_map.keys())
+                    found_count = 0
+
+                    try:
+                        with tarfile.open(
+                            fileobj=bitstream, mode=tar_mode
+                        ) as tar_bundle:
+                            for member in tar_bundle:
+                                if JobManager.is_cancelled(job_id):
+                                    break
+
+                                # Optimization: stop early if we've found all target files
+                                if not remaining_files:
+                                    logger.debug(
+                                        f"All {found_count} target files found in archive {archive_id}, "
+                                        f"stopping tar iteration early"
+                                    )
+                                    break
+
+                                clean_name = self.normalize_path(member.name)
+                                if clean_name not in normalized_map:
+                                    continue
+
+                                remaining_files.discard(clean_name)
                                 found_count += 1
                                 v = normalized_map[clean_name]
                                 final_path = self._sanitize_recovery_path(
@@ -1380,12 +1396,37 @@ class ArchiverService:
                                             )
 
                                         processed_bytes += v.offset_end - v.offset_start
-                                else:
-                                    # Standard tar extraction for symlinks/dirs/etc handles metadata natively
-                                    tar_bundle.extract(member, path=destination_root)
+                                elif member.issym() or member.islnk():
+                                    # Handle symlinks - extract manually to control destination
+                                    link_target = member.linkname
+                                    if os.path.lexists(final_path):
+                                        os.remove(final_path)
+                                    os.symlink(link_target, final_path)
+                                elif member.isdir():
+                                    # Create directory with proper permissions
+                                    os.makedirs(final_path, exist_ok=True)
+                                    try:
+                                        os.chmod(final_path, member.mode)
+                                        os.utime(
+                                            final_path, (member.mtime, member.mtime)
+                                        )
+                                    except Exception as e:
+                                        logger.debug(
+                                            f"Failed to apply metadata to directory {final_path}: {e}"
+                                        )
 
                         if found_count == 0:
                             raise FileNotFoundError(f"Archive {archive_id} mismatch")
+
+                        if remaining_files:
+                            logger.warning(
+                                f"Archive {archive_id}: Only found {found_count} of "
+                                f"{len(normalized_map)} target files. Missing: {remaining_files}"
+                            )
+                    finally:
+                        # Ensure bitstream is closed, especially important for tape devices
+                        if hasattr(bitstream, "close"):
+                            bitstream.close()
 
             if not JobManager.is_cancelled(job_id):
                 db_session.query(models.RestoreCart).delete()

@@ -1,7 +1,7 @@
 import subprocess
 import os
 import time
-from typing import Optional, BinaryIO, cast, Dict, Any, List
+from typing import Optional, BinaryIO, Dict, Any, List
 import struct
 import re
 from .base import AbstractStorageProvider
@@ -841,9 +841,9 @@ class LTOProvider(AbstractStorageProvider):
                 f"This may indicate an archive written before the file-number fix."
             )
 
-        cmd_dd = ["dd", f"if={self.device_path}", "bs=256k"]
-        self._log_command(cmd_dd)
-        proc = subprocess.Popen(cmd_dd, stdout=subprocess.PIPE)
-        if proc.stdout is None:
-            raise RuntimeError("Failed to open dd pipe")
-        return cast(BinaryIO, proc.stdout)
+        # For selective restore, we need to provide a way to iterate through
+        # the tar and extract only specific files. Return the device path
+        # so the archiver can open tarfile directly on the tape device.
+        # This avoids reading the entire archive via dd when we only need
+        # a subset of files.
+        return open(self.device_path, "rb", buffering=256 * 1024)

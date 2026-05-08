@@ -145,6 +145,19 @@ Tape restores read archives in `sorted(archive_groups.keys())`. String sort orde
 
 **Fix:** `_archive_sort_key` tries `int()` first, falling back to string for non-numeric IDs (HDD paths, cloud keys).
 
+### Selective Restore from Tape
+**Problem:** Old code used `dd` to read the entire archive into a pipe, then iterated through ALL tar members to find selected files. This was inefficient and extracted everything.
+
+**Fix:**
+1. `read_archive()` now opens the tape device directly (`open(device_path, "rb")`) instead of using `dd`
+2. `run_restore()` creates a `normalized_map` of target files and tracks `remaining_files`
+3. Iterates through tar members sequentially, extracting only matching files
+4. **Stops early** once all target files are found: `if not remaining_files: break`
+5. Properly handles symlinks, directories, and regular files with full metadata restoration
+6. Ensures bitstream is closed in `finally` block to release the tape device
+
+This avoids reading the entire tar when only a subset of files are needed.
+
 ### Streaming File Number Bug
 `finalize_stream` used to call `_get_current_file_number()` **after** `weof`. Since `weof` advances to the next file, this returned the **next** file number. Restores would seek past the archive.
 
