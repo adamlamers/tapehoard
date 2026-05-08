@@ -136,11 +136,13 @@ class LTOProvider(AbstractStorageProvider):
         if not os.path.exists(self.device_path):
             return {}
 
-        # Throttle MAM reads to once every 2 seconds unless forced
+        # Throttle MAM reads to once every 30 seconds unless forced.
+        # MAM data is stable once a tape is loaded; reading it on every 3-second
+        # poll would run blocking sg_read_attr commands far more often than needed.
         now = time.time()
         if not force and (
             now - LTOProvider._lkg_state[self.device_path].get("last_mam_check", 0)
-            < 2.0
+            < 30.0
         ):
             return LTOProvider._lkg_state[self.device_path]["mam"]
 
@@ -353,18 +355,19 @@ class LTOProvider(AbstractStorageProvider):
         return "LTO Tape"
 
     def check_online(self, force: bool = False) -> bool:
-        """Checks if the tape drive is online. Throttled to 2 seconds."""
+        """Checks if the tape drive is online. Throttled to 10 seconds."""
         if not os.path.exists(self.device_path):
             LTOProvider._lkg_state[self.device_path]["online"] = False
             return False
 
-        # Return LKG if we checked very recently
+        # Return LKG if we checked recently (longer than poll interval to avoid
+        # running blocking SCSI commands on every 3-second UI poll).
         now = time.time()
         if (
             not force
             and now
             - LTOProvider._lkg_state[self.device_path].get("last_online_check", 0)
-            < 2.0
+            < 10.0
         ):
             return LTOProvider._lkg_state[self.device_path]["online"]
 

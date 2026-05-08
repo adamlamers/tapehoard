@@ -143,13 +143,14 @@ def list_media(refresh: bool = False, db_session: Session = Depends(get_db)):
         live_info = None
 
         if provider:
+            from app.providers.tape import LTOProvider
+
             if (
                 has_active_job
-                and media.media_type == "lto_tape"
+                and isinstance(provider, LTOProvider)
                 and hasattr(provider, "device_path")
             ):
                 # Use cached state — no SCSI commands while drive is busy writing.
-                from app.providers.tape import LTOProvider
 
                 live_info = LTOProvider.get_cached_live_info(provider.device_path)
                 is_online = live_info["online"]
