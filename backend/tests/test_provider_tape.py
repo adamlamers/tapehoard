@@ -38,10 +38,12 @@ def test_lto_insertion_detection(mocker):
     """Verifies that needs_registration triggers only on new insertion."""
 
     device = "/dev/nst0"
-    # 1. Start with Empty State
-    LTOProvider._lkg_state = {
-        device: {"drive": {}, "mam": {}, "online": False, "last_check": 0.0}
-    }
+    # Patch class-level cache so mutations don't bleed into other tests
+    mocker.patch.object(
+        LTOProvider,
+        "_lkg_state",
+        {device: {"drive": {}, "mam": {}, "online": False, "last_check": 0.0}},
+    )
     provider = LTOProvider({"device_path": device})
 
     # Mock OS path existence

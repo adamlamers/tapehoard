@@ -1,9 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-import pytest
 
 from app.db import models
-
 
 # ── list_jobs ──
 
@@ -351,16 +349,3 @@ def test_retry_non_scan_job(client, db_session):
     response = client.post(f"/system/jobs/{job.id}/retry")
     assert response.status_code == 400
     assert "Retry for BACKUP jobs is not supported" in response.json()["detail"]
-
-
-# ── stream_jobs ──
-
-
-@pytest.mark.skip(
-    reason="Async infinite SSE stream cannot be tested with synchronous TestClient"
-)
-def test_stream_jobs_returns_sse(client):
-    """Tests that the stream endpoint is registered and accessible."""
-    response = client.get("/system/jobs/stream")
-    assert response.status_code == 200
-    assert "text/event-stream" in response.headers.get("content-type", "")

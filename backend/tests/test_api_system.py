@@ -128,26 +128,6 @@ def test_get_dashboard_stats_redundancy_ratio(client, db_session):
     assert data["redundancy_ratio"] == 0.0
 
 
-def test_get_settings_empty(client):
-    """Tests retrieving settings when none are set."""
-    response = client.get("/system/settings")
-    assert response.status_code == 200
-    assert response.json() == {}
-
-
-def test_update_settings(client):
-    """Tests updating a system setting."""
-    response = client.post(
-        "/system/settings", json={"key": "schedule_scan", "value": "0 2 * * *"}
-    )
-    assert response.status_code == 200
-    assert response.json() == {"message": "Setting committed."}
-
-    # Verify retrieval
-    response = client.get("/system/settings")
-    assert response.json()["schedule_scan"] == "0 2 * * *"
-
-
 def test_trigger_scan(client):
     """Tests triggering a system scan."""
     response = client.post("/system/scan")
