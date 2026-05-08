@@ -141,6 +141,19 @@ def _get_last_scan_time(db_session: Session) -> Optional[datetime]:
     return last_scan.completed_at if last_scan else None
 
 
+def escape_fts5_query(query: str) -> str:
+    """Escapes a query string for safe use in SQLite FTS5 MATCH expressions.
+
+    FTS5 has special syntax characters that cause errors if not escaped:
+    - Double quotes need to be doubled (" becomes "")
+    - The query is wrapped in double quotes to treat it as a literal phrase
+    """
+    # Escape double quotes by doubling them
+    escaped = query.replace('"', '""')
+    # Wrap in double quotes for literal phrase search
+    return f'"{escaped}"'
+
+
 # --- Shared Schemas ---
 
 

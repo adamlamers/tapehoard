@@ -10,6 +10,7 @@ from app.api.common import (
     get_ignored_status,
     _validate_path_within_roots,
     _get_last_scan_time,
+    escape_fts5_query,
 )
 from sqlalchemy import text
 from app.db import models
@@ -153,7 +154,7 @@ def search_system_index(
 
     ignore_filter = " AND fs.is_ignored = 0" if not include_ignored else ""
     path_filter = ""
-    query_params = {"query": f'"{q}"'}
+    query_params = {"query": escape_fts5_query(q)}
 
     if path and path != "ROOT":
         path_filter = " AND fs.file_path LIKE :path_prefix"

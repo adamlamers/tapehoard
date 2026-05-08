@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.schemas import ItemMetadataSchema, TreeNodeSchema
+from app.api.common import escape_fts5_query
 from app.db import models
 from app.db.database import get_db
 
@@ -238,7 +239,7 @@ def search(q: str, path: Optional[str] = None, db_session: Session = Depends(get
     )
 
     path_prefix = f"{path}%" if path and path != "ROOT" else "%"
-    query_params = {"query": q, "path_prefix": path_prefix}
+    query_params = {"query": escape_fts5_query(q), "path_prefix": path_prefix}
 
     rows = db_session.execute(search_sql, query_params).fetchall()
     results = []
