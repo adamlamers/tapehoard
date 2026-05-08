@@ -13,7 +13,8 @@
         FolderTree,
         Clock,
         ArrowRight,
-        AlertTriangle
+        AlertTriangle,
+        CassetteTape
     } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import PageHeader from '$lib/components/ui/PageHeader.svelte';
@@ -43,6 +44,7 @@
     let loading = $state(false);
     let searchLoading = $state(false);
     let selectedItemMetadata = $state<ItemMetadataSchema | null>(null);
+    let selectedItem = $state<FileItem | null>(null);
     let metadataLoading = $state(false);
     let searchTimeout: any;
 
@@ -164,6 +166,11 @@
         } finally {
             metadataLoading = false;
         }
+    }
+
+    function handleSelect(item: FileItem) {
+        selectedItem = item;
+        fetchMetadata(item);
     }
 
     async function handleToggleCart(item: FileItem) {
@@ -288,7 +295,7 @@
                 mode="index"
                 onNavigate={(path) => currentPath = path}
                 onToggleTrack={handleToggleCart}
-                onSelect={fetchMetadata}
+                onSelect={handleSelect}
                 onOpenLocation={(item) => {
                     // Navigate to parent directory of the file
                     const parts = item.path.split('/').filter(Boolean);
@@ -342,6 +349,28 @@
                                     </div>
                                 {/if}
                             </div>
+
+                            <!-- Media location badges (files and directories) -->
+                            {#if selectedItem?.media && selectedItem.media.length > 0}
+                                <div class="space-y-2">
+                                    <span class="text-xs font-medium text-text-secondary opacity-60 block">Stored On</span>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        {#if selectedItem.media.length > 3}
+                                            <span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[10px] px-1.5 py-0.5 rounded border border-blue-500/20 font-medium">
+                                                <CassetteTape size={10} />
+                                                {selectedItem.media.length} locations
+                                            </span>
+                                        {:else}
+                                            {#each selectedItem.media as m}
+                                                <span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[10px] px-1.5 py-0.5 rounded border border-blue-500/20 font-medium">
+                                                    <CassetteTape size={10} />
+                                                    {m}
+                                                </span>
+                                            {/each}
+                                        {/if}
+                                    </div>
+                                </div>
+                            {/if}
 
                             {#if selectedItemMetadata.type === 'file'}
                                 {#if selectedItemMetadata.is_partially_archived}

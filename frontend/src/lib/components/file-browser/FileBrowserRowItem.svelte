@@ -236,12 +236,19 @@
 								{#if mode === "index"}
 										{#if item.media && item.media.length > 0}
 												<div class="flex gap-1 overflow-hidden shrink-0">
-													{#each item.media as m}
+													{#if item.media.length > 3}
 															<span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[10px] px-1.5 py-0.5 rounded border border-blue-500/20 font-medium">
 																	<CassetteTape size={10} />
-																	{m}
+																	{item.media.length} locations
 															</span>
-													{/each}
+													{:else}
+															{#each item.media as m}
+																	<span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[10px] px-1.5 py-0.5 rounded border border-blue-500/20 font-medium">
+																			<CassetteTape size={10} />
+																			{m}
+																	</span>
+															{/each}
+													{/if}
 												</div>
 										{/if}
 										{#if item.is_partially_archived}

@@ -206,6 +206,8 @@
         discrepancies.filter(d => d.is_deleted && d.has_versions).length
     );
 
+    const selectionCounts = $derived(getAffectedCounts(selectedPaths));
+
     onMount(loadDiscrepancies);
 </script>
 
@@ -226,6 +228,27 @@
                     {discrepancies.length} found
                 </span>
             </div>
+            <Button
+                variant={selectedPaths.size > 0 ? 'default' : 'outline'}
+                class="transition-all {selectedPaths.size === 0 ? 'opacity-50' : ''}"
+                onclick={batchResolve}
+                disabled={selectedPaths.size === 0 || batchLoading}
+            >
+                {#if batchLoading}
+                    <RotateCw size={14} class="mr-1 animate-spin" /> Resolving...
+                {:else if selectedPaths.size === 0}
+                    <FileX size={14} class="mr-1" /> Resolve selection
+                {:else if selectionCounts.recoverable > 0 && selectionCounts.lost > 0}
+                    <HardDriveDownload size={14} class="mr-1" />
+                    Recover {selectionCounts.recoverable}, confirm {selectionCounts.lost} lost
+                {:else if selectionCounts.recoverable > 0}
+                    <HardDriveDownload size={14} class="mr-1" />
+                    Add {selectionCounts.recoverable} to restore queue
+                {:else}
+                    <FileX size={14} class="mr-1" />
+                    Confirm {selectionCounts.lost} as deleted
+                {/if}
+            </Button>
             <Button variant="outline" size="icon" onclick={loadDiscrepancies} disabled={loading}>
                 <RotateCw size={16} class={loading ? 'animate-spin' : ''} />
             </Button>
@@ -260,39 +283,6 @@
                 variant="warning"
             />
         </div>
-
-        <!-- Batch Actions Bar -->
-        {#if selectedPaths.size > 0}
-            {@const { recoverable: recoverableCount, lost: lostCount } = getAffectedCounts(selectedPaths)}
-            <div class="flex items-center gap-3 p-3 bg-bg-tertiary/50 rounded-lg border border-border-color">
-                <div class="flex flex-col text-sm text-text-secondary">
-                    <span>{selectedPaths.size} item(s) selected</span>
-                    {#if recoverableCount > 0 && lostCount > 0}
-                        <span class="text-xs opacity-60">{recoverableCount} recoverable, {lostCount} lost forever</span>
-                    {:else if recoverableCount > 0}
-                        <span class="text-xs opacity-60">All {recoverableCount} file(s) can be recovered</span>
-                    {:else if lostCount > 0}
-                        <span class="text-xs opacity-60">All {lostCount} file(s) are lost forever</span>
-                    {/if}
-                </div>
-                <div class="flex gap-2 ml-auto">
-                    <Button size="sm" variant="default" onclick={batchResolve} disabled={batchLoading}>
-                        {#if batchLoading}
-                            <RotateCw size={14} class="mr-1 animate-spin" /> Resolving...
-                        {:else if recoverableCount > 0 && lostCount > 0}
-                            <HardDriveDownload size={14} class="mr-1" />
-                            Recover {recoverableCount}, confirm {lostCount} lost
-                        {:else if recoverableCount > 0}
-                            <HardDriveDownload size={14} class="mr-1" />
-                            Add {recoverableCount} to restore queue
-                        {:else}
-                            <FileX size={14} class="mr-1" />
-                            Confirm {lostCount} as deleted
-                        {/if}
-                    </Button>
-                </div>
-            </div>
-        {/if}
 
         <!-- FileBrowser Component in discrepancies mode -->
         <div class="flex-1 min-h-[600px] bg-bg-secondary border border-border-color shadow-2xl rounded-lg flex flex-col relative overflow-hidden">
@@ -329,28 +319,38 @@
             </div>
             <div class="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
                 {#if reportData.recovered_count > 0}
+                    {@const shown = reportData.recovered_paths.slice(0, 250)}
+                    {@const overflow = reportData.recovered_count - shown.length}
                     <div class="space-y-2">
                         <div class="flex items-center gap-2 text-success-color">
                             <HardDriveDownload size={16} />
                             <span class="font-medium">{reportData.recovered_count} file(s) queued for recovery</span>
                         </div>
                         <ul class="text-sm text-text-secondary space-y-1 pl-6">
-                            {#each reportData.recovered_paths as path}
+                            {#each shown as path}
                                 <li class="truncate">{path}</li>
                             {/each}
+                            {#if overflow > 0}
+                                <li class="text-text-secondary/50 italic">…and {overflow} more. Download the report to see all.</li>
+                            {/if}
                         </ul>
                     </div>
                 {/if}
                 {#if reportData.lost_count > 0}
+                    {@const shown = reportData.lost_paths.slice(0, 250)}
+                    {@const overflow = reportData.lost_count - shown.length}
                     <div class="space-y-2">
                         <div class="flex items-center gap-2 text-error-color">
                             <FileX size={16} />
                             <span class="font-medium">{reportData.lost_count} file(s) confirmed as permanently lost</span>
                         </div>
                         <ul class="text-sm text-text-secondary space-y-1 pl-6">
-                            {#each reportData.lost_paths as path}
+                            {#each shown as path}
                                 <li class="truncate">{path}</li>
                             {/each}
+                            {#if overflow > 0}
+                                <li class="text-text-secondary/50 italic">…and {overflow} more. Download the report to see all.</li>
+                            {/if}
                         </ul>
                     </div>
                 {/if}
