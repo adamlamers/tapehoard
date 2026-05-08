@@ -258,6 +258,7 @@ class BatchTrackRequest(BaseModel):
 
 class TapeOperationRequest(BaseModel):
     device_path: str
+    secure_erase: bool = False
 
 
 class TapeFileNumberResponse(BaseModel):

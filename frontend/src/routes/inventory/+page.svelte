@@ -245,7 +245,9 @@
                 discoveredAssets = (hardwareRes.data as any[]).map(newAsset => {
                     const oldAsset = discoveredAssets.find(a => a.device_path === newAsset.device_path);
                     if (oldAsset && oldAsset.hardware_info && newAsset.hardware_info) {
-                         if (Object.keys(newAsset.hardware_info.tape || {}).length === 0 && Object.keys(oldAsset.hardware_info.tape || {}).length > 0) {
+                        // null = backend confirmed no tape loaded; {} = drive busy, cache may be empty.
+                        // Only preserve old tape info for the {} case, never for null.
+                        if (newAsset.hardware_info.tape !== null && Object.keys(newAsset.hardware_info.tape || {}).length === 0 && Object.keys(oldAsset.hardware_info.tape || {}).length > 0) {
                             newAsset.hardware_info.tape = oldAsset.hardware_info.tape;
                         }
                         if (Object.keys(newAsset.hardware_info.drive || {}).length === 0 && Object.keys(oldAsset.hardware_info.drive || {}).length > 0) {
@@ -276,7 +278,9 @@
                 }
                 const oldAsset = discoveredAssets.find(a => a.device_path === newAsset.device_path);
                 if (oldAsset && oldAsset.hardware_info && newAsset.hardware_info) {
-                     if (Object.keys(newAsset.hardware_info.tape || {}).length === 0 && Object.keys(oldAsset.hardware_info.tape || {}).length > 0) {
+                    // null = backend confirmed no tape loaded; {} = drive busy, cache may be empty.
+                    // Only preserve old tape info for the {} case, never for null.
+                    if (newAsset.hardware_info.tape !== null && Object.keys(newAsset.hardware_info.tape || {}).length === 0 && Object.keys(oldAsset.hardware_info.tape || {}).length > 0) {
                         newAsset.hardware_info.tape = oldAsset.hardware_info.tape;
                     }
                     if (Object.keys(newAsset.hardware_info.drive || {}).length === 0 && Object.keys(oldAsset.hardware_info.drive || {}).length > 0) {
@@ -650,16 +654,19 @@
         showReinitConfirmDialog = true;
     }
 
-    async function handleTapeReinitialize() {
+    async function handleTapeReinitialize(secureErase = false) {
         if (!reinitTargetDrive) return;
         const devicePath = reinitTargetDrive.device_path;
         tapeOperationLoading = `reinit-${devicePath}`;
         showReinitConfirmDialog = false;
         try {
             await reinitializeTape({
-                body: { device_path: devicePath }
+                body: { device_path: devicePath, secure_erase: secureErase }
             });
-            toast.success("Tape erased. Use 'Initialize Media' to write a new label.");
+            toast.success(secureErase
+                ? "Tape securely erased. Use 'Initialize Media' to write a new label."
+                : "Tape cleared. Use 'Initialize Media' to write a new label."
+            );
             await loadMedia(true, true);
         } catch (error: any) {
             const msg = error?.response?.data?.detail || error?.message || "Unknown error";
@@ -934,10 +941,14 @@
                                                     <h3 class="text-2xl font-bold text-text-primary tracking-tight">{info?.drive?.vendor || 'Unknown'}</h3>
                                                     <span class="text-lg font-medium text-text-secondary opacity-40">{info?.drive?.model || 'Generic LTO'}</span>
                                                 </div>
-                                                <StatusBadge variant="blue">
-                                                    <div class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse"></div>
-                                                    Online
-                                                </StatusBadge>
+                                                {#if info?.tape}
+                                                    <StatusBadge variant="blue">
+                                                        <div class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse"></div>
+                                                        Online
+                                                    </StatusBadge>
+                                                {:else}
+                                                    <StatusBadge variant="neutral">No tape</StatusBadge>
+                                                {/if}
                                             </div>
                                             <div class="mt-2 flex items-center gap-4 text-xs font-mono text-text-secondary/60">
                                                 <span>FIRMWARE: <span class="text-text-primary">{info?.drive?.firmware || 'N/A'}</span></span>
@@ -1727,11 +1738,11 @@
 
             <div class="space-y-4">
                 <div class="p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
-                    <p class="text-sm text-text-primary font-medium mb-2">This action will permanently erase all data on the tape:</p>
+                    <p class="text-sm text-text-primary font-medium mb-2">This will clear the tape and remove all archive records from the database:</p>
                     <ul class="text-sm text-text-secondary space-y-1 list-disc list-inside">
-                        <li>All archives stored on this tape will be deleted from the database</li>
-                        <li>The tape will be physically erased (long operation)</li>
-                        <li>You will need to re-initialize the tape with a new label</li>
+                        <li>All archive records for this tape will be removed from the database</li>
+                        <li>The tape is rewound and an end-of-file marker is written at the start — fast operation</li>
+                        <li>You will need to use 'Initialize Media' to write a new label</li>
                     </ul>
                 </div>
 
@@ -1742,12 +1753,20 @@
                 </div>
             </div>
 
-            <footer class="flex gap-3 pt-4 border-t border-border-color">
-                <Button variant="outline" class="flex-1 h-10" onclick={() => showReinitConfirmDialog = false}>Cancel</Button>
-                <Button variant="default" class="flex-[2] h-10 bg-red-500 hover:bg-red-600 text-white" onclick={handleTapeReinitialize}>
-                    <AlertOctagon size={16} class="mr-2" />
-                    Yes, Erase Everything
-                </Button>
+            <footer class="flex flex-col gap-3 pt-4 border-t border-border-color">
+                <div class="flex gap-3">
+                    <Button variant="outline" class="flex-1 h-10" onclick={() => showReinitConfirmDialog = false}>Cancel</Button>
+                    <Button variant="default" class="flex-[2] h-10 bg-red-500 hover:bg-red-600 text-white" onclick={() => handleTapeReinitialize(false)}>
+                        <AlertOctagon size={16} class="mr-2" />
+                        Clear & Re-initialize
+                    </Button>
+                </div>
+                <button
+                    class="text-xs text-text-secondary/40 hover:text-red-400 transition-colors text-center underline underline-offset-2"
+                    onclick={() => handleTapeReinitialize(true)}
+                >
+                    Secure erase (full SCSI erase — takes hours)
+                </button>
             </footer>
         </Card>
     </Dialog>

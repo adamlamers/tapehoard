@@ -1184,6 +1184,10 @@ export type TapeOperationRequest = {
      * Device Path
      */
     device_path: string;
+    /**
+     * Secure Erase
+     */
+    secure_erase?: boolean;
 };
 
 /**

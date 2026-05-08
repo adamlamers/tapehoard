@@ -95,6 +95,13 @@ def discover_hardware(db_session: Session = Depends(get_db)):
                         except Exception:
                             pass
 
+                    # When no active job, an empty tape dict means no tape is loaded.
+                    # Use None so the frontend can distinguish "no tape" from
+                    # "tape present but info unavailable due to busy drive" ({}).
+                    tape_info = (
+                        state["tape"] if has_active_job else (state["tape"] or None)
+                    )
+
                     discovered_nodes.append(
                         {
                             "type": "tape",
@@ -104,7 +111,7 @@ def discover_hardware(db_session: Session = Depends(get_db)):
                             "status": "ready" if not is_known else "active",
                             "hardware_info": {
                                 "drive": state["drive"],
-                                "tape": state["tape"],
+                                "tape": tape_info,
                                 "file_number": file_number,
                             },
                         }
@@ -349,9 +356,14 @@ def reinitialize_tape(
     request: TapeOperationRequest, db_session: Session = Depends(get_db)
 ):
     """
-    Re-initialize a tape by erasing all data and removing associated archives.
-    WARNING: This will permanently delete all data on the tape and remove all
-    archive records from the database.
+    Prepares a tape to receive a new label.
+
+    Default (secure_erase=False): rewinds the tape and writes a single filemark at
+    BOT, logically clearing it in seconds.  The old data remains on tape but is
+    unreachable once a new label is written over it.
+
+    With secure_erase=True: issues a full SCSI erase, which can take many hours but
+    physically overwrites every block.
     """
     provider = _get_tape_provider(request.device_path, db_session)
 
@@ -370,54 +382,63 @@ def reinitialize_tape(
             detail="Cannot perform tape operation while a job is active",
         )
 
-    # Check if tape is write-protected
     if provider.is_write_protected():
         raise HTTPException(status_code=409, detail="Tape is write-protected")
 
-        # Get tape identity before erasing (for file version deletion)
-        mam_info = provider.get_mam_info()
-        tape_identifier = mam_info.get("barcode") or mam_info.get("serial")
-        versions_deleted = 0
+    # Get tape identity before clearing (to purge DB records)
+    mam_info = provider.get_mam_info()
+    tape_identifier = mam_info.get("barcode") or mam_info.get("serial")
+    versions_deleted = 0
 
-        try:
-            # Find and delete file versions for this tape
-            if tape_identifier:
-                media_record = (
-                    db_session.query(models.StorageMedia)
-                    .filter(models.StorageMedia.identifier == tape_identifier)
-                    .first()
+    try:
+        # Remove all file versions for this tape from the database
+        if tape_identifier:
+            media_record = (
+                db_session.query(models.StorageMedia)
+                .filter(models.StorageMedia.identifier == tape_identifier)
+                .first()
+            )
+            if media_record:
+                versions = (
+                    db_session.query(models.FileVersion)
+                    .filter(models.FileVersion.media_id == media_record.id)
+                    .all()
                 )
-                if media_record:
-                    # Delete all file versions associated with this media
-                    versions = (
-                        db_session.query(models.FileVersion)
-                        .filter(models.FileVersion.media_id == media_record.id)
-                        .all()
-                    )
-                    versions_deleted = len(versions)
-                    for version in versions:
-                        db_session.delete(version)
-                    logger.info(
-                        f"Deleted {versions_deleted} file versions for media {tape_identifier} "
-                        f"(id={media_record.id}) during reinitialization"
-                    )
+                versions_deleted = len(versions)
+                for version in versions:
+                    db_session.delete(version)
+                logger.info(
+                    f"Deleted {versions_deleted} file version(s) for media "
+                    f"{tape_identifier} (id={media_record.id}) during reinitialization"
+                )
 
-            # Erase the tape (this may take a while for full erase)
-            provider._run_mt("erase", timeout_seconds=300)
-            db_session.commit()
-            logger.info(f"Tape {request.device_path} erased for reinitialization")
+        if request.secure_erase:
+            # Full SCSI erase — physically overwrites every block (very slow)
+            provider._run_mt("erase", timeout_seconds=14400)
+            logger.info(f"Tape {request.device_path} fully erased")
+            msg = "Tape securely erased"
+        else:
+            # Fast clear: rewind to BOT and write a single filemark.
+            # Logically marks the tape as empty in seconds; old data is overwritten
+            # once a new label is written by Initialize Media.
+            provider._run_mt("rewind", timeout_seconds=120)
+            provider._run_mt("weof 1", timeout_seconds=30)
+            provider._run_mt("rewind", timeout_seconds=120)
+            logger.info(f"Tape {request.device_path} rewound and cleared")
+            msg = "Tape rewound and cleared"
 
-            msg = "Tape erased successfully"
-            if versions_deleted > 0:
-                msg += f" and {versions_deleted} file version(s) removed from database"
-            msg += ". Use 'Initialize Media' to write a new label."
+        db_session.commit()
 
-            return TapeOperationResponse(
-                success=True, message=msg, device_path=request.device_path
-            )
-        except Exception as e:
-            db_session.rollback()
-            logger.error(f"Failed to reinitialize tape {request.device_path}: {e}")
-            raise HTTPException(
-                status_code=500, detail=f"Failed to reinitialize tape: {str(e)}"
-            )
+        if versions_deleted > 0:
+            msg += f" ({versions_deleted} archive record(s) removed from database)"
+        msg += ". Use 'Initialize Media' to write a new label."
+
+        return TapeOperationResponse(
+            success=True, message=msg, device_path=request.device_path
+        )
+    except Exception as e:
+        db_session.rollback()
+        logger.error(f"Failed to reinitialize tape {request.device_path}: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to reinitialize tape: {str(e)}"
+        )
