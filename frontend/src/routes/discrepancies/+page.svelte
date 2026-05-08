@@ -310,10 +310,21 @@
 
 <!-- Resolution Report Modal -->
 {#if showReport && reportData}
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onclick={() => showReport = false}>
-        <div class="bg-bg-secondary border border-border-color rounded-xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden" onclick={(e) => e.stopPropagation()}>
+    <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        onmousedown={() => showReport = false}
+        role="presentation"
+    >
+        <div
+            class="bg-bg-secondary border border-border-color rounded-xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden"
+            onmousedown={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="report-title"
+            tabindex="-1"
+        >
             <div class="p-5 border-b border-border-color">
-                <h3 class="text-lg font-semibold">Resolution Report</h3>
+                <h3 id="report-title" class="text-lg font-semibold">Resolution Report</h3>
                 <p class="text-sm text-text-secondary mt-1">Results of the batch discrepancy resolution</p>
             </div>
             <div class="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
