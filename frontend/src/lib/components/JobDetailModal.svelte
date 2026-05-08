@@ -15,8 +15,8 @@
     let job = $state<AppApiCommonJobSchema | null>(null);
     let logs = $state<{ id: number; message: string; timestamp: string }[]>([]);
     let loading = $state(true);
-    let eventSource: EventSource | null = null;
-    let latestLogMessage = $state<string | null>(null);
+    let jobEventSource: EventSource | null = null;
+    let logsEventSource: EventSource | null = null;
 
     async function loadJob() {
         loading = true;
@@ -34,13 +34,13 @@
         }
     }
 
-    function connectSse() {
-        if (eventSource) return;
+    function connectJobSse() {
+        if (jobEventSource) return;
 
         const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001';
-        eventSource = new EventSource(`${apiUrl}/system/jobs/stream`);
+        jobEventSource = new EventSource(`${apiUrl}/system/jobs/stream`);
 
-        eventSource.onmessage = (event) => {
+        jobEventSource.onmessage = (event) => {
             try {
                 const jobs = JSON.parse(event.data) as Array<{
                     id: number;
@@ -49,7 +49,6 @@
                     progress: number;
                     current_task: string | null;
                     error_message: string | null;
-                    latest_log: string | null;
                     started_at: string | null;
                     created_at: string | null;
                 }>;
@@ -64,40 +63,76 @@
                     completed_at: (job as any)?.completed_at ?? null,
                 } as AppApiCommonJobSchema;
 
-                if (updated.latest_log && updated.latest_log !== latestLogMessage) {
-                    latestLogMessage = updated.latest_log;
-                    // Append to local log display so user sees new entries immediately
-                    logs = [
-                        ...logs,
-                        {
-                            id: Date.now(),
-                            message: updated.latest_log,
-                            timestamp: new Date().toISOString(),
-                        },
-                    ];
-                }
-
-                // Job finished — close SSE and refresh full logs one last time
+                // Job finished — close SSE
                 if (updated.status !== 'RUNNING' && updated.status !== 'PENDING') {
-                    closeSse();
-                    refreshLogs();
+                    closeJobSse();
                 }
             } catch (err) {
-                console.error('SSE parse error:', err);
+                console.error('Job SSE parse error:', err);
             }
         };
 
-        eventSource.onerror = (err) => {
-            console.error('SSE connection error:', err);
+        jobEventSource.onerror = (err) => {
+            console.error('Job SSE connection error:', err);
             // EventSource auto-reconnects; we only clean up on unmount
         };
     }
 
-    function closeSse() {
-        if (eventSource) {
-            eventSource.close();
-            eventSource = null;
+    function connectLogsSse() {
+        if (logsEventSource) return;
+
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001';
+        logsEventSource = new EventSource(`${apiUrl}/system/jobs/${jobId}/logs/stream`);
+
+        logsEventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+
+                // Check for completion signal
+                if (data.complete) {
+                    closeLogsSse();
+                    return;
+                }
+
+                // Check for error
+                if (data.error) {
+                    console.error('Logs SSE error:', data.error);
+                    closeLogsSse();
+                    return;
+                }
+
+                // Data is an array of log entries
+                if (Array.isArray(data) && data.length > 0) {
+                    logs = [...logs, ...data];
+                }
+            } catch (err) {
+                console.error('Logs SSE parse error:', err);
+            }
+        };
+
+        logsEventSource.onerror = (err) => {
+            console.error('Logs SSE connection error:', err);
+            // EventSource auto-reconnects; we only clean up on unmount
+        };
+    }
+
+    function closeJobSse() {
+        if (jobEventSource) {
+            jobEventSource.close();
+            jobEventSource = null;
         }
+    }
+
+    function closeLogsSse() {
+        if (logsEventSource) {
+            logsEventSource.close();
+            logsEventSource = null;
+        }
+    }
+
+    function closeAllSse() {
+        closeJobSse();
+        closeLogsSse();
     }
 
     async function refreshLogs() {
@@ -135,12 +170,13 @@
     // Start SSE once initial load is done and job is active
     $effect(() => {
         if (!loading && job && (job.status === 'RUNNING' || job.status === 'PENDING')) {
-            connectSse();
+            connectJobSse();
+            connectLogsSse();
         }
     });
 
     onDestroy(() => {
-        closeSse();
+        closeAllSse();
     });
 </script>
 

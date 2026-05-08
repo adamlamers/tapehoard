@@ -1458,6 +1458,34 @@ export type StreamJobsResponses = {
     200: unknown;
 };
 
+export type StreamJobLogsData = {
+    body?: never;
+    path: {
+        /**
+         * Job Id
+         */
+        job_id: number;
+    };
+    query?: never;
+    url: '/system/jobs/{job_id}/logs/stream';
+};
+
+export type StreamJobLogsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StreamJobLogsError = StreamJobLogsErrors[keyof StreamJobLogsErrors];
+
+export type StreamJobLogsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type GetJobData = {
     body?: never;
     path: {

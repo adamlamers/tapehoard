@@ -170,6 +170,60 @@ async def stream_jobs(request: Request):
     )
 
 
+# NOTE: /jobs/{job_id}/logs/stream MUST be registered BEFORE /jobs/{job_id}/logs
+# because FastAPI matches routes in definition order.
+@router.get("/jobs/{job_id}/logs/stream", operation_id="stream_job_logs")
+async def stream_job_logs(job_id: int, request: Request):
+    """Server-Sent Events (SSE) endpoint for real-time job log streaming."""
+    last_log_id = 0
+
+    async def event_generator():
+        nonlocal last_log_id
+        while not await request.is_disconnected():
+            with SessionLocal() as db_session:
+                # Check if job exists
+                job = db_session.get(models.Job, job_id)
+                if not job:
+                    yield f"data: {json.dumps({'error': 'Job not found'})}\n\n"
+                    return
+
+                # Get new logs since last check
+                logs = (
+                    db_session.query(models.JobLog)
+                    .filter(models.JobLog.job_id == job_id)
+                    .filter(models.JobLog.id > last_log_id)
+                    .order_by(models.JobLog.id.asc())
+                    .all()
+                )
+
+                if logs:
+                    last_log_id = logs[-1].id
+                    serialized_logs = [
+                        {
+                            "id": log.id,
+                            "message": log.message,
+                            "timestamp": log.timestamp.isoformat()
+                            if isinstance(log.timestamp, datetime)
+                            else log.timestamp,
+                        }
+                        for log in logs
+                    ]
+                    yield f"data: {json.dumps(serialized_logs)}\n\n"
+
+                # Stop streaming if job is finished
+                if job.status not in ["RUNNING", "PENDING"]:
+                    yield f"data: {json.dumps({'complete': True})}\n\n"
+                    return
+
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @router.get("/jobs/{job_id}", response_model=JobSchema, operation_id="get_job")
 def get_job(job_id: int, db_session: Session = Depends(get_db)):
     """Retrieves detailed metadata for a specific job."""
