@@ -114,6 +114,18 @@ def list_media(refresh: bool = False, db_session: Session = Depends(get_db)):
     """Returns all registered media assets with real-time hardware status."""
     from app.services.archiver import archiver_manager
 
+    # Skip live SCSI probes when a backup/restore job is running.  mt/sg_read_attr
+    # block on "Device or resource busy" and can take 15+ s per tape, starving the
+    # thread pool and making every other page slow.
+    has_active_job = (
+        db_session.query(models.Job)
+        .filter(
+            models.Job.status.in_(["PENDING", "RUNNING"]),
+            models.Job.is_cancelled.is_(False),
+        )
+        .first()
+    ) is not None
+
     media_assets = (
         db_session.query(models.StorageMedia)
         .order_by(models.StorageMedia.priority_index.asc())
@@ -131,36 +143,52 @@ def list_media(refresh: bool = False, db_session: Session = Depends(get_db)):
         live_info = None
 
         if provider:
-            is_online = provider.check_online(force=refresh)
-            try:
-                # Attempt to identify the media non-intrusively
-                # pass allow_intrusive=False if the provider supports it, otherwise default
-                import inspect
+            if (
+                has_active_job
+                and media.media_type == "lto_tape"
+                and hasattr(provider, "device_path")
+            ):
+                # Use cached state — no SCSI commands while drive is busy writing.
+                from app.providers.tape import LTOProvider
 
-                if (
-                    "allow_intrusive"
-                    in inspect.signature(provider.identify_media).parameters
-                ):
-                    detected_id = provider.identify_media(allow_intrusive=False)
-                else:
-                    detected_id = provider.identify_media()
+                live_info = LTOProvider.get_cached_live_info(provider.device_path)
+                is_online = live_info["online"]
+                identity = live_info.get("identity")
+                hardware_identified = bool(identity) and identity == media.identifier
+                needs_registration = False
+            else:
+                is_online = provider.check_online(force=refresh)
+                try:
+                    # Attempt to identify the media non-intrusively
+                    # pass allow_intrusive=False if the provider supports it, otherwise default
+                    import inspect
 
-                hardware_identified = detected_id == media.identifier
+                    if (
+                        "allow_intrusive"
+                        in inspect.signature(provider.identify_media).parameters
+                    ):
+                        detected_id = provider.identify_media(allow_intrusive=False)
+                    else:
+                        detected_id = provider.identify_media()
 
-                # Always populate live_info using the unified interface
-                live_info = provider.get_live_info(force=refresh)
-                needs_registration = live_info.get("needs_registration", False)
+                    hardware_identified = detected_id == media.identifier
 
-                # For HDD providers, also grab host-level capacity if possible
-                if is_online and media.media_type == "hdd":
-                    from app.providers.hdd import OfflineHDDProvider
+                    # Always populate live_info using the unified interface
+                    live_info = provider.get_live_info(force=refresh)
+                    needs_registration = live_info.get("needs_registration", False)
 
-                    if isinstance(provider, OfflineHDDProvider):
-                        usage = psutil.disk_usage(provider.mount_base)
-                        host_free_bytes = usage.free
-                        host_total_bytes = usage.total
-            except Exception as e:
-                logger.debug(f"Error populating live info for {media.identifier}: {e}")
+                    # For HDD providers, also grab host-level capacity if possible
+                    if is_online and media.media_type == "hdd":
+                        from app.providers.hdd import OfflineHDDProvider
+
+                        if isinstance(provider, OfflineHDDProvider):
+                            usage = psutil.disk_usage(provider.mount_base)
+                            host_free_bytes = usage.free
+                            host_total_bytes = usage.total
+                except Exception as e:
+                    logger.debug(
+                        f"Error populating live info for {media.identifier}: {e}"
+                    )
 
         # Parse config
         final_config = {}

@@ -74,6 +74,21 @@ class LTOProvider(AbstractStorageProvider):
                 "last_mam_check": 0.0,
             }
 
+    @classmethod
+    def get_cached_live_info(cls, device_path: str) -> Dict[str, Any]:
+        """Returns the last-known-good state for a device path without issuing any
+        SCSI commands.  Safe to call while a backup job is writing to the drive."""
+        lkg = cls._lkg_state.get(device_path, {})
+        mam = lkg.get("mam", {})
+        identity = mam.get("barcode") or mam.get("serial")
+        return {
+            "online": lkg.get("online", False),
+            "drive": lkg.get("drive", {}),
+            "tape": mam,
+            "identity": identity,
+            "needs_registration": False,
+        }
+
     def _log_command(self, cmd: List[str]):
         """Logs the exact command being sent to the hardware."""
         logger.debug(f"HARDWARE CMD: {' '.join(cmd)}")

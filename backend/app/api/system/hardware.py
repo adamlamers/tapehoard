@@ -20,6 +20,17 @@ def discover_hardware(db_session: Session = Depends(get_db)):
     """Polls host hardware and mount points to discover unregistered storage media."""
     discovered_nodes = []
 
+    # If a backup/restore job is active, skip blocking SCSI commands (mt/sg_read_attr
+    # retry on "Device or resource busy" for up to 60 s and would stall this endpoint).
+    has_active_job = (
+        db_session.query(models.Job)
+        .filter(
+            models.Job.status.in_(["PENDING", "RUNNING"]),
+            models.Job.is_cancelled.is_(False),
+        )
+        .first()
+    ) is not None
+
     # Load Ignore List
     ignored_record = (
         db_session.query(models.SystemSetting)
@@ -41,7 +52,11 @@ def discover_hardware(db_session: Session = Depends(get_db)):
                 from app.providers.tape import LTOProvider
 
                 tape_provider = LTOProvider(config={"device_path": dev_path})
-                state = tape_provider.get_live_info()
+                state = (
+                    LTOProvider.get_cached_live_info(dev_path)
+                    if has_active_job
+                    else tape_provider.get_live_info()
+                )
 
                 if state["online"]:
                     barcode = state["identity"]
@@ -69,9 +84,11 @@ def discover_hardware(db_session: Session = Depends(get_db)):
                             is not None
                         )
 
-                    # Get current file number if tape is loaded
+                    # Get current file number if tape is loaded and no job is active.
+                    # Skipped when a job runs because _get_current_file_number() retries
+                    # "Device or resource busy" for up to 60 s and would stall discovery.
                     file_number = None
-                    if state["tape"]:
+                    if state["tape"] and not has_active_job:
                         try:
                             file_number_str = tape_provider._get_current_file_number()
                             file_number = int(file_number_str)
