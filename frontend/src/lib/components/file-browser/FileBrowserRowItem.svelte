@@ -15,10 +15,12 @@
 			Square,
 			EyeOff,
 			Trash2,
-			AlertTriangle
+			AlertTriangle,
+			FolderOpen
         } from "lucide-svelte";
         import { Checkbox } from "$lib/components/ui/checkbox";
         import { Button } from "$lib/components/ui/button";
+        import ContextMenu from "$lib/components/ui/ContextMenu.svelte";
         import type { FileItem } from "$lib/types";
         import { cn, formatSize } from "$lib/utils";
 
@@ -32,6 +34,7 @@
                 onToggleSelect = () => {},
                 onAddToCart = () => {},
                 onDelete = () => {},
+                onOpenLocation = () => {},
                 mode = "host",
                 colWidths = { mtime: 200, type: 150, size: 120 }
         } = $props<{
@@ -44,9 +47,21 @@
                 onToggleSelect?: () => void;
                 onAddToCart?: () => void;
                 onDelete?: () => void;
+                onOpenLocation?: () => void;
                 mode?: "host" | "index" | "live" | "cart" | "discrepancies";
                 colWidths?: { mtime: number; type: number; size: number };
         }>();
+
+        let contextMenuShow = $state(false);
+        let contextMenuX = $state(0);
+        let contextMenuY = $state(0);
+
+        function handleContextMenu(e: MouseEvent) {
+                e.preventDefault();
+                contextMenuX = e.clientX;
+                contextMenuY = e.clientY;
+                contextMenuShow = true;
+        }
 
         const FileIcon = $derived.by(() => {
                 if (item.type === "directory") return Folder;
@@ -124,7 +139,19 @@
         onclick={onClick}
         ondblclick={(e) => { e.stopPropagation(); onDoubleClick(); }}
         onkeydown={(e) => e.key === "Enter" && onDoubleClick()}
+        oncontextmenu={handleContextMenu}
 >
+        <ContextMenu x={contextMenuX} y={contextMenuY} bind:show={contextMenuShow}>
+                <div class="flex flex-col gap-0.5">
+                        <button
+                                class="flex items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-white/5 rounded-lg transition-colors text-left"
+                                onclick={() => { contextMenuShow = false; onOpenLocation(); }}
+                        >
+                                <FolderOpen size={16} class="text-text-secondary" />
+                                Open file location
+                        </button>
+                </div>
+        </ContextMenu>
         <!-- SELECTION CHECKBOX -->
         <div
                 class="flex h-10 w-12 shrink-0 items-center justify-center border-r border-border-color/10"

@@ -148,14 +148,7 @@ def test_search_index(client, db_session):
     )
     db_session.commit()
 
-    # Manually insert into FTS5 since triggers may not fire on ORM inserts in tests
-    from sqlalchemy import text
-
-    db_session.execute(
-        text("INSERT INTO filesystem_fts(rowid, file_path) VALUES (:rowid, :path)"),
-        {"rowid": file1.id, "path": file1.file_path},
-    )
-    db_session.commit()
+    # Triggers automatically populate filesystem_fts, no manual insert needed
 
     response = client.get("/archive/search?q=important")
     assert response.status_code == 200
@@ -290,14 +283,7 @@ def test_search_shows_partially_archived(client, db_session):
     )
     db_session.commit()
 
-    # Manually insert into FTS5 since triggers may not fire on ORM inserts in tests
-    from sqlalchemy import text
-
-    db_session.execute(
-        text("INSERT INTO filesystem_fts(rowid, file_path) VALUES (:rowid, :path)"),
-        {"rowid": file1.id, "path": file1.file_path},
-    )
-    db_session.commit()
+    # Triggers automatically populate filesystem_fts, no manual insert needed
 
     response = client.get("/archive/search?q=partial")
     assert response.status_code == 200

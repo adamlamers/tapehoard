@@ -60,6 +60,21 @@
         let sortColumn = $state<"name" | "size" | "mtime" | "type">("name");
         let sortDirection = $state<"asc" | "desc">("asc");
 
+        // --- Breadcrumbs Scroll ---
+        let breadcrumbsContainer = $state<HTMLElement | null>(null);
+
+        // Scroll breadcrumbs to the right when path changes
+        $effect(() => {
+                // Access currentPath to trigger effect when navigation happens
+                const _ = currentPath;
+                if (breadcrumbsContainer) {
+                        // Use setTimeout to ensure DOM has updated
+                        setTimeout(() => {
+                                breadcrumbsContainer!.scrollLeft = breadcrumbsContainer!.scrollWidth;
+                        }, 0);
+                }
+        });
+
         // --- Navigation History ---
         let navigationHistory = $state<string[]>([currentPath]);
         let historyIndex = $state(0);
@@ -253,7 +268,11 @@
         });
 
 	const filteredFiles = $derived.by(() => {
-		let result = files.filter((f: FileItem) => f.path.toLowerCase().includes((searchQuery || "").toLowerCase()));
+		// When searching (query >= 3 chars), trust the API results - don't filter locally.
+		// When not searching (browse mode), also trust the API results which returns
+		// the current directory contents. Local filtering is disabled because it can
+		// incorrectly filter search results when transitioning back to browse mode.
+		let result = files;
 
 		// Deduplicate by path to prevent keyed each block errors
 		const seen = new Set<string>();
@@ -500,7 +519,10 @@
                                                 onblur={() => setTimeout(() => isEditingPath = false, 100)}
                                         />
                                 {:else}
-                                        <div class="flex-1 flex items-center overflow-x-auto scrollbar-hide">
+                                        <div
+                                                bind:this={breadcrumbsContainer}
+                                                class="flex-1 flex items-center overflow-x-auto scrollbar-hide"
+                                        >
                                                 {#each breadcrumbs as crumb, i}
                                                         {#if i > 0}
                                                                 <ChevronRight size={14} class="mx-1 text-text-secondary/30 shrink-0"></ChevronRight>
@@ -665,6 +687,13 @@
                                                                         onToggleSelect={() => handleToggleItem(item)}
                                                                         onAddToCart={() => onAddToCart(item)}
                                                                         onDelete={() => onDelete(item)}
+                                                                        onOpenLocation={() => {
+                                                                                // Navigate to parent directory of the file
+                                                                                const parts = item.path.split('/').filter(Boolean);
+                                                                                parts.pop(); // Remove the file/directory name
+                                                                                const parentPath = parts.length === 0 ? 'ROOT' : '/' + parts.join('/');
+                                                                                navigateTo(parentPath);
+                                                                        }}
                                                                 />
                                                         {/each}
                                                 {/if}

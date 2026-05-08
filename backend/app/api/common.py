@@ -146,12 +146,19 @@ def escape_fts5_query(query: str) -> str:
 
     FTS5 has special syntax characters that cause errors if not escaped:
     - Double quotes need to be doubled (" becomes "")
-    - The query is wrapped in double quotes to treat it as a literal phrase
+    - Leading dots, hyphens, etc. have special meaning
+    - Asterisk (*) enables prefix matching when outside quotes
+    - The trigram tokenizer works best with literal phrase matching
+
+    Returns a query that will match any file path containing the search term.
     """
     # Escape double quotes by doubling them
     escaped = query.replace('"', '""')
-    # Wrap in double quotes for literal phrase search
-    return f'"{escaped}"'
+
+    # Always wrap in double quotes for literal matching
+    # This treats special characters (., -, etc.) as literals
+    # The * after the closing quote enables prefix matching
+    return f'"{escaped}"*'
 
 
 # --- Shared Schemas ---
