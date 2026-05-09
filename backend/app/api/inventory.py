@@ -113,6 +113,7 @@ def list_providers():
 def list_media(refresh: bool = False, db_session: Session = Depends(get_db)):
     """Returns all registered media assets with real-time hardware status."""
     from app.services.archiver import archiver_manager
+    from app.providers.tape import LTOProvider
 
     # Skip live SCSI probes when a backup/restore job is running.  mt/sg_read_attr
     # block on "Device or resource busy" and can take 15+ s per tape, starving the
@@ -131,6 +132,35 @@ def list_media(refresh: bool = False, db_session: Session = Depends(get_db)):
         .order_by(models.StorageMedia.priority_index.asc())
         .all()
     )
+
+    # Build a drive-scan map once for ALL configured tape drives so tape status is
+    # not tied to the drive recorded in extra_config.  A tape can live in any drive.
+    drive_record = (
+        db_session.query(models.SystemSetting)
+        .filter(models.SystemSetting.key == "tape_drives")
+        .first()
+    )
+    configured_drives: list = json.loads(drive_record.value) if drive_record else []
+
+    # identity → {"device_path": str, "state": live_info_dict}
+    tape_location_map: Dict[str, Any] = {}
+    for drive_path in configured_drives:
+        try:
+            if has_active_job:
+                state = LTOProvider.get_cached_live_info(drive_path)
+            else:
+                tape_prov = LTOProvider(config={"device_path": drive_path})
+                state = tape_prov.get_live_info(force=refresh)
+
+            identity = state.get("identity")
+            if state.get("online") and identity:
+                tape_location_map[identity] = {
+                    "device_path": drive_path,
+                    "state": state,
+                }
+        except Exception as e:
+            logger.debug(f"Drive scan failed for {drive_path}: {e}")
+
     results = []
 
     for media in media_assets:
@@ -143,25 +173,19 @@ def list_media(refresh: bool = False, db_session: Session = Depends(get_db)):
         live_info = None
 
         if provider:
-            from app.providers.tape import LTOProvider
-
-            if (
-                has_active_job
-                and isinstance(provider, LTOProvider)
-                and hasattr(provider, "device_path")
-            ):
-                # Use cached state — no SCSI commands while drive is busy writing.
-
-                live_info = LTOProvider.get_cached_live_info(provider.device_path)
-                is_online = live_info["online"]
-                identity = live_info.get("identity")
-                hardware_identified = bool(identity) and identity == media.identifier
-                needs_registration = False
+            if isinstance(provider, LTOProvider):
+                # Tape: look up in the all-drives map. A confirmed identity match
+                # means this exact tape is currently loaded in some drive.
+                location = tape_location_map.get(media.identifier)
+                if location:
+                    is_online = True
+                    hardware_identified = True
+                    live_info = location["state"]
+                    needs_registration = live_info.get("needs_registration", False)
+                # else: tape is not in any configured drive → is_online stays False
             else:
                 is_online = provider.check_online(force=refresh)
                 try:
-                    # Attempt to identify the media non-intrusively
-                    # pass allow_intrusive=False if the provider supports it, otherwise default
                     import inspect
 
                     if (
@@ -173,8 +197,6 @@ def list_media(refresh: bool = False, db_session: Session = Depends(get_db)):
                         detected_id = provider.identify_media()
 
                     hardware_identified = detected_id == media.identifier
-
-                    # Always populate live_info using the unified interface
                     live_info = provider.get_live_info(force=refresh)
                     needs_registration = live_info.get("needs_registration", False)
 

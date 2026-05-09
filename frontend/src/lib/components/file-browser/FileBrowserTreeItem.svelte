@@ -105,7 +105,13 @@
                 return HardDrive;
         });
 
-        const hasSubdirs = $derived((children && children.length > 0) || node.hasChildren);
+        // Once loaded, trust the actual children list. Before loading, trust node.hasChildren
+        // so we can show the arrow optimistically without waiting for the lazy fetch.
+        const hasSubdirs = $derived(
+            loaded
+                ? children.length > 0
+                : (children.length > 0 || !!node.hasChildren)
+        );
 </script>
 
 <div class="tree-item-group">
