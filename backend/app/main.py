@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from loguru import logger
 
-from app.api import archive, backups, inventory, restores
+from app.api import archive, backups, inventory, oauth, restores
 from app.api.system import (
     dashboard,
     database,
@@ -75,6 +75,7 @@ app.include_router(inventory.router)
 app.include_router(archive.router)
 app.include_router(backups.router)
 app.include_router(restores.router)
+app.include_router(oauth.router)
 
 # --- Frontend Static File Serving ---
 

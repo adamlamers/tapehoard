@@ -1,39 +1,9 @@
-import hashlib
-import json
 import boto3
-import os
 import io
 from typing import Optional, BinaryIO, Dict, Any
 from .base import AbstractStorageProvider
+from .encryption import get_secret, encrypt, decrypt, obfuscated_name
 from loguru import logger
-
-# Modern high-performance encryption via PyCryptodome
-from Crypto.Cipher import AES
-from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Hash import SHA256
-
-
-# Keystore helpers (avoid circular imports)
-def _get_secret(name: str) -> Optional[str]:
-    """Look up a secret value from the settings keystore by name."""
-    if not name:
-        return None
-    try:
-        from app.db.database import SessionLocal
-        from app.db import models
-
-        with SessionLocal() as db_session:
-            record = (
-                db_session.query(models.SystemSetting)
-                .filter(models.SystemSetting.key == "secrets")
-                .first()
-            )
-            if record and record.value:
-                secrets = json.loads(record.value)
-                return secrets.get(name)
-    except Exception:
-        pass
-    return None
 
 
 class CloudStorageProvider(AbstractStorageProvider):
@@ -117,18 +87,13 @@ class CloudStorageProvider(AbstractStorageProvider):
         self.obfuscate = config.get("obfuscate_filenames", False)
 
         # Resolve encryption passphrase from keystore (no global fallback)
-        encryption_secret_name = config.get("encryption_secret_name")
-        self.passphrase = (
-            _get_secret(encryption_secret_name) if encryption_secret_name else None
-        )
+        self.passphrase = get_secret(config.get("encryption_secret_name"))
 
         # Resolve credentials from keystore
         access_key = config.get("access_key")
         secret_key_name = config.get("secret_access_key_name")
         secret_key = (
-            _get_secret(secret_key_name)
-            if secret_key_name
-            else config.get("secret_key")
+            get_secret(secret_key_name) if secret_key_name else config.get("secret_key")
         )
 
         client_kwargs = {
@@ -141,24 +106,10 @@ class CloudStorageProvider(AbstractStorageProvider):
 
         self.s3 = boto3.client("s3", **client_kwargs)
 
-    def _derive_key(self, salt: bytes) -> bytes:
-        """Derives a 256-bit AES key using PBKDF2-HMAC-SHA256"""
-        if not self.passphrase:
-            raise ValueError("No encryption passphrase configured")
-
-        return PBKDF2(
-            self.passphrase, salt, dkLen=32, count=100000, hmac_hash_module=SHA256
-        )
-
     def _get_obfuscated_key(self, prefix: str, path: str) -> str:
-        """Returns a hashed version of the filename if obfuscation is enabled."""
         if not self.obfuscate:
             return f"{prefix}/{path.lstrip('./')}"
-
-        # We hash the path to hide metadata while keeping it deterministic
-        hashed = hashlib.sha256(path.encode("utf-8")).hexdigest()
-        # Use two-level sharding to prevent S3 prefix performance issues with 100k+ files
-        return f"{prefix}/{hashed[:2]}/{hashed[2:4]}/{hashed}"
+        return f"{prefix}/{obfuscated_name(path)}"
 
     def get_name(self) -> str:
         return f"Cloud ({self.provider_type})"
@@ -222,43 +173,23 @@ class CloudStorageProvider(AbstractStorageProvider):
         return self.identify_media() == media_id
 
     def write_archive(self, media_id: str, stream: BinaryIO) -> str:
-        """
-        Encrypts data with AES-256-GCM before upload.
-        Format: [Salt (16)] + [Nonce (12)] + [Tag (16)] + [Ciphertext]
-        """
         import uuid
 
-        # Archives are always obfuscated by UUID for privacy and collision avoidance
         raw_key = f"archives/{uuid.uuid4().hex}.tar"
         object_key = self._get_obfuscated_key("archives", raw_key)
+        data = stream.read()
 
         if self.passphrase:
             logger.info(
                 f"Uploading AES-256-GCM archive to {self.bucket_name}/{object_key}"
             )
-
-            # 1. Setup crypto artifacts
-            salt = os.urandom(16)
-            nonce = os.urandom(12)
-            key = self._derive_key(salt)
-
-            # 2. Encrypt
-            cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
-            data = stream.read()
-            ciphertext, tag = cipher.encrypt_and_digest(data)
-
-            # 3. Concatenate and upload
-            payload = salt + nonce + tag + ciphertext
-
+            payload = encrypt(self.passphrase, data)
             try:
                 self.s3.put_object(
                     Bucket=self.bucket_name,
                     Key=object_key,
                     Body=payload,
-                    Metadata={
-                        "x-amz-meta-tapehoard-encrypted": "v2-gcm",
-                        "x-amz-meta-tapehoard-type": "archive",
-                    },
+                    Metadata={"x-amz-meta-tapehoard-encrypted": "v2-gcm"},
                 )
                 return object_key
             except Exception as e:
@@ -267,7 +198,7 @@ class CloudStorageProvider(AbstractStorageProvider):
         else:
             logger.info(f"Uploading plain archive to {self.bucket_name}/{object_key}")
             try:
-                self.s3.upload_fileobj(stream, self.bucket_name, object_key)
+                self.s3.upload_fileobj(io.BytesIO(data), self.bucket_name, object_key)
                 return object_key
             except Exception as e:
                 logger.error(f"Cloud upload failed: {e}")
@@ -276,38 +207,20 @@ class CloudStorageProvider(AbstractStorageProvider):
     def write_file_direct(
         self, media_id: str, relative_path: str, stream: BinaryIO
     ) -> str:
-        """
-        Uploads a single file directly to the cloud.
-        """
         object_key = self._get_obfuscated_key("objects", relative_path)
+        data = stream.read()
 
         if self.passphrase:
             logger.info(
                 f"Uploading AES-256-GCM object to {self.bucket_name}/{object_key}"
             )
-
-            # 1. Setup crypto artifacts
-            salt = os.urandom(16)
-            nonce = os.urandom(12)
-            key = self._derive_key(salt)
-
-            # 2. Encrypt
-            cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
-            data = stream.read()
-            ciphertext, tag = cipher.encrypt_and_digest(data)
-
-            # 3. Concatenate and upload
-            payload = salt + nonce + tag + ciphertext
-
+            payload = encrypt(self.passphrase, data)
             try:
                 self.s3.put_object(
                     Bucket=self.bucket_name,
                     Key=object_key,
                     Body=payload,
-                    Metadata={
-                        "x-amz-meta-tapehoard-encrypted": "v2-gcm",
-                        "x-amz-meta-tapehoard-type": "object",
-                    },
+                    Metadata={"x-amz-meta-tapehoard-encrypted": "v2-gcm"},
                 )
                 return object_key
             except Exception as e:
@@ -316,14 +229,13 @@ class CloudStorageProvider(AbstractStorageProvider):
         else:
             logger.info(f"Uploading plain object to {self.bucket_name}/{object_key}")
             try:
-                self.s3.upload_fileobj(stream, self.bucket_name, object_key)
+                self.s3.upload_fileobj(io.BytesIO(data), self.bucket_name, object_key)
                 return object_key
             except Exception as e:
                 logger.error(f"Cloud object upload failed: {e}")
                 raise
 
     def read_archive(self, media_id: str, location_id: str) -> BinaryIO:
-        """Retrieves and decrypts an AES-GCM archive"""
         response = self.s3.get_object(Bucket=self.bucket_name, Key=location_id)
         raw_payload = response["Body"].read()
 
@@ -335,20 +247,8 @@ class CloudStorageProvider(AbstractStorageProvider):
 
         if is_encrypted:
             logger.info(f"Decrypting AES-GCM cloud archive: {location_id}")
-
-            # Extract artifacts from payload
-            salt = raw_payload[:16]
-            nonce = raw_payload[16:28]
-            tag = raw_payload[28:44]
-            ciphertext = raw_payload[44:]
-
-            # Derive key and decrypt
-            key = self._derive_key(salt)
-            cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
-
             try:
-                decrypted_data = cipher.decrypt_and_verify(ciphertext, tag)
-                return io.BytesIO(decrypted_data)
+                return io.BytesIO(decrypt(self.passphrase, raw_payload))
             except ValueError as e:
                 logger.error(f"Decryption failed (MAC mismatch): {e}")
                 raise ValueError(

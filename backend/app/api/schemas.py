@@ -110,9 +110,34 @@ class CloudCreateSchema(MediaBaseSchema):
     encryption_secret_name: Optional[str] = None
 
 
+class GoogleDriveCreateSchema(MediaBaseSchema):
+    """Schema for creating a Google Drive media target."""
+
+    media_type: Literal["google_drive"] = "google_drive"
+    credential_key: str  # oauth_cred_google_drive_* key in SystemSetting
+    encryption_secret_name: Optional[str] = None
+    obfuscate_filenames: bool = False
+
+
+class DropboxCreateSchema(MediaBaseSchema):
+    """Schema for creating a Dropbox media target."""
+
+    media_type: Literal["dropbox"] = "dropbox"
+    credential_key: str  # oauth_cred_dropbox_* key in SystemSetting
+    root_folder: Optional[str] = None  # defaults to /TapeHoard/{identifier}
+    encryption_secret_name: Optional[str] = None
+    obfuscate_filenames: bool = False
+
+
 # Discriminated union type for creating media
 # Uses media_type field to route to the correct type-specific schema
-MediaCreateSchema = LtoTapeCreateSchema | OfflineHddCreateSchema | CloudCreateSchema
+MediaCreateSchema = (
+    LtoTapeCreateSchema
+    | OfflineHddCreateSchema
+    | CloudCreateSchema
+    | GoogleDriveCreateSchema
+    | DropboxCreateSchema
+)
 
 
 class MediaUpdateSchema(BaseModel):

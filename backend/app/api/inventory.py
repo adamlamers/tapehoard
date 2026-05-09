@@ -87,10 +87,18 @@ def list_providers():
     import os
 
     from app.providers.cloud import CloudStorageProvider
+    from app.providers.dropbox_provider import DropboxProvider
+    from app.providers.google_drive import GoogleDriveProvider
     from app.providers.hdd import OfflineHDDProvider
     from app.providers.tape import LTOProvider
 
-    providers = [LTOProvider, OfflineHDDProvider, CloudStorageProvider]
+    providers = [
+        LTOProvider,
+        OfflineHDDProvider,
+        CloudStorageProvider,
+        GoogleDriveProvider,
+        DropboxProvider,
+    ]
 
     if os.environ.get("TAPEHOARD_TEST_MODE") == "true":
         from app.providers.mock import MockLTOProvider
@@ -413,6 +421,30 @@ def create_media(
         new_media.max_part_size_mb = request_data.max_part_size_mb
         new_media.obfuscate_filenames = request_data.obfuscate_filenames
         new_media.encryption_secret_name = request_data.encryption_secret_name
+    elif request_data.media_type == "google_drive":
+        assert isinstance(request_data, schemas.GoogleDriveCreateSchema)
+        gdrive_config: dict = {"credential_key": request_data.credential_key}
+        if request_data.encryption_secret_name:
+            gdrive_config["encryption_secret_name"] = (
+                request_data.encryption_secret_name
+            )
+        if request_data.obfuscate_filenames:
+            gdrive_config["obfuscate_filenames"] = True
+        new_media.extra_config = json.dumps(gdrive_config)
+        new_media.encryption_secret_name = request_data.encryption_secret_name
+        new_media.obfuscate_filenames = request_data.obfuscate_filenames
+    elif request_data.media_type == "dropbox":
+        assert isinstance(request_data, schemas.DropboxCreateSchema)
+        dbx_config: dict = {"credential_key": request_data.credential_key}
+        if request_data.root_folder:
+            dbx_config["root_folder"] = request_data.root_folder
+        if request_data.encryption_secret_name:
+            dbx_config["encryption_secret_name"] = request_data.encryption_secret_name
+        if request_data.obfuscate_filenames:
+            dbx_config["obfuscate_filenames"] = True
+        new_media.extra_config = json.dumps(dbx_config)
+        new_media.encryption_secret_name = request_data.encryption_secret_name
+        new_media.obfuscate_filenames = request_data.obfuscate_filenames
 
     db_session.add(new_media)
     db_session.commit()
@@ -599,16 +631,28 @@ def initialize_media(
 
     try:
         if storage_provider.initialize_media(media_record.identifier):
-            # Persist auto-generated device_path to DB so archiver finds the same dir
+            current_config = (
+                json.loads(media_record.extra_config)
+                if media_record.extra_config
+                else {}
+            )
             if media_record.media_type == "s3_compat":
-                # Cloud providers don't have device_path
                 pass
+            elif media_record.media_type == "google_drive":
+                from app.providers.google_drive import GoogleDriveProvider
+
+                if isinstance(storage_provider, GoogleDriveProvider):
+                    current_config["folder_id"] = storage_provider.folder_id
+                    media_record.extra_config = json.dumps(current_config)
+                    db_session.commit()
+            elif media_record.media_type == "dropbox":
+                from app.providers.dropbox_provider import DropboxProvider
+
+                if isinstance(storage_provider, DropboxProvider):
+                    current_config["root_folder"] = storage_provider.root_folder
+                    media_record.extra_config = json.dumps(current_config)
+                    db_session.commit()
             else:
-                current_config = (
-                    json.loads(media_record.extra_config)
-                    if media_record.extra_config
-                    else {}
-                )
                 if "device_path" not in current_config:
                     current_config["device_path"] = storage_provider.device_path
                     media_record.extra_config = json.dumps(current_config)

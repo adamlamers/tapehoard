@@ -349,6 +349,62 @@ export type DiscrepancySchema = {
 };
 
 /**
+ * DropboxCreateSchema
+ *
+ * Schema for creating a Dropbox media target.
+ */
+export type DropboxCreateSchema = {
+    /**
+     * Identifier
+     */
+    identifier: string;
+    /**
+     * Media Type
+     */
+    media_type?: 'dropbox';
+    /**
+     * Capacity
+     */
+    capacity: number;
+    /**
+     * Location
+     */
+    location?: string | null;
+    /**
+     * Location Building
+     */
+    location_building?: string | null;
+    /**
+     * Location Room
+     */
+    location_room?: string | null;
+    /**
+     * Location Rack
+     */
+    location_rack?: string | null;
+    /**
+     * Location Slot
+     */
+    location_slot?: string | null;
+    /**
+     * Credential Key
+     */
+    credential_key: string;
+    /**
+     * Root Folder
+     */
+    root_folder?: string | null;
+    /**
+     * Encryption Secret Name
+     */
+    encryption_secret_name?: string | null;
+    /**
+     * Obfuscate Filenames
+     */
+    obfuscate_filenames?: boolean;
+};
+
+/**
  * FileItemSchema
  */
 export type FileItemSchema = {
@@ -380,6 +436,58 @@ export type FileItemSchema = {
      * Sha256 Hash
      */
     sha256_hash?: string | null;
+};
+
+/**
+ * GoogleDriveCreateSchema
+ *
+ * Schema for creating a Google Drive media target.
+ */
+export type GoogleDriveCreateSchema = {
+    /**
+     * Identifier
+     */
+    identifier: string;
+    /**
+     * Media Type
+     */
+    media_type?: 'google_drive';
+    /**
+     * Capacity
+     */
+    capacity: number;
+    /**
+     * Location
+     */
+    location?: string | null;
+    /**
+     * Location Building
+     */
+    location_building?: string | null;
+    /**
+     * Location Room
+     */
+    location_room?: string | null;
+    /**
+     * Location Rack
+     */
+    location_rack?: string | null;
+    /**
+     * Location Slot
+     */
+    location_slot?: string | null;
+    /**
+     * Credential Key
+     */
+    credential_key: string;
+    /**
+     * Encryption Secret Name
+     */
+    encryption_secret_name?: string | null;
+    /**
+     * Obfuscate Filenames
+     */
+    obfuscate_filenames?: boolean;
 };
 
 /**
@@ -985,6 +1093,28 @@ export type OfflineHddCreateSchema = {
 };
 
 /**
+ * PollResponse
+ */
+export type PollResponse = {
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Credential Key
+     */
+    credential_key?: string | null;
+    /**
+     * Email
+     */
+    email?: string | null;
+    /**
+     * Error
+     */
+    error?: string | null;
+};
+
+/**
  * ReorderMediaRequest
  */
 export type ReorderMediaRequest = {
@@ -1130,6 +1260,20 @@ export type StagingInfoSchema = {
      * Free Bytes
      */
     free_bytes: number;
+};
+
+/**
+ * StartResponse
+ */
+export type StartResponse = {
+    /**
+     * Auth Url
+     */
+    auth_url: string;
+    /**
+     * State
+     */
+    state: string;
 };
 
 /**
@@ -1956,34 +2100,6 @@ export type CreateSecretResponses = {
     200: unknown;
 };
 
-export type GetSecretData = {
-    body?: never;
-    path: {
-        /**
-         * Name
-         */
-        name: string;
-    };
-    query?: never;
-    url: '/system/secrets/{name}';
-};
-
-export type GetSecretErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetSecretError = GetSecretErrors[keyof GetSecretErrors];
-
-export type GetSecretResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
 export type TestNotificationData = {
     body: TestNotificationRequest;
     path?: never;
@@ -2599,7 +2715,7 @@ export type CreateMediaData = {
     /**
      * Request Data
      */
-    body: LtoTapeCreateSchema | OfflineHddCreateSchema | CloudCreateSchema;
+    body: LtoTapeCreateSchema | OfflineHddCreateSchema | CloudCreateSchema | GoogleDriveCreateSchema | DropboxCreateSchema;
     path?: never;
     query?: never;
     url: '/inventory/media';
@@ -3197,6 +3313,146 @@ export type GetRestoreQueueTreeResponses = {
 };
 
 export type GetRestoreQueueTreeResponse = GetRestoreQueueTreeResponses[keyof GetRestoreQueueTreeResponses];
+
+export type OauthStartData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Provider
+         */
+        provider: string;
+    };
+    url: '/oauth/start';
+};
+
+export type OauthStartErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OauthStartError = OauthStartErrors[keyof OauthStartErrors];
+
+export type OauthStartResponses = {
+    /**
+     * Successful Response
+     */
+    200: StartResponse;
+};
+
+export type OauthStartResponse = OauthStartResponses[keyof OauthStartResponses];
+
+export type OauthCallbackData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Code
+         */
+        code?: string | null;
+        /**
+         * State
+         */
+        state?: string | null;
+        /**
+         * Error
+         */
+        error?: string | null;
+    };
+    url: '/oauth/callback';
+};
+
+export type OauthCallbackErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OauthCallbackError = OauthCallbackErrors[keyof OauthCallbackErrors];
+
+export type OauthCallbackResponses = {
+    /**
+     * Successful Response
+     */
+    200: string;
+};
+
+export type OauthCallbackResponse = OauthCallbackResponses[keyof OauthCallbackResponses];
+
+export type OauthPollData = {
+    body?: never;
+    path: {
+        /**
+         * State
+         */
+        state: string;
+    };
+    query?: never;
+    url: '/oauth/poll/{state}';
+};
+
+export type OauthPollErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OauthPollError = OauthPollErrors[keyof OauthPollErrors];
+
+export type OauthPollResponses = {
+    /**
+     * Successful Response
+     */
+    200: PollResponse;
+};
+
+export type OauthPollResponse = OauthPollResponses[keyof OauthPollResponses];
+
+export type ListOauthCredentialsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/oauth/credentials';
+};
+
+export type ListOauthCredentialsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type DeleteOauthCredentialData = {
+    body?: never;
+    path: {
+        /**
+         * Key
+         */
+        key: string;
+    };
+    query?: never;
+    url: '/oauth/credentials/{key}';
+};
+
+export type DeleteOauthCredentialErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteOauthCredentialError = DeleteOauthCredentialErrors[keyof DeleteOauthCredentialErrors];
+
+export type DeleteOauthCredentialResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type CheckHealthData = {
     body?: never;

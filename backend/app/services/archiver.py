@@ -16,6 +16,8 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from app.db import models
 from app.providers.cloud import CloudStorageProvider
+from app.providers.dropbox_provider import DropboxProvider
+from app.providers.google_drive import GoogleDriveProvider
 from app.providers.hdd import OfflineHDDProvider
 from app.providers.tape import LTOProvider
 from app.services.scanner import JobManager
@@ -96,6 +98,8 @@ class ArchiverService:
             LTOProvider.provider_id: LTOProvider,
             OfflineHDDProvider.provider_id: OfflineHDDProvider,
             CloudStorageProvider.provider_id: CloudStorageProvider,
+            GoogleDriveProvider.provider_id: GoogleDriveProvider,
+            DropboxProvider.provider_id: DropboxProvider,
             # Backwards compatibility for legacy DB records
             "tape": LTOProvider,
             "hdd": OfflineHDDProvider,
@@ -165,6 +169,7 @@ class ArchiverService:
             provider_config.setdefault(
                 "obfuscate_filenames", media_record.obfuscate_filenames
             )
+        # google_drive and dropbox store all config in extra_config — already loaded above
 
         return provider_cls(config=provider_config)
 

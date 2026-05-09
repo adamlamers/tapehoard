@@ -128,8 +128,79 @@
         storage_class: '',
         max_part_size_mb: 5000,
         obfuscate_filenames: false,
-        encryption_secret_name: ''
+        encryption_secret_name: '',
+        // OAuth provider fields (google_drive / dropbox)
+        credential_key: '',
+        oauth_email: '',
+        oauth_state: '',
+        oauth_polling: false,
+        root_folder: ''
     });
+
+    let oauthPopup: Window | null = null;
+    let oauthPollTimer: ReturnType<typeof setInterval> | null = null;
+
+    async function startOAuth(provider: 'google_drive' | 'dropbox') {
+        try {
+            const res = await fetch(`/oauth/start?provider=${provider}`);
+            if (!res.ok) {
+                const err = await res.json();
+                toast.error(err.detail || 'OAuth start failed');
+                return;
+            }
+            const { auth_url, state } = await res.json();
+            newMedia.oauth_state = state;
+            newMedia.oauth_polling = true;
+            newMedia.oauth_email = '';
+            newMedia.credential_key = '';
+
+            oauthPopup = window.open(auth_url, 'tapehoard_oauth', 'width=600,height=700,left=300,top=100');
+
+            // Listen for postMessage from the callback page
+            const handleMessage = (event: MessageEvent) => {
+                if (event.data?.tapehoard_oauth) {
+                    const { credential_key, email, error } = event.data.tapehoard_oauth;
+                    if (error) {
+                        toast.error(`OAuth error: ${error}`);
+                        newMedia.oauth_polling = false;
+                    } else {
+                        newMedia.credential_key = credential_key;
+                        newMedia.oauth_email = email;
+                        newMedia.oauth_polling = false;
+                        toast.success(`Connected as ${email}`);
+                    }
+                    window.removeEventListener('message', handleMessage);
+                    if (oauthPollTimer) { clearInterval(oauthPollTimer); oauthPollTimer = null; }
+                }
+            };
+            window.addEventListener('message', handleMessage);
+
+            // Fallback polling in case postMessage is blocked
+            oauthPollTimer = setInterval(async () => {
+                if (!newMedia.oauth_polling) { clearInterval(oauthPollTimer!); oauthPollTimer = null; return; }
+                try {
+                    const pr = await fetch(`/oauth/poll/${state}`);
+                    if (!pr.ok) return;
+                    const pd = await pr.json();
+                    if (pd.status === 'connected') {
+                        newMedia.credential_key = pd.credential_key;
+                        newMedia.oauth_email = pd.email;
+                        newMedia.oauth_polling = false;
+                        toast.success(`Connected as ${pd.email}`);
+                        window.removeEventListener('message', handleMessage);
+                        clearInterval(oauthPollTimer!); oauthPollTimer = null;
+                    } else if (pd.status === 'error') {
+                        toast.error(`OAuth error: ${pd.error}`);
+                        newMedia.oauth_polling = false;
+                        window.removeEventListener('message', handleMessage);
+                        clearInterval(oauthPollTimer!); oauthPollTimer = null;
+                    }
+                } catch (_) {}
+            }, 2000);
+        } catch (e) {
+            toast.error('Failed to start OAuth flow');
+        }
+    }
 
     // Provider template change handler
     function handleProviderTemplateChange(template: string) {
@@ -489,6 +560,17 @@
             payload.max_part_size_mb = newMedia.max_part_size_mb;
             payload.obfuscate_filenames = newMedia.obfuscate_filenames;
             payload.encryption_secret_name = newMedia.encryption_secret_name || undefined;
+        } else if (newMedia.media_type === 'google_drive') {
+            if (!newMedia.credential_key) { toast.error('Connect a Google account first'); return; }
+            payload.credential_key = newMedia.credential_key;
+            payload.encryption_secret_name = newMedia.encryption_secret_name || undefined;
+            payload.obfuscate_filenames = newMedia.obfuscate_filenames;
+        } else if (newMedia.media_type === 'dropbox') {
+            if (!newMedia.credential_key) { toast.error('Connect a Dropbox account first'); return; }
+            payload.credential_key = newMedia.credential_key;
+            if (newMedia.root_folder) payload.root_folder = newMedia.root_folder;
+            payload.encryption_secret_name = newMedia.encryption_secret_name || undefined;
+            payload.obfuscate_filenames = newMedia.obfuscate_filenames;
         }
 
         try {
@@ -695,7 +777,8 @@
 {#snippet ConfigIcon(type: string)}
     {#if type === 'lto_tape' || type === 'tape'}<CassetteTape size={24} />
     {:else if type === 'local_hdd' || type === 'hdd'}<HardDrive size={24} />
-    {:else}<Cloud size={24} />{/if}
+    {:else}<Cloud size={24} />
+    {/if}
 {/snippet}
 
 {#snippet mediaRow(media: MediaSchema)}
@@ -1271,17 +1354,22 @@
                 <Button variant="ghost" size="icon" class="hover:bg-white/5" onclick={() => showRegisterDialog = false}><X size={20} /></Button>
             </header>
 
-    <div class="grid grid-cols-3 gap-4">
+    <div class="flex gap-3 overflow-x-auto shrink-0 pb-3">
         {#each providersList.filter(p => !['mock_lto'].includes(p.provider_id)) as provider}
-            <button class={cn("flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all", newMedia.media_type === provider.provider_id ? "bg-blue-500/10 border-blue-500 text-blue-400 shadow-lg shadow-blue-500/10" : "bg-bg-primary/50 border-border-color text-text-secondary hover:border-text-secondary/30")}
+            <button class={cn("flex-none w-32 flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all", newMedia.media_type === provider.provider_id ? "bg-blue-500/10 border-blue-500 text-blue-400 shadow-lg shadow-blue-500/10" : "bg-bg-primary/50 border-border-color text-text-secondary hover:border-text-secondary/30")}
                 onclick={() => {
                     newMedia.media_type = provider.provider_id;
+                    newMedia.credential_key = '';
+                    newMedia.oauth_email = '';
                     if (provider.provider_id === 'lto_tape') {
                         newMedia.location = 'Storage Shelf';
                         newMedia.generation = 'LTO-6';
                         newMedia.capacity = LTO_CAPACITY['LTO-6'];
                     } else if (provider.provider_id === 'local_hdd') {
                         newMedia.location = 'Offsite Safe';
+                    } else if (provider.provider_id === 'google_drive' || provider.provider_id === 'dropbox') {
+                        newMedia.location = 'Cloud';
+                        newMedia.capacity = 0;
                     } else {
                         newMedia.location = 'Cloud';
                         handleProviderTemplateChange('aws');
@@ -1303,7 +1391,7 @@
                             <label class="text-xs font-medium text-text-secondary ml-1" for="identifier">
                                 {newMedia.media_type === 'lto_tape' ? 'Barcode' : newMedia.media_type === 'local_hdd' ? 'Identifier / Serial' : 'Friendly Name'}
                             </label>
-                            <Input id="identifier" bind:value={newMedia.identifier} placeholder={newMedia.media_type === 'lto_tape' ? 'TAPE01' : newMedia.media_type === 'local_hdd' ? 'Samsung-T7-001' : 'AWS-Production'} class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
+                            <Input id="identifier" bind:value={newMedia.identifier} placeholder={newMedia.media_type === 'lto_tape' ? 'TAPE01' : newMedia.media_type === 'local_hdd' ? 'Samsung-T7-001' : newMedia.media_type === 'google_drive' ? 'GDrive-Backup-01' : newMedia.media_type === 'dropbox' ? 'Dropbox-Backup-01' : 'AWS-Production'} class="h-10 bg-bg-primary/50 border-border-color font-mono text-sm" />
                         </div>
 
                         {#if newMedia.media_type === 'lto_tape'}
@@ -1405,7 +1493,7 @@
                 <!-- Location Section -->
                 <div class="space-y-4">
                     <h3 class="text-xs font-semibold text-text-secondary uppercase tracking-wider">Location</h3>
-                    {#if newMedia.media_type !== 's3_compat'}
+                    {#if newMedia.media_type !== 's3_compat' && newMedia.media_type !== 'google_drive' && newMedia.media_type !== 'dropbox'}
                         <div class="grid grid-cols-4 gap-4">
                             <div class="space-y-2">
                                 <label class="text-xs font-medium text-text-secondary ml-1" for="location_building">Building</label>
@@ -1508,6 +1596,53 @@
                                 <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
                             </div>
                             <p class="text-[10px] text-text-secondary leading-tight opacity-60">Manage secrets in <a href="/settings" class="text-blue-500 hover:underline">Settings</a>.</p>
+                        </div>
+                    {:else if newMedia.media_type === 'google_drive' || newMedia.media_type === 'dropbox'}
+                        <!-- OAuth connect section -->
+                        <div class="space-y-3">
+                            <p class="text-[10px] text-text-secondary leading-relaxed opacity-70">
+                                {newMedia.media_type === 'google_drive'
+                                    ? 'Store archives in a Google Drive folder. Requires OAuth2 authorization. Set google_drive_client_id and google_drive_client_secret in the Secrets keystore first.'
+                                    : 'Store archives in a Dropbox folder. Requires OAuth2 authorization. Set dropbox_app_key and dropbox_app_secret in the Secrets keystore first.'}
+                            </p>
+                            {#if newMedia.oauth_email}
+                                <div class="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-xl">
+                                    <div class="w-2 h-2 rounded-full bg-green-400 shrink-0"></div>
+                                    <span class="text-xs text-green-400 font-medium">Connected as {newMedia.oauth_email}</span>
+                                </div>
+                            {:else}
+                                <Button
+                                    variant="outline"
+                                    class="w-full h-10 gap-2"
+                                    onclick={() => startOAuth(newMedia.media_type as 'google_drive' | 'dropbox')}
+                                    disabled={newMedia.oauth_polling}
+                                >
+                                    {#if newMedia.oauth_polling}
+                                        <RotateCw size={14} class="animate-spin" />
+                                        Waiting for authorization…
+                                    {:else}
+                                        <Cloud size={14} />
+                                        {newMedia.media_type === 'google_drive' ? 'Connect with Google' : 'Connect with Dropbox'}
+                                    {/if}
+                                </Button>
+                            {/if}
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-medium text-text-secondary ml-1" for="oauth-encryption_secret_name">Encryption Secret</label>
+                            <div class="relative">
+                                <select id="oauth-encryption_secret_name" bind:value={newMedia.encryption_secret_name} class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 pr-10 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer">
+                                    <option value="">None (no encryption)</option>
+                                    {#each secretsList as secret}
+                                        <option value={secret}>{secret}</option>
+                                    {/each}
+                                </select>
+                                <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+                            </div>
+                            <p class="text-[10px] text-text-secondary leading-tight opacity-60">Manage secrets in <a href="/settings" class="text-blue-500 hover:underline">Settings</a>.</p>
+                        </div>
+                        <div class="flex items-center gap-3 p-3 rounded-xl border border-border-color bg-bg-primary/30">
+                            <input id="oauth-obfuscate_filenames" type="checkbox" bind:checked={newMedia.obfuscate_filenames} class="w-4 h-4 rounded border-border-color bg-bg-primary text-blue-600 focus:ring-blue-500/20" />
+                            <label class="text-xs font-medium text-text-secondary cursor-pointer" for="oauth-obfuscate_filenames">Obfuscate Filenames</label>
                         </div>
                     {/if}
                 </div>

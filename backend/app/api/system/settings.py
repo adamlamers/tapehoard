@@ -247,12 +247,3 @@ def delete_secret(
     del secrets[request_data.name]
     _set_secrets(db_session, secrets)
     return {"message": f"Secret '{request_data.name}' removed."}
-
-
-@router.get("/secrets/{name}", operation_id="get_secret")
-def get_secret(name: str, db_session: Session = Depends(get_db)):
-    """Retrieves the value of a secret by name."""
-    secrets = _get_secrets(db_session)
-    if name not in secrets:
-        raise HTTPException(status_code=404, detail="Secret not found.")
-    return {"name": name, "value": secrets[name]}

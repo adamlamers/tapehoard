@@ -90,7 +90,7 @@ Always declare explicit `operation_id`. Never let FastAPI auto-generate it.
 
 ### TypeScript SDK
 
-Regenerate after any backend endpoint/schema change:
+Regenerate OpenAPI typescript client after any backend endpoint/schema change:
 ```bash
 just generate-client
 ```

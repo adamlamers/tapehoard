@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddDirectoryToRestoreQueueData, AddDirectoryToRestoreQueueErrors, AddDirectoryToRestoreQueueResponses, AddFileToRestoreQueueData, AddFileToRestoreQueueErrors, AddFileToRestoreQueueResponses, ArchiveBrowseData, ArchiveBrowseErrors, ArchiveBrowseResponses, ArchiveMetadataData, ArchiveMetadataErrors, ArchiveMetadataResponses, ArchiveSearchData, ArchiveSearchErrors, ArchiveSearchResponses, ArchiveTreeData, ArchiveTreeErrors, ArchiveTreeResponses, BatchAddToRestoreQueueData, BatchAddToRestoreQueueErrors, BatchAddToRestoreQueueResponses, BatchConfirmDiscrepanciesData, BatchConfirmDiscrepanciesErrors, BatchConfirmDiscrepanciesResponses, BatchDeleteDiscrepanciesData, BatchDeleteDiscrepanciesErrors, BatchDeleteDiscrepanciesResponses, BatchDismissDiscrepanciesData, BatchDismissDiscrepanciesErrors, BatchDismissDiscrepanciesResponses, BatchResolveDiscrepanciesData, BatchResolveDiscrepanciesErrors, BatchResolveDiscrepanciesResponses, BatchTrackData, BatchTrackErrors, BatchTrackResponses, BrowseDiscrepanciesData, BrowseDiscrepanciesErrors, BrowseDiscrepanciesResponses, BrowseRestoreQueueData, BrowseRestoreQueueErrors, BrowseRestoreQueueResponses, CancelJobData, CancelJobErrors, CancelJobResponses, CheckHealthData, CheckHealthResponses, ClearRestoreQueueData, ClearRestoreQueueResponses, ConfirmDiscrepancyData, ConfirmDiscrepancyErrors, ConfirmDiscrepancyResponses, CreateMediaData, CreateMediaErrors, CreateMediaResponses, CreateSecretData, CreateSecretErrors, CreateSecretResponses, DeleteDiscrepancyData, DeleteDiscrepancyErrors, DeleteDiscrepancyResponses, DeleteMediaData, DeleteMediaErrors, DeleteMediaResponses, DeleteSecretData, DeleteSecretErrors, DeleteSecretResponses, DetectMediaData, DetectMediaResponses, DiscoverHardwareData, DiscoverHardwareResponses, DismissDiscrepancyData, DismissDiscrepancyErrors, DismissDiscrepancyResponses, DownloadExclusionReportData, DownloadExclusionReportErrors, DownloadExclusionReportResponses, EjectTapeData, EjectTapeErrors, EjectTapeResponses, ExportDatabaseData, ExportDatabaseResponses, FilesystemBrowseData, FilesystemBrowseErrors, FilesystemBrowseResponses, FilesystemSearchData, FilesystemSearchErrors, FilesystemSearchResponses, FilesystemTreeData, FilesystemTreeErrors, FilesystemTreeResponses, GetAnalyticsData, GetAnalyticsResponses, GetDashboardStatsData, GetDashboardStatsResponses, GetDiscrepancyTreeData, GetDiscrepancyTreeErrors, GetDiscrepancyTreeResponses, GetJobCountData, GetJobCountResponses, GetJobData, GetJobErrors, GetJobLogsData, GetJobLogsErrors, GetJobLogsResponses, GetJobResponses, GetJobStatsData, GetJobStatsResponses, GetRestoreManifestData, GetRestoreManifestResponses, GetRestoreQueueData, GetRestoreQueueResponses, GetRestoreQueueTreeData, GetRestoreQueueTreeErrors, GetRestoreQueueTreeResponses, GetScanStatusData, GetScanStatusResponses, GetSecretData, GetSecretErrors, GetSecretResponses, GetSettingsData, GetSettingsResponses, GetStagingInfoData, GetStagingInfoResponses, GetTapeFileNumberData, GetTapeFileNumberErrors, GetTapeFileNumberResponses, GetTreemapData, GetTreemapResponses, IgnoreHardwareData, IgnoreHardwareErrors, IgnoreHardwareResponses, ImportDatabaseData, ImportDatabaseErrors, ImportDatabaseResponses, InitializeMediaData, InitializeMediaErrors, InitializeMediaResponses, ListBackupsData, ListBackupsResponses, ListDirectoriesData, ListDirectoriesErrors, ListDirectoriesResponses, ListDiscrepanciesData, ListDiscrepanciesResponses, ListJobsData, ListJobsErrors, ListJobsResponses, ListMediaData, ListMediaErrors, ListMediaResponses, ListProvidersData, ListProvidersResponses, ListSecretsData, ListSecretsResponses, ReinitializeTapeData, ReinitializeTapeErrors, ReinitializeTapeResponses, RemoveFromRestoreQueueData, RemoveFromRestoreQueueErrors, RemoveFromRestoreQueueResponses, ReorderMediaData, ReorderMediaErrors, ReorderMediaResponses, ResetTestEnvironmentData, ResetTestEnvironmentResponses, RetryJobData, RetryJobErrors, RetryJobResponses, RewindTapeData, RewindTapeErrors, RewindTapeResponses, StreamJobLogsData, StreamJobLogsErrors, StreamJobLogsResponses, StreamJobsData, StreamJobsResponses, StreamScanStatusData, StreamScanStatusResponses, TestExclusionsData, TestExclusionsErrors, TestExclusionsResponses, TestNotificationData, TestNotificationErrors, TestNotificationResponses, TriggerAutoBackupData, TriggerAutoBackupResponses, TriggerBackupData, TriggerBackupErrors, TriggerBackupResponses, TriggerIndexingData, TriggerIndexingResponses, TriggerRestoreData, TriggerRestoreErrors, TriggerRestoreResponses, TriggerScanData, TriggerScanResponses, UndoDismissDiscrepancyData, UndoDismissDiscrepancyErrors, UndoDismissDiscrepancyResponses, UpdateMediaData, UpdateMediaErrors, UpdateMediaResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses } from './types.gen';
+import type { AddDirectoryToRestoreQueueData, AddDirectoryToRestoreQueueErrors, AddDirectoryToRestoreQueueResponses, AddFileToRestoreQueueData, AddFileToRestoreQueueErrors, AddFileToRestoreQueueResponses, ArchiveBrowseData, ArchiveBrowseErrors, ArchiveBrowseResponses, ArchiveMetadataData, ArchiveMetadataErrors, ArchiveMetadataResponses, ArchiveSearchData, ArchiveSearchErrors, ArchiveSearchResponses, ArchiveTreeData, ArchiveTreeErrors, ArchiveTreeResponses, BatchAddToRestoreQueueData, BatchAddToRestoreQueueErrors, BatchAddToRestoreQueueResponses, BatchConfirmDiscrepanciesData, BatchConfirmDiscrepanciesErrors, BatchConfirmDiscrepanciesResponses, BatchDeleteDiscrepanciesData, BatchDeleteDiscrepanciesErrors, BatchDeleteDiscrepanciesResponses, BatchDismissDiscrepanciesData, BatchDismissDiscrepanciesErrors, BatchDismissDiscrepanciesResponses, BatchResolveDiscrepanciesData, BatchResolveDiscrepanciesErrors, BatchResolveDiscrepanciesResponses, BatchTrackData, BatchTrackErrors, BatchTrackResponses, BrowseDiscrepanciesData, BrowseDiscrepanciesErrors, BrowseDiscrepanciesResponses, BrowseRestoreQueueData, BrowseRestoreQueueErrors, BrowseRestoreQueueResponses, CancelJobData, CancelJobErrors, CancelJobResponses, CheckHealthData, CheckHealthResponses, ClearRestoreQueueData, ClearRestoreQueueResponses, ConfirmDiscrepancyData, ConfirmDiscrepancyErrors, ConfirmDiscrepancyResponses, CreateMediaData, CreateMediaErrors, CreateMediaResponses, CreateSecretData, CreateSecretErrors, CreateSecretResponses, DeleteDiscrepancyData, DeleteDiscrepancyErrors, DeleteDiscrepancyResponses, DeleteMediaData, DeleteMediaErrors, DeleteMediaResponses, DeleteOauthCredentialData, DeleteOauthCredentialErrors, DeleteOauthCredentialResponses, DeleteSecretData, DeleteSecretErrors, DeleteSecretResponses, DetectMediaData, DetectMediaResponses, DiscoverHardwareData, DiscoverHardwareResponses, DismissDiscrepancyData, DismissDiscrepancyErrors, DismissDiscrepancyResponses, DownloadExclusionReportData, DownloadExclusionReportErrors, DownloadExclusionReportResponses, EjectTapeData, EjectTapeErrors, EjectTapeResponses, ExportDatabaseData, ExportDatabaseResponses, FilesystemBrowseData, FilesystemBrowseErrors, FilesystemBrowseResponses, FilesystemSearchData, FilesystemSearchErrors, FilesystemSearchResponses, FilesystemTreeData, FilesystemTreeErrors, FilesystemTreeResponses, GetAnalyticsData, GetAnalyticsResponses, GetDashboardStatsData, GetDashboardStatsResponses, GetDiscrepancyTreeData, GetDiscrepancyTreeErrors, GetDiscrepancyTreeResponses, GetJobCountData, GetJobCountResponses, GetJobData, GetJobErrors, GetJobLogsData, GetJobLogsErrors, GetJobLogsResponses, GetJobResponses, GetJobStatsData, GetJobStatsResponses, GetRestoreManifestData, GetRestoreManifestResponses, GetRestoreQueueData, GetRestoreQueueResponses, GetRestoreQueueTreeData, GetRestoreQueueTreeErrors, GetRestoreQueueTreeResponses, GetScanStatusData, GetScanStatusResponses, GetSettingsData, GetSettingsResponses, GetStagingInfoData, GetStagingInfoResponses, GetTapeFileNumberData, GetTapeFileNumberErrors, GetTapeFileNumberResponses, GetTreemapData, GetTreemapResponses, IgnoreHardwareData, IgnoreHardwareErrors, IgnoreHardwareResponses, ImportDatabaseData, ImportDatabaseErrors, ImportDatabaseResponses, InitializeMediaData, InitializeMediaErrors, InitializeMediaResponses, ListBackupsData, ListBackupsResponses, ListDirectoriesData, ListDirectoriesErrors, ListDirectoriesResponses, ListDiscrepanciesData, ListDiscrepanciesResponses, ListJobsData, ListJobsErrors, ListJobsResponses, ListMediaData, ListMediaErrors, ListMediaResponses, ListOauthCredentialsData, ListOauthCredentialsResponses, ListProvidersData, ListProvidersResponses, ListSecretsData, ListSecretsResponses, OauthCallbackData, OauthCallbackErrors, OauthCallbackResponses, OauthPollData, OauthPollErrors, OauthPollResponses, OauthStartData, OauthStartErrors, OauthStartResponses, ReinitializeTapeData, ReinitializeTapeErrors, ReinitializeTapeResponses, RemoveFromRestoreQueueData, RemoveFromRestoreQueueErrors, RemoveFromRestoreQueueResponses, ReorderMediaData, ReorderMediaErrors, ReorderMediaResponses, ResetTestEnvironmentData, ResetTestEnvironmentResponses, RetryJobData, RetryJobErrors, RetryJobResponses, RewindTapeData, RewindTapeErrors, RewindTapeResponses, StreamJobLogsData, StreamJobLogsErrors, StreamJobLogsResponses, StreamJobsData, StreamJobsResponses, StreamScanStatusData, StreamScanStatusResponses, TestExclusionsData, TestExclusionsErrors, TestExclusionsResponses, TestNotificationData, TestNotificationErrors, TestNotificationResponses, TriggerAutoBackupData, TriggerAutoBackupResponses, TriggerBackupData, TriggerBackupErrors, TriggerBackupResponses, TriggerIndexingData, TriggerIndexingResponses, TriggerRestoreData, TriggerRestoreErrors, TriggerRestoreResponses, TriggerScanData, TriggerScanResponses, UndoDismissDiscrepancyData, UndoDismissDiscrepancyErrors, UndoDismissDiscrepancyResponses, UpdateMediaData, UpdateMediaErrors, UpdateMediaResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -246,13 +246,6 @@ export const createSecret = <ThrowOnError extends boolean = false>(options: Opti
 });
 
 /**
- * Get Secret
- *
- * Retrieves the value of a secret by name.
- */
-export const getSecret = <ThrowOnError extends boolean = false>(options: Options<GetSecretData, ThrowOnError>) => (options.client ?? client).get<GetSecretResponses, GetSecretErrors, ThrowOnError>({ url: '/system/secrets/{name}', ...options });
-
-/**
  * Test Notification
  *
  * Dispatches a test alert to the provided Apprise URL.
@@ -332,8 +325,14 @@ export const ejectTape = <ThrowOnError extends boolean = false>(options: Options
 /**
  * Reinitialize Tape
  *
- * Re-initialize a tape by erasing all data and rewriting the label.
- * WARNING: This will permanently delete all data on the tape.
+ * Prepares a tape to receive a new label.
+ *
+ * Default (secure_erase=False): rewinds the tape and writes a single filemark at
+ * BOT, logically clearing it in seconds.  The old data remains on tape but is
+ * unreachable once a new label is written over it.
+ *
+ * With secure_erase=True: issues a full SCSI erase, which can take many hours but
+ * physically overwrites every block.
  */
 export const reinitializeTape = <ThrowOnError extends boolean = false>(options: Options<ReinitializeTapeData, ThrowOnError>) => (options.client ?? client).post<ReinitializeTapeResponses, ReinitializeTapeErrors, ThrowOnError>({
     url: '/system/hardware/tape/reinitialize',
@@ -694,6 +693,44 @@ export const browseRestoreQueue = <ThrowOnError extends boolean = false>(options
  * Returns a recursive tree view of the recovery queue's virtual filesystem.
  */
 export const getRestoreQueueTree = <ThrowOnError extends boolean = false>(options?: Options<GetRestoreQueueTreeData, ThrowOnError>) => (options?.client ?? client).get<GetRestoreQueueTreeResponses, GetRestoreQueueTreeErrors, ThrowOnError>({ url: '/restores/queue/tree', ...options });
+
+/**
+ * Oauth Start
+ *
+ * Generates an OAuth2 authorization URL for the given provider and returns it
+ * together with a one-time state token the frontend should poll.
+ */
+export const oauthStart = <ThrowOnError extends boolean = false>(options: Options<OauthStartData, ThrowOnError>) => (options.client ?? client).get<OauthStartResponses, OauthStartErrors, ThrowOnError>({ url: '/oauth/start', ...options });
+
+/**
+ * Oauth Callback
+ *
+ * Handles the OAuth2 redirect from Google / Dropbox, exchanges the code for
+ * tokens, stores them, and returns a self-closing HTML page that posts a
+ * message to the opener window.
+ */
+export const oauthCallback = <ThrowOnError extends boolean = false>(options?: Options<OauthCallbackData, ThrowOnError>) => (options?.client ?? client).get<OauthCallbackResponses, OauthCallbackErrors, ThrowOnError>({ url: '/oauth/callback', ...options });
+
+/**
+ * Oauth Poll
+ *
+ * Polls the result of an in-progress OAuth flow.
+ */
+export const oauthPoll = <ThrowOnError extends boolean = false>(options: Options<OauthPollData, ThrowOnError>) => (options.client ?? client).get<OauthPollResponses, OauthPollErrors, ThrowOnError>({ url: '/oauth/poll/{state}', ...options });
+
+/**
+ * List Credentials
+ *
+ * Returns all stored OAuth credential keys and their provider/email.
+ */
+export const listOauthCredentials = <ThrowOnError extends boolean = false>(options?: Options<ListOauthCredentialsData, ThrowOnError>) => (options?.client ?? client).get<ListOauthCredentialsResponses, unknown, ThrowOnError>({ url: '/oauth/credentials', ...options });
+
+/**
+ * Delete Credential
+ *
+ * Removes a stored OAuth credential (disconnects the account).
+ */
+export const deleteOauthCredential = <ThrowOnError extends boolean = false>(options: Options<DeleteOauthCredentialData, ThrowOnError>) => (options.client ?? client).delete<DeleteOauthCredentialResponses, DeleteOauthCredentialErrors, ThrowOnError>({ url: '/oauth/credentials/{key}', ...options });
 
 /**
  * Check Health

@@ -101,7 +101,24 @@ export interface CloudCreateData {
     encryption_secret_name?: string;
 }
 
-export type MediaCreateData = LtoTapeCreateData | OfflineHddCreateData | CloudCreateData;
+export interface GoogleDriveCreateData {
+    media_type: 'google_drive';
+    identifier: string;
+    capacity: number;
+    location?: string;
+    credential_key: string;
+}
+
+export interface DropboxCreateData {
+    media_type: 'dropbox';
+    identifier: string;
+    capacity: number;
+    location?: string;
+    credential_key: string;
+    root_folder?: string;
+}
+
+export type MediaCreateData = LtoTapeCreateData | OfflineHddCreateData | CloudCreateData | GoogleDriveCreateData | DropboxCreateData;
 
 // LTO Generation capacity mapping (in GB, base-10)
 export const LTO_CAPACITY: Record<string, number> = {
