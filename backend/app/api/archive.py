@@ -181,7 +181,7 @@ def browse(path: str = "ROOT", db_session: Session = Depends(get_db)):
 
         archived_bytes = f[7] or 0
         file_size = f[2] or 0
-        is_partially_archived = archived_bytes > 0 and archived_bytes < file_size
+        is_partially_archived = archived_bytes < file_size
 
         results.append(
             {
@@ -248,7 +248,7 @@ def search(q: str, path: Optional[str] = None, db_session: Session = Depends(get
             continue
         archived_bytes = r[7] or 0
         file_size = r[2] or 0
-        is_partially_archived = archived_bytes > 0 and archived_bytes < file_size
+        is_partially_archived = archived_bytes < file_size
         results.append(
             {
                 "name": os.path.basename(r[1]),

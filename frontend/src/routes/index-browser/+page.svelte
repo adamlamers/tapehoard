@@ -355,19 +355,12 @@
                                 <div class="space-y-2">
                                     <span class="text-xs font-medium text-text-secondary opacity-60 block">Stored On</span>
                                     <div class="flex flex-wrap gap-1.5">
-                                        {#if selectedItem.media.length > 3}
+                                        {#each selectedItem.media as m}
                                             <span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[10px] px-1.5 py-0.5 rounded border border-blue-500/20 font-medium">
                                                 <CassetteTape size={10} />
-                                                {selectedItem.media.length} locations
+                                                {m}
                                             </span>
-                                        {:else}
-                                            {#each selectedItem.media as m}
-                                                <span class="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 text-[10px] px-1.5 py-0.5 rounded border border-blue-500/20 font-medium">
-                                                    <CassetteTape size={10} />
-                                                    {m}
-                                                </span>
-                                            {/each}
-                                        {/if}
+                                        {/each}
                                     </div>
                                 </div>
                             {/if}

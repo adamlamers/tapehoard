@@ -225,6 +225,19 @@ class ArchiverService:
             remaining_file_bytes = file_state.size - covered_bytes
 
             if file_state.size == 0:
+                # Guard: if the file has grown on disk since the scan, skip it so a
+                # subsequent rescan can update the DB size before we archive it.
+                try:
+                    actual_size = os.path.getsize(file_state.file_path)
+                except OSError:
+                    actual_size = 0
+                if actual_size > 0:
+                    logger.info(
+                        f"Skipping {file_state.file_path}: DB size=0 but disk size="
+                        f"{actual_size} — re-archive after next scan"
+                    )
+                    continue
+
                 has_any_version = (
                     db_session.query(models.FileVersion)
                     .filter(models.FileVersion.filesystem_state_id == file_state.id)
