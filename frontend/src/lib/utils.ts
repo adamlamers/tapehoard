@@ -49,8 +49,8 @@ export function formatSize(bytes: number | null | undefined): string {
     const units = ["B", "KB", "MB", "GB", "TB"];
     let unitIndex = 0;
     let size = bytes;
-    while (size >= 1024 && unitIndex < units.length - 1) {
-        size /= 1024;
+    while (size >= 1000 && unitIndex < units.length - 1) {
+        size /= 1000;
         unitIndex++;
     }
     return `${size.toFixed(1)} ${units[unitIndex]}`;

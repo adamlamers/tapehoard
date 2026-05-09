@@ -1111,8 +1111,8 @@
                                                             </div>
                                                             <ProgressBar value={perc} size="sm" />
                                                             <div class="flex justify-between mt-1 text-[9px] font-medium text-text-secondary/50 mono">
-                                                                <span>Used: {(used_mib / 1024).toFixed(1)} GiB</span>
-                                                                <span>Free: {(info.tape.remaining_capacity_mib / 1024).toFixed(1)} GiB</span>
+                                                                <span>Used: {(used_mib * 1.048576 / 1000).toFixed(1)} GB</span>
+                                                                <span>Free: {(info.tape.remaining_capacity_mib * 1.048576 / 1000).toFixed(1)} GB</span>
                                                             </div>
                                                         </div>
                                                     {/if}
