@@ -110,16 +110,30 @@ import { cancelJob as cancelJobApi, retryJob as retryJobApi } from '$lib/api';
 ```bash
 cd backend && uv run pytest tests/ -v
 ```
-- 230 tests; uses pytest-mock for filesystem/hardware mocking
+- 252 tests; uses pytest-mock for filesystem/hardware mocking
 - **Important:** Mocks patching `get_source_roots` or `get_exclusion_spec` must target `app.api.common` (not `app.api.system`)
 
 ### Frontend E2E
 ```bash
 cd frontend && npx playwright test
 ```
-- 34 Playwright tests using Chromium
+- 44 Playwright tests using Chromium
 - Backend test server auto-starts via `playwright.config.ts`
 - Tests use `requestContext` for API calls + `page` for UI
+
+### Playwright: Wait on a Specific Job, Not All Jobs
+
+When a test triggers multiple backup jobs sequentially, using `jobs.find(j => j.job_type === 'BACKUP')` returns the first match — which may be an already-completed earlier job, producing a false-positive. Always extract the `job_id` from the trigger response and poll it directly:
+
+```typescript
+const resp = await requestContext.post(`${API_URL}/backups/trigger/${mediaId}`);
+const { job_id } = await resp.json();
+
+await expect(async () => {
+  const jobResp = await requestContext.get(`${API_URL}/system/jobs/${job_id}`);
+  expect((await jobResp.json()).status).toBe('COMPLETED');
+}).toPass({ timeout: 30000 });
+```
 
 ### macOS IPv6
 On macOS, `localhost` resolves to `::1`, but uvicorn binds to IPv4, causing `ECONNREFUSED ::1:8001`.
@@ -248,6 +262,88 @@ redundancy_ratio = (archived_size / eligible_size) * 100
 - `archived_size` = sum of `FileVersion` byte ranges on active/full media
 - `eligible_size` = `total_size - ignored_size` from `filesystem_state`
 
+Note: this ratio reflects first-copy coverage, not redundancy depth. It does not account for the `redundancy_target` setting. See §Redundancy Tracking System for the full picture.
+
+## Redundancy Tracking System
+
+### Data Model
+
+Two additions to the DB schema (migration `c2983e8729c5`):
+
+```sql
+-- Denormalized count of distinct media that hold a complete copy of this file
+ALTER TABLE filesystem_state ADD COLUMN redundancy_count INTEGER DEFAULT 0;
+CREATE INDEX idx_fs_redundancy ON filesystem_state(redundancy_count, is_ignored, is_deleted);
+
+-- One row per (file, media) pair where a complete, non-split copy exists
+CREATE TABLE file_media_coverage (
+    file_id  INTEGER REFERENCES filesystem_state(id) ON DELETE CASCADE,
+    media_id INTEGER REFERENCES storage_media(id) ON DELETE CASCADE,
+    PRIMARY KEY (file_id, media_id)
+);
+```
+
+SQLite triggers keep `redundancy_count` in sync automatically:
+- `trg_coverage_insert` — increments on `INSERT INTO file_media_coverage`
+- `trg_coverage_delete` — decrements on `DELETE FROM file_media_coverage`
+
+**Never update `redundancy_count` directly.** Insert/delete from `file_media_coverage` and let the triggers do it.
+
+### What Counts as "Coverage"
+
+A row is inserted into `file_media_coverage` only when:
+```
+offset_start == 0 AND offset_end == filesystem_state.size
+```
+Split chunks (partial byte ranges) do **not** create coverage rows. `redundancy_count` counts complete, independently restorable copies.
+
+### Two-Phase Batch Assembly (`assemble_backup_batch`)
+
+Phase 1 — first-time backups:
+- Selects files where `redundancy_count == 0` (never backed up)
+- Uses global covered-bytes tracking to allow splits across multiple archive chunks
+- Excludes files already having any `FileVersion` on the target media
+
+Phase 2 — redundant copies:
+- Selects files where `0 < redundancy_count < redundancy_target` and no `FileMediaCoverage` row on the target media
+- Always starts at `offset_start = 0` (no splits — a redundant copy must be complete)
+- Tagged `is_redundant_copy=True` in the batch item
+
+### Dedup Bypass for Redundant Copies
+
+The archiver's deduplication check (`existing_versions.get((hash, start, end))`) is skipped for items with `is_redundant_copy=True`. Without this bypass, the dedup would find the existing `FileVersion` on another media and create a pointer back to it rather than physically writing to the target — the file would never land on the new media and redundancy_count would never increment.
+
+```python
+dupe = None
+if not item.get("is_redundant_copy"):
+    dupe = existing_versions.get((file_state.sha256_hash, item["offset_start"], item["offset_end"]))
+```
+
+### Coverage Recording
+
+`_record_coverage(db, items, media_id)` is called after each write batch (random-access, streaming, and staged tar paths all call it). It inserts `OR IGNORE` into `file_media_coverage` for any item where `offset_start == 0 AND offset_end == file.size`. The trigger fires and increments `redundancy_count`.
+
+### Media Status Transitions and Coverage
+
+| Transition | `file_versions` | `file_media_coverage` | Effect on `redundancy_count` |
+|------------|----------------|----------------------|------------------------------|
+| `→ FAILED` | Deleted | Deleted (trigger fires) | Decremented for all affected files |
+| `→ RETIRED` | Deleted | Deleted (trigger fires) | Decremented for all affected files |
+| `initialize` (wipe) | Deleted | Deleted (trigger fires) | Decremented for all affected files |
+| Delete media record | Deleted | Deleted via `ON DELETE CASCADE` (trigger fires) | Decremented |
+
+### Test Mode: LTO vs HDD
+
+`TAPEHOARD_TEST_MODE=true` (set by `playwright.config.ts` for the test server):
+- **LTO tape** → replaced by `MockLTOProvider` (writes to a temp directory, has `device_path` attr)
+- **HDD** → uses the real `OfflineHDDProvider` (writes to the `mount_path` on disk)
+
+Playwright redundancy tests use real HDD media at `/tmp/tapehoard_e2e_hdd_redundancy_{a,b}`.
+
+### `OfflineHDDProvider.device_path`
+
+`OfflineHDDProvider` does **not** have a `device_path` attribute. The `initialize_media` API endpoint uses `getattr(storage_provider, "device_path", None)` with a guard before saving to `extra_config`. Do not add unconditional `storage_provider.device_path` access — it will raise `AttributeError` for HDD media.
+
 ## Common Tasks
 
 ### Add a New System Endpoint
@@ -304,6 +400,7 @@ Pre-commit hooks are configured but may stash unstaged changes.
 |------|----------|
 | `README.md` | Human-facing project overview |
 | `AGENTS.md` | This file — agent development guide |
+| `MULTIPLE_REDUNDANCY.md` | Redundancy feature — what's implemented, what's remaining (restore manifest set cover, dashboard under-protected count, insights query, metadata API) |
 
 ## Critical Context for Tape Operations
 
