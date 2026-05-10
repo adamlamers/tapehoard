@@ -105,6 +105,116 @@ def test_assemble_backup_batch(db_session):
     assert batch[1]["is_split"] is True
 
 
+def test_batch_generation_wide_file_sizes(db_session):
+    """
+    Verifies batch assembly across a wide range of file sizes (0 B → 640 GB)
+    against 1.5 TB media.
+
+    Rules under test:
+    - Files that fit entirely in remaining space are never split.
+    - Files larger than total media capacity are split (at ≥ MINIMUM_FRAGMENT_SIZE).
+    - Files larger than remaining space but smaller than total capacity are skipped
+      (deferred to the next media, not forcibly split).
+    - An empty file (size=0) with no prior version is included as-is.
+    """
+    TB = 1024**4
+    GB = 1024**3
+    MB = 1024**2
+
+    MEDIA_CAPACITY = int(1.5 * TB)
+    MINIMUM_FRAGMENT = 100 * MB  # mirrors archiver constant
+
+    archiver = ArchiverService()
+
+    m = models.StorageMedia(
+        media_type="hdd",
+        identifier="TAPE_WIDE",
+        capacity=MEDIA_CAPACITY,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add(m)
+
+    # Build a representative set of file sizes spanning 0 B → 640 GB
+    file_sizes = [
+        ("empty.bin", 0),
+        ("tiny_1b.bin", 1),
+        ("small_1mb.bin", 1 * MB),
+        ("medium_500mb.bin", 500 * MB),
+        ("large_1gb.bin", 1 * GB),
+        ("large_100gb.bin", 100 * GB),
+        ("large_640gb.bin", 640 * GB),
+        # Larger than one media (1.6 TB > 1.5 TB) — must be split
+        ("giant_1600gb.bin", 1600 * GB),
+    ]
+
+    file_records = {}
+    for name, size in file_sizes:
+        f = models.FilesystemState(file_path=f"/data/{name}", size=size, mtime=1)
+        db_session.add(f)
+        file_records[name] = (f, size)
+
+    db_session.commit()
+
+    batch = archiver.assemble_backup_batch(db_session, m.id)
+
+    batch_by_path = {item["file_state"].file_path: item for item in batch}
+
+    # --- empty file must be included ---
+    assert "/data/empty.bin" in batch_by_path, "empty file should be in batch"
+    empty_item = batch_by_path["/data/empty.bin"]
+    assert empty_item["offset_start"] == 0
+    assert empty_item["offset_end"] == 0
+    assert empty_item["is_split"] is False
+
+    # --- files that fit on 1.5 TB media must NOT be split ---
+    fits_entirely = [
+        "tiny_1b.bin",
+        "small_1mb.bin",
+        "medium_500mb.bin",
+        "large_1gb.bin",
+        "large_100gb.bin",
+        "large_640gb.bin",
+    ]
+    for name in fits_entirely:
+        path = f"/data/{name}"
+        assert path in batch_by_path, f"{name} should be included in batch"
+        item = batch_by_path[path]
+        _, size = file_records[name]
+        assert item["offset_start"] == 0, f"{name} should start at 0"
+        assert item["offset_end"] == size, f"{name} should be fully included"
+        assert item["is_split"] is False, f"{name} must not be split (fits on media)"
+
+    # --- giant file (1.6 TB > 1.5 TB media) must be present and split ---
+    giant_path = "/data/giant_1600gb.bin"
+    assert (
+        giant_path in batch_by_path
+    ), "giant file larger than media must be split-included"
+    giant_item = batch_by_path[giant_path]
+    assert giant_item["is_split"] is True, "giant file must be marked as split"
+    assert giant_item["offset_start"] == 0
+    fragment_size = giant_item["offset_end"] - giant_item["offset_start"]
+    assert (
+        fragment_size >= MINIMUM_FRAGMENT
+    ), f"split fragment ({fragment_size}) must be ≥ MINIMUM_FRAGMENT_SIZE ({MINIMUM_FRAGMENT})"
+    assert (
+        fragment_size <= MEDIA_CAPACITY
+    ), "split fragment must not exceed media capacity"
+
+    # --- no item in the batch exceeds media capacity ---
+    for item in batch:
+        chunk = item["offset_end"] - item["offset_start"]
+        assert (
+            chunk <= MEDIA_CAPACITY
+        ), f"{item['file_state'].file_path}: batch chunk {chunk} exceeds media capacity"
+
+    # --- accumulated batch size must not exceed media capacity ---
+    total = sum(item["offset_end"] - item["offset_start"] for item in batch)
+    assert (
+        total <= MEDIA_CAPACITY
+    ), f"total batch size {total} exceeds media capacity {MEDIA_CAPACITY}"
+
+
 def test_run_backup_mocked(db_session, mocker, tmp_path):
     """Tests the full backup orchestration with mocked hardware."""
     # Setup staging
