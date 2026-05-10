@@ -60,8 +60,6 @@ def discover_hardware(db_session: Session = Depends(get_db)):
 
                 if state["online"]:
                     barcode = state["identity"]
-                    if barcode in ignore_list:
-                        continue
 
                     # Check if this tape is already known by barcode OR serial number
                     is_known = False
@@ -84,6 +82,14 @@ def discover_hardware(db_session: Session = Depends(get_db)):
                             is not None
                         )
 
+                    # Check ignore list by barcode, device_path (for new tapes), or generic "NEW TAPE"
+                    if barcode and barcode in ignore_list:
+                        continue
+                    if not barcode and not is_known and dev_path in ignore_list:
+                        continue
+                    if not barcode and not is_known and "NEW TAPE" in ignore_list:
+                        continue
+
                     # Get current file number if tape is loaded and no job is active.
                     # Skipped when a job runs because _get_current_file_number() retries
                     # "Device or resource busy" for up to 60 s and would stall discovery.
@@ -102,11 +108,12 @@ def discover_hardware(db_session: Session = Depends(get_db)):
                         state["tape"] if has_active_job else (state["tape"] or None)
                     )
 
+                    # Use device_path as identifier for new tapes so they can be individually ignored
                     discovered_nodes.append(
                         {
                             "type": "tape",
                             "device_path": dev_path,
-                            "identifier": state["identity"] or "NEW TAPE",
+                            "identifier": barcode or dev_path,
                             "is_registered": is_known,
                             "status": "ready" if not is_known else "active",
                             "hardware_info": {
@@ -142,7 +149,7 @@ def discover_hardware(db_session: Session = Depends(get_db)):
                     if not entry.is_dir():
                         continue
 
-                    if entry.path in restricted_paths or entry.path in ignore_list:
+                    if entry.path in restricted_paths:
                         continue
 
                     # Check for TapeHoard signature
@@ -165,7 +172,21 @@ def discover_hardware(db_session: Session = Depends(get_db)):
                         except Exception:
                             continue
 
-                    if disk_barcode in ignore_list:
+                    # Auto-detect device UUID for ignore list checking
+                    device_uuid = None
+                    try:
+                        from app.core.utils import get_path_uuid
+
+                        device_uuid = get_path_uuid(entry.path)
+                    except Exception:
+                        pass
+
+                    # Check ignore list by barcode, device_uuid, or generic "NEW DISK" identifier
+                    if disk_barcode and disk_barcode in ignore_list:
+                        continue
+                    if device_uuid and device_uuid in ignore_list:
+                        continue
+                    if not disk_barcode and "NEW DISK" in ignore_list:
                         continue
                     is_known = (
                         db_session.query(models.StorageMedia)
@@ -175,24 +196,20 @@ def discover_hardware(db_session: Session = Depends(get_db)):
                     )
 
                     if not is_known:
-                        # Auto-detect capacity and UUID for HDDs
+                        # Auto-detect capacity for HDDs
                         capacity_bytes = None
-                        device_uuid = None
                         try:
-                            from app.core.utils import get_path_uuid
-
-                            device_uuid = get_path_uuid(entry.path)
-
                             st = os.statvfs(entry.path)
                             capacity_bytes = st.f_blocks * st.f_frsize
                         except Exception:
                             pass
 
+                        # Use device_uuid as identifier for new disks so they can be individually ignored
                         discovered_nodes.append(
                             {
                                 "type": "hdd",
                                 "mount_path": entry.path,
-                                "identifier": disk_barcode or "NEW DISK",
+                                "identifier": disk_barcode or device_uuid or "NEW DISK",
                                 "is_registered": False,
                                 "status": "uninitialized",
                                 "capacity_bytes": capacity_bytes,
