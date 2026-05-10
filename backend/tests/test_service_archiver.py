@@ -967,3 +967,204 @@ def test_backup_skips_files_modified_after_job_start(db_session, mocker, tmp_pat
     versions = db_session.query(models.FileVersion).filter_by(media_id=media.id).all()
     assert len(versions) == 1
     assert versions[0].filesystem_state_id == f_stable.id
+
+
+# ---------------------------------------------------------------------------
+# Redundancy tests
+# ---------------------------------------------------------------------------
+
+
+def test_redundancy_target_excludes_already_covered_file(db_session):
+    """A file with redundancy_count >= target must not appear in the batch."""
+    archiver = ArchiverService()
+
+    m = models.StorageMedia(
+        media_type="hdd",
+        identifier="MR1",
+        capacity=10_000_000,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add(m)
+
+    f = models.FilesystemState(file_path="/r/done.txt", size=100, mtime=1)
+    db_session.add(f)
+    db_session.flush()
+
+    # Simulate a complete copy on m (coverage row + redundancy_count=1)
+    db_session.add(models.FileMediaCoverage(file_id=f.id, media_id=m.id))
+    db_session.flush()
+    db_session.refresh(f)
+    assert f.redundancy_count == 1
+
+    db_session.commit()
+
+    # target=1 → file already has 1 copy → should not appear
+    batch = archiver.assemble_backup_batch(db_session, m.id, redundancy_target=1)
+    paths = [item["file_state"].file_path for item in batch]
+    assert "/r/done.txt" not in paths
+
+
+def test_redundancy_target_includes_file_for_second_media(db_session):
+    """A file with 1 copy on media A should appear in the batch for media B at target=2."""
+    archiver = ArchiverService()
+
+    m_a = models.StorageMedia(
+        media_type="hdd",
+        identifier="MR_A",
+        capacity=10_000_000,
+        status="active",
+        bytes_used=0,
+    )
+    m_b = models.StorageMedia(
+        media_type="hdd",
+        identifier="MR_B",
+        capacity=10_000_000,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add_all([m_a, m_b])
+
+    f = models.FilesystemState(file_path="/r/need_redundancy.txt", size=100, mtime=1)
+    db_session.add(f)
+    db_session.flush()
+
+    # File has one complete copy on m_a
+    db_session.add(models.FileMediaCoverage(file_id=f.id, media_id=m_a.id))
+    db_session.flush()
+    db_session.refresh(f)
+    assert f.redundancy_count == 1
+
+    db_session.commit()
+
+    # target=2 → file still needs one more copy → should appear in m_b's batch
+    batch = archiver.assemble_backup_batch(db_session, m_b.id, redundancy_target=2)
+    paths = [item["file_state"].file_path for item in batch]
+    assert "/r/need_redundancy.txt" in paths
+
+    # The redundant copy should start from offset 0 (full re-copy)
+    item = next(
+        i for i in batch if i["file_state"].file_path == "/r/need_redundancy.txt"
+    )
+    assert item["offset_start"] == 0
+    assert item["offset_end"] == f.size
+    assert item["is_split"] is False
+
+
+def test_redundancy_target_excludes_file_already_on_same_media(db_session):
+    """A file with redundancy_count < target but already on this media must be excluded."""
+    archiver = ArchiverService()
+
+    m_a = models.StorageMedia(
+        media_type="hdd",
+        identifier="MR_C",
+        capacity=10_000_000,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add(m_a)
+
+    f = models.FilesystemState(file_path="/r/on_a.txt", size=100, mtime=1)
+    db_session.add(f)
+    db_session.flush()
+
+    # File has one complete copy on m_a
+    db_session.add(models.FileMediaCoverage(file_id=f.id, media_id=m_a.id))
+    db_session.flush()
+    db_session.refresh(f)
+    assert f.redundancy_count == 1
+
+    db_session.commit()
+
+    # target=2 but we're assembling for m_a (already has this file) → must exclude
+    batch = archiver.assemble_backup_batch(db_session, m_a.id, redundancy_target=2)
+    paths = [item["file_state"].file_path for item in batch]
+    assert "/r/on_a.txt" not in paths
+
+
+def test_redundancy_target_two_copies_satisfies_target(db_session):
+    """A file with redundancy_count == target should not appear in any batch."""
+    archiver = ArchiverService()
+
+    m_a = models.StorageMedia(
+        media_type="hdd",
+        identifier="MR_D1",
+        capacity=10_000_000,
+        status="active",
+        bytes_used=0,
+    )
+    m_b = models.StorageMedia(
+        media_type="hdd",
+        identifier="MR_D2",
+        capacity=10_000_000,
+        status="active",
+        bytes_used=0,
+    )
+    m_c = models.StorageMedia(
+        media_type="hdd",
+        identifier="MR_D3",
+        capacity=10_000_000,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add_all([m_a, m_b, m_c])
+
+    f = models.FilesystemState(file_path="/r/satisfied.txt", size=100, mtime=1)
+    db_session.add(f)
+    db_session.flush()
+
+    # File has two complete copies (on m_a and m_b)
+    db_session.add(models.FileMediaCoverage(file_id=f.id, media_id=m_a.id))
+    db_session.add(models.FileMediaCoverage(file_id=f.id, media_id=m_b.id))
+    db_session.flush()
+    db_session.refresh(f)
+    assert f.redundancy_count == 2
+
+    db_session.commit()
+
+    # target=2 → satisfied → must not appear in m_c's batch
+    batch = archiver.assemble_backup_batch(db_session, m_c.id, redundancy_target=2)
+    paths = [item["file_state"].file_path for item in batch]
+    assert "/r/satisfied.txt" not in paths
+
+
+def test_record_coverage_inserts_for_complete_writes(db_session):
+    """_record_coverage inserts coverage rows only for non-split complete writes."""
+    archiver = ArchiverService()
+
+    m = models.StorageMedia(
+        media_type="hdd",
+        identifier="MR_E",
+        capacity=10_000_000,
+        status="active",
+        bytes_used=0,
+    )
+    f_complete = models.FilesystemState(file_path="/r/complete.txt", size=100, mtime=1)
+    f_split = models.FilesystemState(file_path="/r/split.txt", size=200, mtime=1)
+    db_session.add_all([m, f_complete, f_split])
+    db_session.commit()
+
+    items = [
+        {"file_state": f_complete, "offset_start": 0, "offset_end": 100},
+        {"file_state": f_split, "offset_start": 0, "offset_end": 100},  # partial
+    ]
+    archiver._record_coverage(db_session, items, m.id)
+    db_session.commit()
+
+    db_session.refresh(f_complete)
+    db_session.refresh(f_split)
+
+    assert f_complete.redundancy_count == 1
+    assert f_split.redundancy_count == 0
+
+
+def test_redundancy_target_setting_is_read(db_session):
+    """_get_redundancy_target returns the stored value and defaults to 1."""
+    archiver = ArchiverService()
+
+    # Default: setting absent → 1
+    assert archiver._get_redundancy_target(db_session) == 1
+
+    db_session.add(models.SystemSetting(key="redundancy_target", value="3"))
+    db_session.commit()
+    assert archiver._get_redundancy_target(db_session) == 3

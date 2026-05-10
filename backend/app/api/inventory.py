@@ -473,6 +473,10 @@ def update_media(
             db_session.query(models.FileVersion).filter(
                 models.FileVersion.media_id == media_id
             ).delete()
+            # Purge coverage rows so redundancy_count is decremented for affected files
+            db_session.query(models.FileMediaCoverage).filter(
+                models.FileMediaCoverage.media_id == media_id
+            ).delete()
 
     if request_data.location is not None:
         media_record.location = request_data.location
@@ -596,6 +600,11 @@ def delete_media(media_id: int, db_session: Session = Depends(get_db)):
     if not media_record:
         raise HTTPException(status_code=404, detail="Media record not found.")
 
+    # Purge coverage rows first so redundancy_count is decremented before media deletion
+    db_session.query(models.FileMediaCoverage).filter(
+        models.FileMediaCoverage.media_id == media_id
+    ).delete()
+
     # Explicit cascade for clarity
     if media_record.versions:
         for version_record in media_record.versions:
@@ -631,6 +640,15 @@ def initialize_media(
 
     try:
         if storage_provider.initialize_media(media_record.identifier):
+            # Purge stale file_versions and coverage rows — tape is physically wiped
+            db_session.query(models.FileMediaCoverage).filter(
+                models.FileMediaCoverage.media_id == media_id
+            ).delete()
+            db_session.query(models.FileVersion).filter(
+                models.FileVersion.media_id == media_id
+            ).delete()
+            media_record.bytes_used = 0
+
             current_config = (
                 json.loads(media_record.extra_config)
                 if media_record.extra_config
@@ -653,8 +671,9 @@ def initialize_media(
                     media_record.extra_config = json.dumps(current_config)
                     db_session.commit()
             else:
-                if "device_path" not in current_config:
-                    current_config["device_path"] = storage_provider.device_path
+                dp = getattr(storage_provider, "device_path", None)
+                if dp and "device_path" not in current_config:
+                    current_config["device_path"] = dp
                     media_record.extra_config = json.dumps(current_config)
                     db_session.commit()
             return {"message": "Hardware initialization complete."}

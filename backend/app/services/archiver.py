@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
-from sqlalchemy import func, not_
+from sqlalchemy import func, not_, text
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm.exc import StaleDataError
 
@@ -206,8 +206,72 @@ class ArchiverService:
             .yield_per(1000)
         )
 
+    def _get_redundancy_target(self, db_session: Session) -> int:
+        """Reads the redundancy_target system setting; defaults to 1."""
+        setting = (
+            db_session.query(models.SystemSetting)
+            .filter(models.SystemSetting.key == "redundancy_target")
+            .first()
+        )
+        if setting:
+            try:
+                val = int(setting.value)
+                if val >= 1:
+                    return val
+            except (ValueError, TypeError):
+                pass
+        return 1
+
+    def _get_redundant_candidates(
+        self, db_session: Session, media_id: int, redundancy_target: int
+    ):
+        """Files that have ≥1 complete copy but fewer than redundancy_target copies.
+
+        These files are returned without a global-covered-bytes offset; each redundant
+        copy is written from byte 0.  Only files that fit entirely on this media are
+        included (no splits for redundant copies).
+        """
+        coverage_on_this_media = (
+            db_session.query(models.FileMediaCoverage.file_id)
+            .filter(models.FileMediaCoverage.media_id == media_id)
+            .scalar_subquery()
+        )
+
+        return (
+            db_session.query(models.FilesystemState)
+            .filter(
+                not_(models.FilesystemState.is_ignored),
+                models.FilesystemState.is_deleted.is_(False),
+                models.FilesystemState.redundancy_count >= 1,
+                models.FilesystemState.redundancy_count < redundancy_target,
+                ~models.FilesystemState.id.in_(coverage_on_this_media),
+            )
+            .yield_per(1000)
+        )
+
+    def _record_coverage(
+        self, db_session: Session, items: List[Dict[str, Any]], media_id: int
+    ) -> None:
+        """Insert file_media_coverage rows for non-split complete copies."""
+        for item in items:
+            if (
+                item["offset_start"] == 0
+                and item["offset_end"] == item["file_state"].size
+            ):
+                db_session.execute(
+                    text(
+                        "INSERT OR IGNORE INTO file_media_coverage (file_id, media_id)"
+                        " VALUES (:file_id, :media_id)"
+                    ),
+                    {"file_id": item["file_state"].id, "media_id": media_id},
+                )
+
     def assemble_backup_batch(
-        self, db_session: Session, media_id: int, max_batch_size: Optional[int] = None
+        self,
+        db_session: Session,
+        media_id: int,
+        max_batch_size: Optional[int] = None,
+        redundancy_target: int = 1,
     ) -> List[Dict[str, Any]]:
         """Selects a workload batch that fits within the available media capacity."""
         media_record = db_session.get(models.StorageMedia, media_id)
@@ -218,14 +282,38 @@ class ArchiverService:
         if max_batch_size:
             remaining_capacity = min(remaining_capacity, max_batch_size)
 
-        unbacked_files = self.get_unbacked_files(db_session)
         backup_workload = []
         accumulated_size = 0
         MINIMUM_FRAGMENT_SIZE = 100 * 1024 * 1024  # 100MB
 
+        # Track file IDs already added to avoid duplicates between phases
+        queued_ids: set = set()
+
+        # --- Phase 1: First-time backup ---
+        # Uses global covered-bytes offset so large files can be split across media.
+        # Files already with any version OR coverage on this media are skipped.
+        on_this_media_ids: set = set(
+            row[0]
+            for row in db_session.query(models.FileVersion.filesystem_state_id)
+            .filter(models.FileVersion.media_id == media_id)
+            .distinct()
+        )
+        on_this_media_ids.update(
+            row[0]
+            for row in db_session.query(models.FileMediaCoverage.file_id).filter(
+                models.FileMediaCoverage.media_id == media_id
+            )
+        )
+
+        unbacked_files = self.get_unbacked_files(db_session)
+
         for file_state, covered_bytes in unbacked_files:
             if accumulated_size >= remaining_capacity:
                 break
+            if file_state.id in on_this_media_ids:
+                continue
+            if file_state.redundancy_count >= redundancy_target:
+                continue
 
             remaining_file_bytes = file_state.size - covered_bytes
 
@@ -258,6 +346,7 @@ class ArchiverService:
                             "is_split": False,
                         }
                     )
+                    queued_ids.add(file_state.id)
                 continue
 
             available_space = remaining_capacity - accumulated_size
@@ -271,6 +360,7 @@ class ArchiverService:
                     }
                 )
                 accumulated_size += remaining_file_bytes
+                queued_ids.add(file_state.id)
             elif (
                 file_state.size > media_record.capacity
                 and available_space >= MINIMUM_FRAGMENT_SIZE
@@ -285,11 +375,43 @@ class ArchiverService:
                     }
                 )
                 accumulated_size += available_space
+                queued_ids.add(file_state.id)
                 break
             else:
                 # File is larger than remaining space but smaller than total media capacity.
                 # Skip it for this media to avoid unnecessary fragmentation.
                 continue
+
+        # --- Phase 2: Redundant copies ---
+        # Files with ≥1 complete copy that still need more.  Each redundant copy is
+        # written in full (offset 0 → size); no splitting allowed so that every
+        # redundant copy is independently restorable.
+        # is_redundant_copy=True skips deduplication so the file is physically written
+        # to this media rather than pointing back to an existing copy elsewhere.
+        if redundancy_target > 1 and accumulated_size < remaining_capacity:
+            for file_state in self._get_redundant_candidates(
+                db_session, media_id, redundancy_target
+            ):
+                if accumulated_size >= remaining_capacity:
+                    break
+                if file_state.id in queued_ids:
+                    continue
+
+                available_space = remaining_capacity - accumulated_size
+                if file_state.size <= available_space:
+                    backup_workload.append(
+                        {
+                            "file_state": file_state,
+                            "offset_start": 0,
+                            "offset_end": file_state.size,
+                            "is_split": False,
+                            "is_redundant_copy": True,
+                        }
+                    )
+                    accumulated_size += file_state.size
+                    queued_ids.add(file_state.id)
+                # If file doesn't fit, skip — can't create an independently
+                # restorable redundant copy on this media right now.
 
         return backup_workload
 
@@ -503,6 +625,8 @@ class ArchiverService:
         )
         JobManager.add_job_log(job_id, f"Starting backup to {media_record.identifier}")
 
+        redundancy_target = self._get_redundancy_target(db_session)
+
         from app.core.utils import set_process_priority
 
         set_process_priority("background")
@@ -575,7 +699,9 @@ class ArchiverService:
                 # Sync bytes_used from hardware so remaining_capacity is accurate
                 self._update_bytes_used_from_hardware(media_record, storage_provider)
 
-                workload_batch = self.assemble_backup_batch(db_session, media_id)
+                workload_batch = self.assemble_backup_batch(
+                    db_session, media_id, redundancy_target=redundancy_target
+                )
                 if not workload_batch:
                     JobManager.add_job_log(
                         job_id,
@@ -688,13 +814,17 @@ class ArchiverService:
 
                     for item in chunk_items:
                         file_state = item["file_state"]
-                        dupe = existing_versions.get(
-                            (
-                                file_state.sha256_hash,
-                                item["offset_start"],
-                                item["offset_end"],
+                        # Skip dedup for redundant copies: a pointer to another
+                        # media is not a physically independent redundant copy.
+                        dupe = None
+                        if not item.get("is_redundant_copy"):
+                            dupe = existing_versions.get(
+                                (
+                                    file_state.sha256_hash,
+                                    item["offset_start"],
+                                    item["offset_end"],
+                                )
                             )
-                        )
                         if dupe:
                             db_session.add(
                                 models.FileVersion(
@@ -814,6 +944,9 @@ class ArchiverService:
                                 )
                                 batch_versions_created += 1
 
+                        self._record_coverage(
+                            db_session, remaining_to_write, media_record.id
+                        )
                         try:
                             db_session.commit()
                             JobManager.add_job_log(
@@ -898,6 +1031,9 @@ class ArchiverService:
                             )
                             batch_versions_created += 1
 
+                        self._record_coverage(
+                            db_session, remaining_to_write, media_record.id
+                        )
                         try:
                             db_session.commit()
                             JobManager.add_job_log(
@@ -1049,6 +1185,9 @@ class ArchiverService:
                         if os.path.exists(staging_full_path):
                             os.remove(staging_full_path)
 
+                        self._record_coverage(
+                            db_session, remaining_to_write, media_record.id
+                        )
                         try:
                             db_session.commit()
                             JobManager.add_job_log(

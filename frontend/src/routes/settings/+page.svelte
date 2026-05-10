@@ -55,6 +55,7 @@
     let notificationUrls = $state<string[]>([]);
     let ioniceLevel = $state("idle");
     let tapeWriteStrategy = $state("stage");
+    let redundancyTarget = $state(1);
 
     // Secrets keystore
     let secretsList = $state<string[]>([]);
@@ -72,7 +73,8 @@
         archivalSchedule,
         notificationUrls,
         ioniceLevel,
-        tapeWriteStrategy
+        tapeWriteStrategy,
+        redundancyTarget
     }));
 
     beforeNavigate((navigation: any) => {
@@ -163,6 +165,7 @@
                 if (data.notification_urls) notificationUrls = JSON.parse(data.notification_urls);
                 if (data.ionice_level) ioniceLevel = data.ionice_level;
                 if (data.tape_write_strategy) tapeWriteStrategy = data.tape_write_strategy;
+                if (data.redundancy_target) redundancyTarget = parseInt(data.redundancy_target, 10) || 1;
             }
 
             // Load secrets
@@ -179,7 +182,8 @@
                 archivalSchedule,
                 notificationUrls,
                 ioniceLevel,
-                tapeWriteStrategy
+                tapeWriteStrategy,
+                redundancyTarget
             });
         } catch (error) {
             toast.error("Failed to load system configuration");
@@ -200,7 +204,8 @@
                 updateSettings({ body: { key: "schedule_archival", value: archivalSchedule } }),
                 updateSettings({ body: { key: "notification_urls", value: JSON.stringify(notificationUrls) } }),
                 updateSettings({ body: { key: "ionice_level", value: ioniceLevel } }),
-                updateSettings({ body: { key: "tape_write_strategy", value: tapeWriteStrategy } })
+                updateSettings({ body: { key: "tape_write_strategy", value: tapeWriteStrategy } }),
+                updateSettings({ body: { key: "redundancy_target", value: String(redundancyTarget) } })
             ]);
 
             // Snapshot saved state
@@ -213,7 +218,8 @@
                 archivalSchedule,
                 notificationUrls,
                 ioniceLevel,
-                tapeWriteStrategy
+                tapeWriteStrategy,
+                redundancyTarget
             });
 
             toast.success("System configuration committed");
@@ -687,6 +693,18 @@
                                         <ChevronDown size={16} class="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
                                     </div>
                                     <p class="text-[10px] text-text-secondary leading-tight opacity-60">Stream mode requires a fast source disk that can sustain the tape drive's minimum streaming speed to avoid shoe-shining.</p>
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-xs font-medium text-text-secondary ml-1" for="redundancy-target">Redundancy target</label>
+                                    <input
+                                        id="redundancy-target"
+                                        type="number"
+                                        min="1"
+                                        max="10"
+                                        bind:value={redundancyTarget}
+                                        class="w-full h-10 bg-bg-primary border border-border-color rounded-xl px-4 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                    />
+                                    <p class="text-[10px] text-text-secondary leading-tight opacity-60">Number of copies each file should have across active media. Auto-backup cycles through media until this target is met.</p>
                                 </div>
                             </div>
                         </Card>

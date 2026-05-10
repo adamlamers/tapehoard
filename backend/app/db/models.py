@@ -35,6 +35,10 @@ class FilesystemState(Base):
         DateTime, default=lambda: datetime.now(timezone.utc), index=True
     )
 
+    redundancy_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0"
+    )
+
     versions: Mapped[List["FileVersion"]] = relationship(back_populates="file_state")
 
 
@@ -207,4 +211,15 @@ class SystemSetting(Base):
         DateTime,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class FileMediaCoverage(Base):
+    __tablename__ = "file_media_coverage"
+
+    file_id: Mapped[int] = mapped_column(
+        ForeignKey("filesystem_state.id", ondelete="CASCADE"), primary_key=True
+    )
+    media_id: Mapped[int] = mapped_column(
+        ForeignKey("storage_media.id", ondelete="CASCADE"), primary_key=True
     )
