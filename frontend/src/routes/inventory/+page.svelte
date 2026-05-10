@@ -861,7 +861,7 @@
     <td class="px-6 py-3">
         <div class="flex items-center gap-1.5 text-text-secondary">
             <MapPin size={12} class="opacity-40" />
-            <span class="text-xs font-medium">{media.location || (media.location_building ? `${media.location_building}${media.location_room ? ' / ' + media.location_room : ''}` : 'Unknown')}</span>
+            <span class="text-xs font-medium">{media.location_building ? [media.location_building, media.location_room, media.location_rack, media.location_slot].filter(Boolean).join(' / ') : (media.location || 'Unknown')}</span>
         </div>
     </td>
     <td class="px-6 py-3">

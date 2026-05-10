@@ -189,7 +189,10 @@ class CloudStorageProvider(AbstractStorageProvider):
                     Bucket=self.bucket_name,
                     Key=object_key,
                     Body=payload,
-                    Metadata={"x-amz-meta-tapehoard-encrypted": "v2-gcm"},
+                    Metadata={
+                        "x-amz-meta-tapehoard-encrypted": "v2-gcm",
+                        "x-amz-meta-tapehoard-type": "archive",
+                    },
                 )
                 return object_key
             except Exception as e:

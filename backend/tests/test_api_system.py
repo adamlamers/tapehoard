@@ -411,16 +411,16 @@ def test_create_and_list_secret(client):
 
 
 def test_get_secret_value(client):
-    """Tests retrieving a secret value by name."""
+    """Tests that secret values are not retrievable by name endpoint; name still appears in list."""
     client.post(
         "/system/secrets", json={"name": "encryption-key", "value": "super-secret"}
     )
 
     response = client.get("/system/secrets/encryption-key")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["name"] == "encryption-key"
-    assert data["value"] == "super-secret"
+    assert response.status_code == 404
+
+    list_response = client.get("/system/secrets")
+    assert "encryption-key" in list_response.json()
 
 
 def test_get_secret_not_found(client):
@@ -448,17 +448,17 @@ def test_delete_secret_not_found(client):
 
 
 def test_update_existing_secret(client):
-    """Tests overwriting an existing secret value."""
+    """Tests overwriting an existing secret does not error and key remains in list."""
     client.post(
         "/system/secrets", json={"name": " rotating-key ", "value": "old-value"}
     )
-    client.post(
+    response = client.post(
         "/system/secrets", json={"name": " rotating-key ", "value": "new-value"}
     )
-
-    response = client.get("/system/secrets/ rotating-key ")
     assert response.status_code == 200
-    assert response.json()["value"] == "new-value"
+
+    list_response = client.get("/system/secrets")
+    assert " rotating-key " in list_response.json()
 
 
 # ── Filesystem Browse ──
