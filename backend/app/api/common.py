@@ -177,6 +177,7 @@ class DashboardStatsSchema(BaseModel):
     media_distribution: Dict[str, int]
     last_scan_time: Optional[datetime]
     redundancy_ratio: float
+    redundancy_target: int
 
 
 class StagingInfoSchema(BaseModel):

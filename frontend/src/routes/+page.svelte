@@ -162,17 +162,17 @@
 
                         <div class="space-y-4">
                             <div class="flex flex-col gap-1.5">
-                                <span class="text-xs text-text-secondary opacity-60 block">Archived data</span>
+                                <span class="text-xs text-text-secondary opacity-60 block">Total stored</span>
                                 <h4 class="text-3xl font-bold text-success-color mono tabular-nums">{formatSize(stats.archived_data_size)}</h4>
-                                <p class="text-[10px] font-medium text-text-secondary uppercase opacity-40">Unique bytes on media</p>
+                                <p class="text-[10px] font-medium text-text-secondary uppercase opacity-40">Includes redundant copies</p>
                             </div>
                         </div>
 
                         <div class="space-y-4">
                             <div class="flex flex-col gap-1.5">
-                                <span class="text-xs text-text-secondary opacity-60 block">Vulnerable data</span>
+                                <span class="text-xs text-text-secondary opacity-60 block">Under-protected data</span>
                                 <h4 class="text-3xl font-bold text-error-color mono tabular-nums">{formatSize(stats.unprotected_data_size)}</h4>
-                                <p class="text-[10px] font-medium text-text-secondary uppercase opacity-40">Pending archival</p>
+                                <p class="text-[10px] font-medium text-text-secondary uppercase opacity-40">Below {stats.redundancy_target || 1}× target</p>
                             </div>
                         </div>
 
@@ -206,8 +206,10 @@
                                 <ShieldCheck size={16} />
                             </div>
                             <div>
-                                <span class="text-xs text-text-secondary opacity-60 block">Redundancy ratio</span>
-                                <span class="text-sm font-medium text-success-color mono">{stats.redundancy_ratio}% replication</span>
+                                <span class="text-xs text-text-secondary opacity-60 block">Coverage vs target ({stats.redundancy_target || 1}×)</span>
+                                <span class="text-sm font-medium text-success-color mono">
+                                    {stats.redundancy_ratio >= 100 ? '✓' : ''} {stats.redundancy_ratio.toFixed(1)}%
+                                </span>
                             </div>
                         </div>
                     </div>

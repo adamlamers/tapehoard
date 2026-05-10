@@ -103,7 +103,8 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
     )
 
     eligible_size = max(total_size - ignored_size, 1)
-    redundancy_percentage = min((archived_size / eligible_size) * 100, 100.0)
+    # Redundancy ratio can exceed 100% when multiple copies exist
+    redundancy_percentage = (archived_size / eligible_size) * 100
 
     return DashboardStatsSchema(
         monitored_files_count=eligible_count,
@@ -118,6 +119,7 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
         media_distribution=media_counts,
         last_scan_time=last_scan.completed_at if last_scan else None,
         redundancy_ratio=round(redundancy_percentage, 1),
+        redundancy_target=redundancy_target,
     )
 
 

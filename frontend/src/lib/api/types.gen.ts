@@ -310,6 +310,10 @@ export type DashboardStatsSchema = {
      * Redundancy Ratio
      */
     redundancy_ratio: number;
+    /**
+     * Redundancy Target
+     */
+    redundancy_target: number;
 };
 
 /**
