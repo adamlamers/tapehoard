@@ -325,12 +325,23 @@ if not item.get("is_redundant_copy"):
 
 ### Media Status Transitions and Coverage
 
+| Status | Counts Toward Redundancy | Notes |
+|--------|-------------------------|-------|
+| `active` | ✅ Yes | Online and available for writes |
+| `full` | ✅ Yes | Online but at capacity |
+| `offline` | ✅ Yes | **Offline media still provides valid backups** - ejected tapes, disconnected HDDs |
+| `failed` | ❌ No | Hardware failure, data presumed lost |
+| `retired` | ❌ No | Intentionally decommissioned, data deleted |
+
 | Transition | `file_versions` | `file_media_coverage` | Effect on `redundancy_count` |
 |------------|----------------|----------------------|------------------------------|
 | `→ FAILED` | Deleted | Deleted (trigger fires) | Decremented for all affected files |
 | `→ RETIRED` | Deleted | Deleted (trigger fires) | Decremented for all affected files |
+| `→ OFFLINE` | Kept | Kept | No change - still counts as valid backup |
 | `initialize` (wipe) | Deleted | Deleted (trigger fires) | Decremented for all affected files |
 | Delete media record | Deleted | Deleted via `ON DELETE CASCADE` (trigger fires) | Decremented |
+
+**Important:** All queries checking for "valid" or "protected" data must include `status IN ('active', 'full', 'offline')` - excluding only `failed` and `retired`. Offline media (ejected tapes, disconnected drives) still provides protection.
 
 ### Test Mode: LTO vs HDD
 

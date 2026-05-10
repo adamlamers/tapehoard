@@ -49,7 +49,7 @@ def list_discrepancies(db_session: Session = Depends(get_db)):
             .join(models.StorageMedia)
             .filter(
                 models.FileVersion.filesystem_state_id.in_(record_ids),
-                models.StorageMedia.status.in_(["active", "full"]),
+                models.StorageMedia.status.in_(["active", "full", "offline"]),
             )
             .distinct()
             .all()
@@ -459,7 +459,7 @@ def browse_discrepancies(
             .join(models.StorageMedia)
             .filter(
                 models.FileVersion.filesystem_state_id.in_(record_ids),
-                models.StorageMedia.status.in_(["active", "full"]),
+                models.StorageMedia.status.in_(["active", "full", "offline"]),
             )
             .distinct()
             .all()

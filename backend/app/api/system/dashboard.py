@@ -46,12 +46,12 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
             COALESCE(SUM(CASE WHEN sha256_hash IS NOT NULL AND is_ignored = 0 AND is_deleted = 0 THEN 1 ELSE 0 END), 0) as hashed_count,
             COALESCE(SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 THEN 1 ELSE 0 END), 0) as eligible_count,
             COALESCE(SUM(CASE WHEN is_deleted = 1 AND missing_acknowledged_at IS NULL AND is_ignored = 0 THEN 1 ELSE 0 END), 0) as active_discrepancies_count,
-            -- Bytes actually written to active/full media (includes redundant copies, excludes failed/retired media)
+            -- Bytes actually written to active/full/offline media (includes redundant copies, excludes failed/retired media)
             COALESCE((
                 SELECT SUM(fv.offset_end - fv.offset_start)
                 FROM file_versions fv
                 JOIN storage_media sm ON sm.id = fv.media_id
-                WHERE sm.status IN ('active', 'full')
+                WHERE sm.status IN ('active', 'full', 'offline')
             ), 0) as archived_size,
             -- Files with fewer complete copies than the redundancy target
             COALESCE(SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 AND redundancy_count < :target THEN 1 ELSE 0 END), 0) as unprotected_count,
