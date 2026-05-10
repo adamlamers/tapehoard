@@ -30,7 +30,7 @@
     import { Input } from "$lib/components/ui/input";
     import {
         getSettings,
-        updateSettings,
+        updateSettingsBatch,
         testNotification,
         exportDatabase,
         importDatabase,
@@ -64,6 +64,7 @@
     let showAddSecret = $state(false);
 
     let initialState = $state("");
+    let initialValues = $state<Record<string, string>>({});
     const isDirty = $derived(initialState !== JSON.stringify({
         sourceRoots,
         restoreDestinations,
@@ -172,7 +173,7 @@
             const secretsRes = await listSecrets();
             if (secretsRes.data) secretsList = secretsRes.data as string[];
 
-            // Capture snapshot for dirty check
+            // Capture snapshot for dirty check and track initial values
             initialState = JSON.stringify({
                 sourceRoots,
                 restoreDestinations,
@@ -185,6 +186,18 @@
                 tapeWriteStrategy,
                 redundancyTarget
             });
+            initialValues = {
+                source_roots: JSON.stringify(sourceRoots),
+                restore_destinations: JSON.stringify(restoreDestinations),
+                tape_drives: JSON.stringify(tapeDrives),
+                global_exclusions: globalExclusions,
+                schedule_scan: scanSchedule,
+                schedule_archival: archivalSchedule,
+                notification_urls: JSON.stringify(notificationUrls),
+                ionice_level: ioniceLevel,
+                tape_write_strategy: tapeWriteStrategy,
+                redundancy_target: String(redundancyTarget)
+            };
         } catch (error) {
             toast.error("Failed to load system configuration");
         } finally {
@@ -195,20 +208,35 @@
     async function saveSettings() {
         saving = true;
         try {
-            await Promise.all([
-                updateSettings({ body: { key: "source_roots", value: JSON.stringify(sourceRoots) } }),
-                updateSettings({ body: { key: "restore_destinations", value: JSON.stringify(restoreDestinations) } }),
-                updateSettings({ body: { key: "tape_drives", value: JSON.stringify(tapeDrives) } }),
-                updateSettings({ body: { key: "global_exclusions", value: globalExclusions } }),
-                updateSettings({ body: { key: "schedule_scan", value: scanSchedule } }),
-                updateSettings({ body: { key: "schedule_archival", value: archivalSchedule } }),
-                updateSettings({ body: { key: "notification_urls", value: JSON.stringify(notificationUrls) } }),
-                updateSettings({ body: { key: "ionice_level", value: ioniceLevel } }),
-                updateSettings({ body: { key: "tape_write_strategy", value: tapeWriteStrategy } }),
-                updateSettings({ body: { key: "redundancy_target", value: String(redundancyTarget) } })
-            ]);
+            // Build object of only changed settings
+            const changedSettings: Record<string, string> = {};
+
+            const currentValues: Record<string, string> = {
+                source_roots: JSON.stringify(sourceRoots),
+                restore_destinations: JSON.stringify(restoreDestinations),
+                tape_drives: JSON.stringify(tapeDrives),
+                global_exclusions: globalExclusions,
+                schedule_scan: scanSchedule,
+                schedule_archival: archivalSchedule,
+                notification_urls: JSON.stringify(notificationUrls),
+                ionice_level: ioniceLevel,
+                tape_write_strategy: tapeWriteStrategy,
+                redundancy_target: String(redundancyTarget)
+            };
+
+            for (const [key, value] of Object.entries(currentValues)) {
+                if (value !== initialValues[key]) {
+                    changedSettings[key] = value;
+                }
+            }
+
+            const changedCount = Object.keys(changedSettings).length;
+            if (changedCount > 0) {
+                await updateSettingsBatch({ body: { settings: changedSettings } });
+            }
 
             // Snapshot saved state
+            initialValues = { ...currentValues };
             initialState = JSON.stringify({
                 sourceRoots,
                 restoreDestinations,
@@ -222,7 +250,7 @@
                 redundancyTarget
             });
 
-            toast.success("System configuration committed");
+            toast.success(`Saved ${changedCount} setting${changedCount === 1 ? '' : 's'}`);
         } catch (error) {
             toast.error("Failed to save settings");
         } finally {

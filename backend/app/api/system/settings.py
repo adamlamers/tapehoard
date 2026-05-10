@@ -112,6 +112,47 @@ def update_settings(setting_data: SettingSchema, db_session: Session = Depends(g
     return {"message": "Setting committed."}
 
 
+class BatchSettingsRequest(BaseModel):
+    settings: Dict[str, str]
+
+
+@router.post("/settings/batch", operation_id="update_settings_batch")
+def update_settings_batch(
+    request_data: BatchSettingsRequest, db_session: Session = Depends(get_db)
+):
+    """Updates multiple system configuration settings in a single request."""
+    needs_schedule_reload = False
+    needs_exclusion_recompute = False
+
+    for key, value in request_data.settings.items():
+        existing_record = (
+            db_session.query(models.SystemSetting)
+            .filter(models.SystemSetting.key == key)
+            .first()
+        )
+        if existing_record:
+            existing_record.value = value
+        else:
+            db_session.add(models.SystemSetting(key=key, value=value))
+
+        if key in ["schedule_scan", "schedule_archival"]:
+            needs_schedule_reload = True
+        if key == "global_exclusions":
+            needs_exclusion_recompute = True
+
+    db_session.commit()
+
+    if needs_schedule_reload:
+        from app.services.scheduler import scheduler_manager
+
+        scheduler_manager.reload()
+
+    if needs_exclusion_recompute:
+        recompute_exclusion_policy(db_session)
+
+    return {"message": f"{len(request_data.settings)} settings committed."}
+
+
 @router.post(
     "/settings/test-exclusions",
     response_model=TestExclusionsResponse,

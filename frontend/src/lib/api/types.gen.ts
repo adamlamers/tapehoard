@@ -55,6 +55,18 @@ export type BatchResolveReport = {
 };
 
 /**
+ * BatchSettingsRequest
+ */
+export type BatchSettingsRequest = {
+    /**
+     * Settings
+     */
+    settings: {
+        [key: string]: string;
+    };
+};
+
+/**
  * BatchTrackRequest
  */
 export type BatchTrackRequest = {
@@ -1982,6 +1994,29 @@ export type UpdateSettingsErrors = {
 export type UpdateSettingsError = UpdateSettingsErrors[keyof UpdateSettingsErrors];
 
 export type UpdateSettingsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type UpdateSettingsBatchData = {
+    body: BatchSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/system/settings/batch';
+};
+
+export type UpdateSettingsBatchErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateSettingsBatchError = UpdateSettingsBatchErrors[keyof UpdateSettingsBatchErrors];
+
+export type UpdateSettingsBatchResponses = {
     /**
      * Successful Response
      */

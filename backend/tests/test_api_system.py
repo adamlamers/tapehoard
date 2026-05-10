@@ -546,6 +546,36 @@ def test_ignore_hardware_duplicate(client):
     assert response.json()["ignored_hardware"].count("DISK_DUP") == 1
 
 
+def test_update_settings_batch(client):
+    """Tests batch updating multiple settings in a single request."""
+    response = client.post(
+        "/system/settings/batch",
+        json={
+            "settings": {
+                "source_roots": '["/data"]',
+                "scan_schedule": "0 2 * * *",
+                "redundancy_target": "2",
+            }
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["message"] == "3 settings committed."
+
+    # Verify settings were saved
+    response = client.get("/system/settings")
+    data = response.json()
+    assert data["source_roots"] == '["/data"]'
+    assert data["scan_schedule"] == "0 2 * * *"
+    assert data["redundancy_target"] == "2"
+
+
+def test_update_settings_batch_empty(client):
+    """Tests batch updating with empty settings works."""
+    response = client.post("/system/settings/batch", json={"settings": {}})
+    assert response.status_code == 200
+    assert response.json()["message"] == "0 settings committed."
+
+
 # ── Database Export ──
 
 
