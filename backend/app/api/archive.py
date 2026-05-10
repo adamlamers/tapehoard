@@ -53,9 +53,9 @@ def browse(path: str = "ROOT", db_session: Session = Depends(get_db)):
                     SUM(CASE WHEN fs.is_ignored = 0 OR EXISTS(SELECT 1 FROM file_versions fv2 WHERE fv2.filesystem_state_id = fs.id) THEN 1 ELSE 0 END) as total,
                     SUM(CASE WHEN EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) THEN 1 ELSE 0 END) as protected,
                     (SELECT GROUP_CONCAT(DISTINCT sm.identifier)
-                     FROM file_versions fv
-                     JOIN storage_media sm ON sm.id = fv.media_id
-                     JOIN filesystem_state fs2 ON fs2.id = fv.filesystem_state_id
+                     FROM file_media_coverage fmc
+                     JOIN storage_media sm ON sm.id = fmc.media_id
+                     JOIN filesystem_state fs2 ON fs2.id = fmc.file_id
                      WHERE (fs2.file_path = :r OR fs2.file_path LIKE :prefix)) as media_list,
                     SUM(CASE WHEN EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = fs.id) THEN 1 ELSE 0 END) as selected_count,
                     SUM(fs.size) as total_size
@@ -106,9 +106,9 @@ def browse(path: str = "ROOT", db_session: Session = Depends(get_db)):
             SUM(CASE WHEN is_ignored = 0 OR EXISTS(SELECT 1 FROM file_versions fv3 WHERE fv3.filesystem_state_id = filesystem_state.id) THEN 1 ELSE 0 END) as total,
             SUM(CASE WHEN EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = filesystem_state.id) THEN 1 ELSE 0 END) as protected,
             (SELECT GROUP_CONCAT(DISTINCT sm.identifier)
-             FROM file_versions fv
-             JOIN storage_media sm ON sm.id = fv.media_id
-             JOIN filesystem_state fs2 ON fs2.id = fv.filesystem_state_id
+             FROM file_media_coverage fmc
+             JOIN storage_media sm ON sm.id = fmc.media_id
+             JOIN filesystem_state fs2 ON fs2.id = fmc.file_id
              WHERE fs2.file_path LIKE :prefix || SUBSTR(file_path, LENGTH(:prefix) + 1, INSTR(SUBSTR(file_path, LENGTH(:prefix) + 1), '/') - 1) || '/%') as media_list,
             SUM(CASE WHEN EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = filesystem_state.id) THEN 1 ELSE 0 END) as selected_count,
             SUM(size) as total_size
@@ -128,9 +128,9 @@ def browse(path: str = "ROOT", db_session: Session = Depends(get_db)):
             fs.id, fs.file_path, fs.size, fs.mtime,
             EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) as has_version,
             (SELECT GROUP_CONCAT(sm.identifier)
-             FROM file_versions fv
-             JOIN storage_media sm ON sm.id = fv.media_id
-             WHERE fv.filesystem_state_id = fs.id) as media_list,
+             FROM file_media_coverage fmc
+             JOIN storage_media sm ON sm.id = fmc.media_id
+             WHERE fmc.file_id = fs.id) as media_list,
             EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = fs.id) as is_selected,
             COALESCE((SELECT SUM(fv.offset_end - fv.offset_start)
                       FROM file_versions fv
@@ -222,9 +222,9 @@ def search(q: str, path: Optional[str] = None, db_session: Session = Depends(get
             fs.id, fs.file_path, fs.size, fs.mtime,
             EXISTS(SELECT 1 FROM file_versions fv WHERE fv.filesystem_state_id = fs.id) as has_version,
             (SELECT GROUP_CONCAT(sm.identifier)
-             FROM file_versions fv
-             JOIN storage_media sm ON sm.id = fv.media_id
-             WHERE fv.filesystem_state_id = fs.id) as media_list,
+             FROM file_media_coverage fmc
+             JOIN storage_media sm ON sm.id = fmc.media_id
+             WHERE fmc.file_id = fs.id) as media_list,
             EXISTS(SELECT 1 FROM restore_cart rc WHERE rc.filesystem_state_id = fs.id) as is_selected,
             COALESCE((SELECT SUM(fv.offset_end - fv.offset_start)
                       FROM file_versions fv

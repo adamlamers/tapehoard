@@ -1168,3 +1168,86 @@ def test_redundancy_target_setting_is_read(db_session):
     db_session.add(models.SystemSetting(key="redundancy_target", value="3"))
     db_session.commit()
     assert archiver._get_redundancy_target(db_session) == 3
+
+
+def test_phase2_picks_up_redundancy_count_2_for_target3(db_session):
+    """A file with redundancy_count=2 (with FileVersion records) must appear
+    as a Phase 2 candidate when redundancy_target=3."""
+    archiver = ArchiverService()
+
+    m_a = models.StorageMedia(
+        media_type="hdd",
+        identifier="P2T3_A",
+        capacity=10_000_000,
+        status="active",
+        bytes_used=0,
+    )
+    m_b = models.StorageMedia(
+        media_type="hdd",
+        identifier="P2T3_B",
+        capacity=10_000_000,
+        status="active",
+        bytes_used=0,
+    )
+    m_c = models.StorageMedia(
+        media_type="hdd",
+        identifier="P2T3_C",
+        capacity=10_000_000,
+        status="active",
+        bytes_used=0,
+    )
+    db_session.add_all([m_a, m_b, m_c])
+
+    f = models.FilesystemState(
+        file_path="/p2t3/file.txt", size=100, mtime=1, sha256_hash="p2t3hash"
+    )
+    db_session.add(f)
+    db_session.flush()
+
+    # Simulate 2 complete copies: FileVersion + FileMediaCoverage on A and B
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=f.id,
+            media_id=m_a.id,
+            file_number="1",
+            offset_start=0,
+            offset_end=100,
+        )
+    )
+    db_session.add(
+        models.FileVersion(
+            filesystem_state_id=f.id,
+            media_id=m_b.id,
+            file_number="2",
+            offset_start=0,
+            offset_end=100,
+        )
+    )
+    db_session.add(models.FileMediaCoverage(file_id=f.id, media_id=m_a.id))
+    db_session.add(models.FileMediaCoverage(file_id=f.id, media_id=m_b.id))
+    db_session.flush()
+    db_session.refresh(f)
+    assert f.redundancy_count == 2, f"Expected 2, got {f.redundancy_count}"
+    db_session.commit()
+
+    # Target=3, 2 copies exist → file should appear in m_c's batch (Phase 2)
+    batch = archiver.assemble_backup_batch(db_session, m_c.id, redundancy_target=3)
+    paths = [item["file_state"].file_path for item in batch]
+    print(
+        f"Batch items: {[(i['file_state'].file_path, i.get('is_redundant_copy')) for i in batch]}"
+    )
+    assert (
+        "/p2t3/file.txt" in paths
+    ), f"File should be in batch for 3rd copy, got: {paths}"
+
+    # Also verify it's NOT in m_a or m_b's batch (already have copies)
+    batch_a = archiver.assemble_backup_batch(db_session, m_a.id, redundancy_target=3)
+    batch_b = archiver.assemble_backup_batch(db_session, m_b.id, redundancy_target=3)
+    paths_a = [i["file_state"].file_path for i in batch_a]
+    paths_b = [i["file_state"].file_path for i in batch_b]
+    assert (
+        "/p2t3/file.txt" not in paths_a
+    ), "File should NOT be in m_a batch (already has copy)"
+    assert (
+        "/p2t3/file.txt" not in paths_b
+    ), "File should NOT be in m_b batch (already has copy)"

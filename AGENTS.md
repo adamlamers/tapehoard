@@ -402,6 +402,22 @@ Pre-commit hooks are configured but may stash unstaged changes.
 | `AGENTS.md` | This file — agent development guide |
 | `MULTIPLE_REDUNDANCY.md` | Redundancy feature — what's implemented, what's remaining (restore manifest set cover, dashboard under-protected count, insights query, metadata API) |
 
+## Known Migration Issues
+
+### Migration c2983e8729c5 - Offline Media Coverage
+
+**Bug:** The original migration only backfilled `file_media_coverage` for media with status `'active'` or `'full'`, excluding `'offline'` media.
+
+**Impact:** Files on offline tapes have `redundancy_count = 0` even though valid copies exist. The Archive Browser (after the fix to use `file_media_coverage`) won't show offline media locations.
+
+**Fix:** Run the fix script for existing databases:
+```bash
+cd backend
+uv run python scripts/fix_offline_coverage.py --apply
+```
+
+**Migration Updated:** The migration file has been updated to include `'offline'` status for new deployments.
+
 ## Critical Context for Tape Operations
 
 ### `_run_mt` Retry Strategy

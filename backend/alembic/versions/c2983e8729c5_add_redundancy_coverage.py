@@ -40,14 +40,16 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("file_id", "media_id"),
     )
 
-    # Backfill from existing file_versions — only non-split complete copies on active/full media
+    # Backfill from existing file_versions — only non-split complete copies
+    # Include all media statuses (active, full, offline) as they all provide protection.
+    # Failed/retired media should already have their file_versions purged.
     op.execute("""
         INSERT OR IGNORE INTO file_media_coverage (file_id, media_id)
         SELECT DISTINCT fv.filesystem_state_id, fv.media_id
         FROM file_versions fv
         JOIN storage_media sm ON sm.id = fv.media_id
         JOIN filesystem_state fs ON fs.id = fv.filesystem_state_id
-        WHERE sm.status IN ('active', 'full')
+        WHERE sm.status IN ('active', 'full', 'offline')
           AND fv.offset_start = 0
           AND fv.offset_end = fs.size
     """)

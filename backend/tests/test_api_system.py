@@ -224,6 +224,7 @@ def test_dashboard_stats_excludes_failed_media(client, db_session):
             offset_end=2048,
         )
     )
+    db_session.add(models.FileMediaCoverage(file_id=file1.id, media_id=active_media.id))
     db_session.add(
         models.FileVersion(
             filesystem_state_id=file2.id,
@@ -281,6 +282,7 @@ def test_dashboard_stats_counts_only_archived_bytes(client, db_session):
             offset_end=2048,
         )
     )
+    db_session.add(models.FileMediaCoverage(file_id=file1.id, media_id=active_media.id))
     db_session.add(
         models.FileVersion(
             filesystem_state_id=file2.id,
@@ -298,10 +300,10 @@ def test_dashboard_stats_counts_only_archived_bytes(client, db_session):
 
     # Archived data = 2048 + 500 = 2548, NOT 2048 + 3000
     assert data["archived_data_size"] == 2548
-    # Unprotected count = 1 (partial file is still vulnerable)
+    # Unprotected count = 1 (partial file has no complete copy, redundancy_count=0)
     assert data["unprotected_files_count"] == 1
-    # Unprotected size = 3000 - 500 = 2500 (the remaining unarchived bytes)
-    assert data["unprotected_data_size"] == 2500
+    # Unprotected size = 3000 (full size of file2 — no complete copy exists)
+    assert data["unprotected_data_size"] == 3000
 
 
 def test_discrepancies_excludes_versions_on_unavailable_media(client, db_session):

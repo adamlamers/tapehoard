@@ -282,6 +282,12 @@ class ArchiverService:
         if max_batch_size:
             remaining_capacity = min(remaining_capacity, max_batch_size)
 
+        logger.debug(
+            f"assemble_backup_batch: media={media_record.identifier} "
+            f"capacity={media_record.capacity} bytes_used={media_record.bytes_used} "
+            f"remaining={remaining_capacity} redundancy_target={redundancy_target}"
+        )
+
         backup_workload = []
         accumulated_size = 0
         MINIMUM_FRAGMENT_SIZE = 100 * 1024 * 1024  # 100MB
@@ -382,6 +388,11 @@ class ArchiverService:
                 # Skip it for this media to avoid unnecessary fragmentation.
                 continue
 
+        logger.debug(
+            f"assemble_backup_batch: Phase 1 complete — {len(backup_workload)} files, "
+            f"accumulated={accumulated_size} of {remaining_capacity} bytes"
+        )
+
         # --- Phase 2: Redundant copies ---
         # Files with ≥1 complete copy that still need more.  Each redundant copy is
         # written in full (offset 0 → size); no splitting allowed so that every
@@ -389,9 +400,15 @@ class ArchiverService:
         # is_redundant_copy=True skips deduplication so the file is physically written
         # to this media rather than pointing back to an existing copy elsewhere.
         if redundancy_target > 1 and accumulated_size < remaining_capacity:
-            for file_state in self._get_redundant_candidates(
-                db_session, media_id, redundancy_target
-            ):
+            p2_candidates = list(
+                self._get_redundant_candidates(db_session, media_id, redundancy_target)
+            )
+            logger.debug(
+                f"assemble_backup_batch: Phase 2 — {len(p2_candidates)} redundant "
+                f"candidates for media={media_record.identifier} target={redundancy_target} "
+                f"remaining_space={remaining_capacity - accumulated_size}"
+            )
+            for file_state in p2_candidates:
                 if accumulated_size >= remaining_capacity:
                     break
                 if file_state.id in queued_ids:
@@ -412,6 +429,11 @@ class ArchiverService:
                     queued_ids.add(file_state.id)
                 # If file doesn't fit, skip — can't create an independently
                 # restorable redundant copy on this media right now.
+        elif redundancy_target > 1:
+            logger.debug(
+                f"assemble_backup_batch: Phase 2 skipped — media at capacity "
+                f"(accumulated={accumulated_size} >= remaining={remaining_capacity})"
+            )
 
         return backup_workload
 
@@ -703,9 +725,20 @@ class ArchiverService:
                     db_session, media_id, redundancy_target=redundancy_target
                 )
                 if not workload_batch:
+                    db_session.refresh(media_record)
+                    remaining = media_record.capacity - media_record.bytes_used
+                    reason = (
+                        "media is full"
+                        if remaining <= 0
+                        else (
+                            f"all files at or above redundancy target ({redundancy_target}), "
+                            f"already covered on this media, or too large for remaining "
+                            f"{remaining:,} bytes"
+                        )
+                    )
                     JobManager.add_job_log(
                         job_id,
-                        f"Batch {batch_iteration}: No more files require backup",
+                        f"Batch {batch_iteration}: No more files require backup — {reason}",
                     )
                     break
 

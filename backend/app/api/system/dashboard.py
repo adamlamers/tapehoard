@@ -12,6 +12,22 @@ from app.db.database import get_db
 router = APIRouter(tags=["System"])
 
 
+def _get_redundancy_target(db_session: Session) -> int:
+    setting = (
+        db_session.query(models.SystemSetting)
+        .filter_by(key="redundancy_target")
+        .first()
+    )
+    if setting:
+        try:
+            v = int(setting.value)
+            if v >= 1:
+                return v
+        except (ValueError, TypeError):
+            pass
+    return 1
+
+
 @router.get(
     "/dashboard/stats",
     response_model=DashboardStatsSchema,
@@ -19,73 +35,63 @@ router = APIRouter(tags=["System"])
 )
 def get_dashboard_stats(db_session: Session = Depends(get_db)):
     """Computes high-level system statistics for the overview dashboard."""
+    redundancy_target = _get_redundancy_target(db_session)
+
     aggregation_sql = text("""
         SELECT
             COUNT(*) as total_count,
-            SUM(size) as total_size,
-            SUM(CASE WHEN is_ignored = 1 THEN 1 ELSE 0 END) as ignored_count,
-            SUM(CASE WHEN is_ignored = 1 THEN size ELSE 0 END) as ignored_size,
-            SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 AND
-                COALESCE((SELECT SUM(fv.offset_end - fv.offset_start)
-                          FROM file_versions fv
-                          JOIN storage_media sm ON sm.id = fv.media_id
-                          WHERE fv.filesystem_state_id = filesystem_state.id
-                          AND sm.status IN ('active', 'full')), 0) < filesystem_state.size
-            THEN 1 ELSE 0 END) as unprotected_count,
-            SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 AND
-                COALESCE((SELECT SUM(fv.offset_end - fv.offset_start)
-                          FROM file_versions fv
-                          JOIN storage_media sm ON sm.id = fv.media_id
-                          WHERE fv.filesystem_state_id = filesystem_state.id
-                          AND sm.status IN ('active', 'full')), 0) < filesystem_state.size
-            THEN filesystem_state.size - COALESCE((SELECT SUM(fv.offset_end - fv.offset_start)
-                          FROM file_versions fv
-                          JOIN storage_media sm ON sm.id = fv.media_id
-                          WHERE fv.filesystem_state_id = filesystem_state.id
-                          AND sm.status IN ('active', 'full')), 0)
-            ELSE 0 END) as unprotected_size,
-            SUM(CASE WHEN sha256_hash IS NOT NULL AND is_ignored = 0 AND is_deleted = 0 THEN 1 ELSE 0 END) as hashed_count,
-            SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 THEN 1 ELSE 0 END) as eligible_count,
-            COALESCE((SELECT SUM(fv.offset_end - fv.offset_start)
-                      FROM file_versions fv
-                      JOIN storage_media sm ON sm.id = fv.media_id
-                      WHERE sm.status IN ('active', 'full')), 0) as archived_size,
-            SUM(CASE WHEN is_deleted = 1 THEN 1 ELSE 0 END) as missing_count,
-            SUM(CASE WHEN is_deleted = 1 AND missing_acknowledged_at IS NULL AND is_ignored = 0 THEN 1 ELSE 0 END) as active_discrepancies_count
+            COALESCE(SUM(size), 0) as total_size,
+            COALESCE(SUM(CASE WHEN is_ignored = 1 THEN 1 ELSE 0 END), 0) as ignored_count,
+            COALESCE(SUM(CASE WHEN is_ignored = 1 THEN size ELSE 0 END), 0) as ignored_size,
+            COALESCE(SUM(CASE WHEN sha256_hash IS NOT NULL AND is_ignored = 0 AND is_deleted = 0 THEN 1 ELSE 0 END), 0) as hashed_count,
+            COALESCE(SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 THEN 1 ELSE 0 END), 0) as eligible_count,
+            COALESCE(SUM(CASE WHEN is_deleted = 1 AND missing_acknowledged_at IS NULL AND is_ignored = 0 THEN 1 ELSE 0 END), 0) as active_discrepancies_count,
+            -- Bytes actually written to active/full media (includes redundant copies, excludes failed/retired media)
+            COALESCE((
+                SELECT SUM(fv.offset_end - fv.offset_start)
+                FROM file_versions fv
+                JOIN storage_media sm ON sm.id = fv.media_id
+                WHERE sm.status IN ('active', 'full')
+            ), 0) as archived_size,
+            -- Files with fewer complete copies than the redundancy target
+            COALESCE(SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 AND redundancy_count < :target THEN 1 ELSE 0 END), 0) as unprotected_count,
+            COALESCE(SUM(CASE WHEN is_ignored = 0 AND is_deleted = 0 AND redundancy_count < :target THEN size ELSE 0 END), 0) as unprotected_size
         FROM filesystem_state
     """)
 
-    res = db_session.execute(aggregation_sql).fetchone()
+    res = db_session.execute(aggregation_sql, {"target": redundancy_target}).fetchone()
     if res:
-        total_size = res[1] or 0
-        ignored_count = res[2] or 0
-        ignored_size = res[3] or 0
-        unprotected_count = res[4] or 0
-        unprotected_size = res[5] or 0
-        hashed_count = res[6] or 0
-        eligible_count = res[7] or 0
-        archived_size = res[8] or 0
-        active_discrepancies_count = res[10] or 0
+        total_size = res[1]
+        ignored_count = res[2]
+        ignored_size = res[3]
+        hashed_count = res[4]
+        eligible_count = res[5]
+        active_discrepancies_count = res[6]
+        archived_size = res[7]
+        unprotected_count = res[8]
+        unprotected_size = res[9]
     else:
         total_size = 0
         ignored_count = 0
         ignored_size = 0
-        unprotected_count = 0
-        unprotected_size = 0
         hashed_count = 0
         eligible_count = 0
-        archived_size = 0
         active_discrepancies_count = 0
+        archived_size = 0
+        unprotected_count = 0
+        unprotected_size = 0
 
     media_counts = {
         "LTO": db_session.query(models.StorageMedia)
-        .filter(models.StorageMedia.media_type == "tape")
+        .filter(models.StorageMedia.media_type == "lto_tape")
         .count(),
         "HDD": db_session.query(models.StorageMedia)
-        .filter(models.StorageMedia.media_type == "hdd")
+        .filter(models.StorageMedia.media_type == "local_hdd")
         .count(),
         "Cloud": db_session.query(models.StorageMedia)
-        .filter(models.StorageMedia.media_type == "cloud")
+        .filter(
+            models.StorageMedia.media_type.in_(["s3_compat", "google_drive", "dropbox"])
+        )
         .count(),
     }
 
@@ -97,7 +103,7 @@ def get_dashboard_stats(db_session: Session = Depends(get_db)):
     )
 
     eligible_size = max(total_size - ignored_size, 1)
-    redundancy_percentage = (archived_size / eligible_size) * 100
+    redundancy_percentage = min((archived_size / eligible_size) * 100, 100.0)
 
     return DashboardStatsSchema(
         monitored_files_count=eligible_count,
