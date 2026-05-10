@@ -653,38 +653,6 @@ class ArchiverService:
 
         set_process_priority("background")
 
-        # --- Tar Chunking Logic ---
-        # With hardware compression, actual tape usage is ~50-70% of uncompressed.
-        # Use capacity / 50 as chunk target so we get larger, more efficient tars
-        # while still maintaining reasonable restore granularity.
-        MAX_CHUNK_SIZE = media_record.capacity // 50
-        if MAX_CHUNK_SIZE < 100 * 1024 * 1024:  # Minimum 100MB chunk
-            MAX_CHUNK_SIZE = 100 * 1024 * 1024
-
-        # Sanity check: MAX_CHUNK_SIZE should be at least 1MB.
-        # If capacity is so small that MAX_CHUNK_SIZE < 1MB, the unit is probably
-        # wrong (GB stored as bytes) which would create a chunk per file.
-        if MAX_CHUNK_SIZE < 1024 * 1024:
-            logger.warning(
-                f"Media {media_record.identifier} capacity ({media_record.capacity}) "
-                f"produces MAX_CHUNK_SIZE of {MAX_CHUNK_SIZE} bytes. "
-                f"This looks like capacity is stored in GB instead of bytes. "
-                f"Aborting backup to avoid creating thousands of tiny archives."
-            )
-            JobManager.fail_job(
-                job_id,
-                f"Media capacity ({media_record.capacity}) produces chunks of "
-                f"{MAX_CHUNK_SIZE} bytes — expected bytes, got GB? "
-                f"Re-register media with correct capacity.",
-            )
-            return
-
-        JobManager.add_job_log(
-            job_id,
-            f"Chunk target: {MAX_CHUNK_SIZE / (1024 * 1024):.0f}MB "
-            f"(capacity {media_record.capacity / (1024 ** 3):.1f}GiB / 50)",
-        )
-
         storage_provider = self._get_storage_provider(media_record)
         if not storage_provider:
             JobManager.fail_job(
@@ -692,12 +660,48 @@ class ArchiverService:
             )
             return
 
+        supports_random_access = storage_provider.capabilities.get(
+            "supports_random_access", False
+        )
+
         tape_strategy = self._get_tape_write_strategy(db_session)
         use_streaming = (
             tape_strategy == "stream"
             and hasattr(storage_provider, "open_stream")
             and hasattr(storage_provider, "finalize_stream")
         )
+
+        MAX_CHUNK_SIZE = None
+        if not supports_random_access:
+            # With hardware compression, actual tape usage is ~50-70% of uncompressed.
+            # Use capacity / 50 as chunk target so we get larger, more efficient tars
+            # while still maintaining reasonable restore granularity.
+            MAX_CHUNK_SIZE = media_record.capacity // 50
+            if MAX_CHUNK_SIZE < 100 * 1024 * 1024:  # Minimum 100MB chunk
+                MAX_CHUNK_SIZE = 100 * 1024 * 1024
+
+            # Sanity check: if capacity is stored in GB instead of bytes, MAX_CHUNK_SIZE
+            # would be <1MB and we'd create thousands of tiny archives.
+            if MAX_CHUNK_SIZE < 1024 * 1024:
+                logger.warning(
+                    f"Media {media_record.identifier} capacity ({media_record.capacity}) "
+                    f"produces MAX_CHUNK_SIZE of {MAX_CHUNK_SIZE} bytes. "
+                    f"This looks like capacity is stored in GB instead of bytes. "
+                    f"Aborting backup to avoid creating thousands of tiny archives."
+                )
+                JobManager.fail_job(
+                    job_id,
+                    f"Media capacity ({media_record.capacity}) produces chunks of "
+                    f"{MAX_CHUNK_SIZE} bytes — expected bytes, got GB? "
+                    f"Re-register media with correct capacity.",
+                )
+                return
+
+            JobManager.add_job_log(
+                job_id,
+                f"Chunk target: {MAX_CHUNK_SIZE / (1024 * 1024):.0f}MB "
+                f"(capacity {media_record.capacity / (1024 ** 3):.1f}GiB / 50)",
+            )
 
         try:
             if storage_provider.identify_media() != media_record.identifier:
@@ -754,33 +758,31 @@ class ArchiverService:
 
                 batch_uuid = str(uuid.uuid4())
 
-                # Split workload into chunks for packaging
-                chunks = []
-                current_chunk = []
-                current_chunk_size = 0
-                for item in workload_batch:
-                    item_size = item["offset_end"] - item["offset_start"]
-
-                    if (
-                        current_chunk_size + item_size > MAX_CHUNK_SIZE
-                        and current_chunk
-                        and not storage_provider.capabilities.get(
-                            "supports_random_access"
-                        )
-                    ):
+                # For sequential-write media (tape), split into tar chunks so each
+                # archive fits comfortably on the medium. For random-access media
+                # (HDD, cloud), files are written directly — no chunking needed.
+                if supports_random_access:
+                    chunks = [workload_batch]
+                else:
+                    chunks = []
+                    current_chunk = []
+                    current_chunk_size = 0
+                    for item in workload_batch:
+                        item_size = item["offset_end"] - item["offset_start"]
+                        if (
+                            current_chunk_size + item_size > MAX_CHUNK_SIZE
+                            and current_chunk
+                        ):
+                            chunks.append(current_chunk)
+                            current_chunk = []
+                            current_chunk_size = 0
+                        current_chunk.append(item)
+                        current_chunk_size += item_size
+                    if current_chunk:
                         chunks.append(current_chunk)
-                        current_chunk = []
-                        current_chunk_size = 0
-
-                    current_chunk.append(item)
-                    current_chunk_size += item_size
-                if current_chunk:
-                    chunks.append(current_chunk)
 
                 # --- Staging Space Validation (only for stage mode) ---
-                if not use_streaming and not storage_provider.capabilities.get(
-                    "supports_random_access"
-                ):
+                if not use_streaming and not supports_random_access:
                     largest_chunk_size = max(
                         sum(i["offset_end"] - i["offset_start"] for i in chunk)
                         for chunk in chunks
@@ -801,11 +803,17 @@ class ArchiverService:
                     except OSError as e:
                         logger.warning(f"Could not check staging disk usage: {e}")
 
-                JobManager.add_job_log(
-                    job_id,
-                    f"Batch {batch_iteration}: Packed into {len(chunks)} archive(s) "
-                    f"(strategy: {'stream' if use_streaming else 'stage'})",
-                )
+                if supports_random_access:
+                    JobManager.add_job_log(
+                        job_id,
+                        f"Batch {batch_iteration}: {len(workload_batch)} files queued for direct copy",
+                    )
+                else:
+                    JobManager.add_job_log(
+                        job_id,
+                        f"Batch {batch_iteration}: Packed into {len(chunks)} archive(s) "
+                        f"(strategy: {'stream' if use_streaming else 'stage'})",
+                    )
 
                 # Track whether any actual progress was made in this batch.
                 # If all files are skipped (missing/unstable) and none are
@@ -817,10 +825,16 @@ class ArchiverService:
                         break
 
                     chunk_num = chunk_index + 1
-                    JobManager.add_job_log(
-                        job_id,
-                        f"Processing archive {chunk_num}/{len(chunks)} ({len(chunk_items)} files)",
-                    )
+                    if supports_random_access:
+                        JobManager.add_job_log(
+                            job_id,
+                            f"Copying {len(chunk_items)} files directly to {media_record.identifier}",
+                        )
+                    else:
+                        JobManager.add_job_log(
+                            job_id,
+                            f"Processing archive {chunk_num}/{len(chunks)} ({len(chunk_items)} files)",
+                        )
 
                     remaining_to_write = []
 
@@ -909,7 +923,7 @@ class ArchiverService:
                         except Exception:
                             pass
 
-                    if storage_provider.capabilities.get("supports_random_access"):
+                    if supports_random_access:
                         # Random Access: Write files directly
                         import io
 
