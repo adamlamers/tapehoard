@@ -682,9 +682,17 @@
                                         <!-- Scrollable File List -->
                                         <div class="flex-1 overflow-y-auto min-h-0">
                                                 {#if filteredFiles.length === 0}
-                                                        <div class="flex h-full flex-col items-center justify-center p-12 text-center opacity-30">
-                                                                <Search size={48} class="mb-4" strokeWidth={1}></Search>
-                                                                <p class="text-sm font-medium">Folder is empty</p>
+                                                        <div class="flex h-full flex-col items-center justify-center p-12 text-center gap-4">
+                                                                <div class="flex flex-col items-center opacity-30">
+                                                                        <Search size={48} class="mb-4" strokeWidth={1}></Search>
+                                                                        <p class="text-sm font-medium">Folder is empty</p>
+                                                                </div>
+                                                                {#if searchQuery}
+                                                                        <Button variant="outline" size="sm" onclick={() => searchQuery = ''}>
+                                                                                <X size={14} class="mr-1.5" />
+                                                                                Clear search
+                                                                        </Button>
+                                                                {/if}
                                                         </div>
                                                 {:else}
                                                         {#each filteredFiles as item (item.path)}
