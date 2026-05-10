@@ -44,6 +44,7 @@
     import { cn, formatSize } from "$lib/utils";
     import { beforeNavigate } from '$app/navigation';
     import type { Navigation } from '@sveltejs/kit';
+    import { showSupportButton } from "$lib/stores/ui";
 
     let sourceRoots = $state<string[]>(["/source_data"]);
     let restoreDestinations = $state<string[]>(["/restores"]);
@@ -687,6 +688,24 @@
                                     </div>
                                     <p class="text-[10px] text-text-secondary leading-tight opacity-60">Stream mode requires a fast source disk that can sustain the tape drive's minimum streaming speed to avoid shoe-shining.</p>
                                 </div>
+                            </div>
+                        </Card>
+
+                        <Card class="p-5 shadow-xl">
+                            <SectionHeader title="Interface" icon={Monitor} class="mb-6 px-0" />
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-text-primary">Support button</p>
+                                    <p class="text-[10px] text-text-secondary opacity-60 mt-0.5">Hide the support button</p>
+                                </div>
+                                <button
+                                    onclick={() => showSupportButton.set(!$showSupportButton)}
+                                    class="relative w-10 h-6 rounded-full transition-colors {$showSupportButton ? 'bg-blue-600' : 'bg-bg-tertiary border border-border-color'}"
+                                    role="switch"
+                                    aria-checked={$showSupportButton}
+                                >
+                                    <span class="block absolute top-1 w-4 h-4 rounded-full bg-white transition-all {$showSupportButton ? 'left-5' : 'left-1'}"></span>
+                                </button>
                             </div>
                         </Card>
 

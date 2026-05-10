@@ -21,6 +21,8 @@
 	import { cn } from '$lib/utils';
 	import { Toaster } from 'svelte-sonner';
 	import ScanStatusOverlay from '$lib/components/ScanStatusOverlay.svelte';
+	import SupportButton from '$lib/components/SupportButton.svelte';
+	import { showSupportButton } from '$lib/stores/ui';
 	import { client } from '$lib/api/client.gen';
 
 	let { children } = $props();
@@ -172,6 +174,10 @@
 		</div>
 	</main>
 </div>
+
+{#if $showSupportButton}
+	<SupportButton />
+{/if}
 
 <!-- Global Shortcut Help -->
 {#if showShortcuts}
