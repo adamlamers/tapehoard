@@ -194,7 +194,6 @@
                         <Checkbox
                                 checked={item.selected}
                                 indeterminate={item.indeterminate}
-                                onCheckedChange={onToggleTrack}
                         />
                 {/if}
         </div>

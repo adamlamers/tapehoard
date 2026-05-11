@@ -1,7 +1,16 @@
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from sqlalchemy import Integer, String, Float, ForeignKey, DateTime, Boolean, BigInteger
+from sqlalchemy import (
+    Integer,
+    String,
+    Float,
+    ForeignKey,
+    DateTime,
+    Boolean,
+    BigInteger,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -156,6 +165,9 @@ class TrackedSource(Base):
 
 class RestoreCart(Base):
     __tablename__ = "restore_cart"
+    __table_args__ = (
+        UniqueConstraint("filesystem_state_id", name="uq_restore_cart_file"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     filesystem_state_id: Mapped[int] = mapped_column(ForeignKey("filesystem_state.id"))

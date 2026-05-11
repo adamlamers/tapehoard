@@ -152,7 +152,7 @@ test.describe('TapeHoard Golden Path', () => {
     console.log('Step 8: Data Recovery');
     const fileRow = page.locator('div[role="button"]', { hasText: 'test_file_2.txt' });
     await fileRow.locator('button[role="checkbox"]').click();
-    await expect(page.getByText(/2 items in queue/i)).toBeVisible();
+    await expect(page.getByText(/1 items in queue/i)).toBeVisible();
 
     await page.goto('/restores');
     await page.waitForLoadState('load');

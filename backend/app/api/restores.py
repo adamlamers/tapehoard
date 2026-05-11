@@ -149,14 +149,6 @@ def add_directory_to_restore_queue(
 @router.post("/queue/file/{file_id}", operation_id="add_file_to_restore_queue")
 def add_file_to_restore_queue(file_id: int, db_session: Session = Depends(get_db)):
     """Adds a specific file to the recovery queue if it has valid backups."""
-    existing_item = (
-        db_session.query(models.RestoreCart)
-        .filter(models.RestoreCart.filesystem_state_id == file_id)
-        .first()
-    )
-    if existing_item:
-        return {"message": "Item already in queue."}
-
     file_record = db_session.get(models.FilesystemState, file_id)
     if not file_record:
         raise HTTPException(
@@ -174,8 +166,13 @@ def add_file_to_restore_queue(file_id: int, db_session: Session = Depends(get_db
             detail="File has no backed up versions and cannot be recovered.",
         )
 
-    new_queue_item = models.RestoreCart(filesystem_state_id=file_id)
-    db_session.add(new_queue_item)
+    db_session.execute(
+        text(
+            "INSERT OR IGNORE INTO restore_cart (filesystem_state_id, created_at)"
+            " VALUES (:file_id, :now)"
+        ),
+        {"file_id": file_id, "now": datetime.now(timezone.utc)},
+    )
     db_session.commit()
     return {"message": "Added to recovery queue."}
 
