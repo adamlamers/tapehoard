@@ -1,4 +1,6 @@
 import json
+import os
+import subprocess
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -255,6 +257,59 @@ def reorder_media(
     return {"message": "Archival priority synchronized."}
 
 
+def _sg_write_attr_available() -> bool:
+    """Check if sg_write_attr binary is available in PATH."""
+    try:
+        import subprocess
+
+        subprocess.run(["sg_write_attr", "--version"], capture_output=True, check=False)
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def _write_barcode_to_mam(device_path: str, barcode: str) -> bool:
+    """Write the barcode to MAM attribute 0x0806 using sg_write_attr.
+
+    Returns True if successful, False otherwise. Logs but does not raise on failure.
+    """
+    if not _sg_write_attr_available():
+        logger.debug(
+            f"sg_write_attr not available, skipping MAM barcode write for {device_path}"
+        )
+        return False
+
+    if not os.path.exists(device_path):
+        logger.debug(f"Device {device_path} does not exist, skipping MAM barcode write")
+        return False
+
+    try:
+        cmd = ["sg_write_attr", "-w", f"0x0806={barcode}", device_path]
+        logger.debug(f"HARDWARE CMD: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            logger.info(
+                f"Successfully wrote barcode '{barcode}' to MAM 0x0806 on {device_path}"
+            )
+            return True
+        else:
+            stderr = result.stderr or ""
+            # Don't fail on "bad field in cdb" errors - tape may not support MAM writes
+            if (
+                "bad field in cdb" in stderr.lower()
+                or "illegal request" in stderr.lower()
+            ):
+                logger.info(f"Tape does not support MAM barcode writes ({device_path})")
+            else:
+                logger.warning(
+                    f"sg_write_attr failed for {device_path}: {stderr[:200]}"
+                )
+            return False
+    except Exception as e:
+        logger.warning(f"Failed to write barcode to MAM on {device_path}: {e}")
+        return False
+
+
 def _detect_lto_capacity_from_hardware(
     db_session: Session, identifier: str, device_path: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
@@ -382,6 +437,7 @@ def create_media(
     )
 
     # Type-specific fields
+    device_path_for_mam: Optional[str] = None
     if request_data.media_type == "lto_tape":
         assert isinstance(request_data, schemas.LtoTapeCreateSchema)
         generation = request_data.generation
@@ -397,6 +453,11 @@ def create_media(
         new_media.encryption_key_id = request_data.encryption_key_id
         new_media.cleaning_cartridge = request_data.cleaning_cartridge
         new_media.encryption_secret_name = request_data.encryption_secret_name
+        # Track device_path for potential MAM barcode write
+        if detected_info and detected_info.get("device_path"):
+            device_path_for_mam = detected_info["device_path"]
+        elif hasattr(request_data, "device_path") and request_data.device_path:
+            device_path_for_mam = request_data.device_path
     elif request_data.media_type == "local_hdd":
         assert isinstance(request_data, schemas.OfflineHddCreateSchema)
         new_media.drive_model = request_data.drive_model
@@ -449,6 +510,10 @@ def create_media(
     db_session.add(new_media)
     db_session.commit()
     db_session.refresh(new_media)
+
+    # Write barcode to MAM 0x0806 if we have a device_path and sg_write_attr is available
+    if device_path_for_mam and request_data.media_type == "lto_tape":
+        _write_barcode_to_mam(device_path_for_mam, new_media.identifier)
 
     return _media_to_schema(new_media, {})
 
