@@ -101,7 +101,7 @@ jobs:
         retention-days: 14
 
     - name: Upload Playwright Report (Gitea)
-      uses: actions/upload-artifact@v3
+      uses: https://gitea.com/actions/upload-artifact@v3
       if: always() && github.server_url != 'https://github.com'
       with:
         name: playwright-report
