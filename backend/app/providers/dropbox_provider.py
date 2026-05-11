@@ -137,6 +137,7 @@ class DropboxProvider(AbstractStorageProvider):
     def initialize_media(self, media_id: str) -> bool:
         try:
             import dropbox as dropbox_sdk
+            import dropbox.files
 
             dbx = self._get_client()
             self.root_folder = f"/TapeHoard/{media_id}"
@@ -168,6 +169,7 @@ class DropboxProvider(AbstractStorageProvider):
 
     def write_archive(self, media_id: str, stream: BinaryIO) -> str:
         import dropbox as dbx_sdk
+        import dropbox.files
 
         dbx = self._get_client()
         files = dbx_sdk.files

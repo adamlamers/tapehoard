@@ -250,6 +250,8 @@ class CloudStorageProvider(AbstractStorageProvider):
 
         if is_encrypted:
             logger.info(f"Decrypting AES-GCM cloud archive: {location_id}")
+            if not self.passphrase:
+                raise ValueError("Archive is encrypted but no passphrase is configured")
             try:
                 return io.BytesIO(decrypt(self.passphrase, raw_payload))
             except ValueError as e:

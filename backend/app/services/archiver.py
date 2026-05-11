@@ -764,10 +764,27 @@ class ArchiverService:
                 if supports_random_access:
                     chunks = [workload_batch]
                 else:
+                    # Separate zero-byte items: they carry no payload so they
+                    # never trigger a size-based chunk flush.  If left in the
+                    # main loop they accumulate after the last real chunk is
+                    # closed and form a spurious trailing archive.  Instead,
+                    # prepend them to the first chunk so they're always
+                    # bundled with real content.
+                    zero_byte_items = [
+                        item
+                        for item in workload_batch
+                        if item["offset_end"] - item["offset_start"] == 0
+                    ]
+                    nonzero_items = [
+                        item
+                        for item in workload_batch
+                        if item["offset_end"] - item["offset_start"] > 0
+                    ]
+
                     chunks = []
                     current_chunk = []
                     current_chunk_size = 0
-                    for item in workload_batch:
+                    for item in nonzero_items:
                         item_size = item["offset_end"] - item["offset_start"]
                         if (
                             current_chunk_size + item_size > MAX_CHUNK_SIZE
@@ -780,6 +797,12 @@ class ArchiverService:
                         current_chunk_size += item_size
                     if current_chunk:
                         chunks.append(current_chunk)
+
+                    if zero_byte_items:
+                        if chunks:
+                            chunks[0] = zero_byte_items + chunks[0]
+                        else:
+                            chunks = [zero_byte_items]
 
                 # --- Staging Space Validation (only for stage mode) ---
                 if not use_streaming and not supports_random_access:
